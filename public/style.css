@@ -1,0 +1,238 @@
+/* this file is loaded by the webpages */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Helvetica Neue, Helvetica, Ariel, sans-serif;
+  margin: 2em 1em;
+  line-height: 1.5em;
+}
+
+input {
+  border: 1px solid silver;
+  display: block;
+  font-size: 16px;
+  margin-bottom: 10px;
+  padding: 5px;
+  width: 100%;
+}
+
+form button {
+  background-color: #bbbbf2;
+  border: 2px solid currentColor;
+  border-radius: .25em;
+  cursor: pointer;
+  font-size: inherit;
+  line-height: 1.4em;
+  padding: 0.25em 1em;
+  max-width: 20ch;
+}
+
+form button:hover {
+  background-color: lavender;
+}
+
+footer {
+  margin-top: 3em;
+  padding-top: 1.5em;
+  border-top: 1px solid lightgrey;
+}
+
+/* Button styles */
+button.button, a.button {
+  --hue: 190deg;
+  background-color: hsl(var(--hue), 60%, 93%);
+  border-radius: 1.5mm;
+  border: 0.75mm solid hsl(var(--hue), 80%, 50%);
+  font-size: inherit;
+  font-family: inherit;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  padding: 0.5mm 2mm;
+  margin: 2px;
+  text-decoration: none;
+  color: hsl(var(--hue), 80%, 5%);
+}
+
+/* Card Spread styles */
+.card-spread {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.card-spread > .playing-card {
+  margin: 2mm;
+}
+
+/* Flex Row styles */
+div.flex-row, div.toolbar {
+  display: flex;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+}
+
+/* Heading styles */
+h1.heading, h2.heading, h3.heading, h4.heading, h5.heading, h6.heading {
+  font-style: italic;
+  font-size: 25pt;
+  font-weight: 200;
+  max-width: calc(100% - 5rem);
+  line-height: 1.1;
+}
+
+h2.heading { font-size: 23pt; font-weight: 250; }
+h3.heading { font-size: 21pt; font-weight: 300; }
+h4.heading { font-size: 19pt; font-weight: 350; }
+h5.heading { font-size: 17pt; font-weight: 400; }
+h6.heading { font-size: 15pt; font-weight: 450; }
+
+/* Link styles */
+a.link {
+  /* no styles at the moment */
+}
+
+/* Monospace styles */
+pre.monospace {
+  /* no styles at the moment */
+}
+
+/* Notice panel styles */
+.notice-panel {
+  background-color: white;
+  border: 1px solid #eee;
+  border-radius: 2mm;
+  padding: 4mm;
+  box-shadow: 0 2mm 3mm rgba(0, 0, 0, 20%);
+}
+
+.notice-panel > h1 {
+  color: inherit;
+  font-weight: 200;
+  font-style: italic;
+  margin: 0 0 3mm 0;
+}
+
+/* Paragraph styles */
+p.paragraph {
+  
+}
+
+/* Playing card styles */
+.playing-card {
+  display: block;
+  text-decoration: none;
+  width: 64mm;
+  height: 89mm;
+  font-size: 20pt;
+  background-color: white;
+  color: black;
+  font-weight: 300;
+  padding: 5mm;
+  border-radius: 0.125in;
+  border: 1px solid #ddd;
+  box-shadow: 0mm 2mm 3mm rgba(0, 0, 0, 20%);
+}
+
+.playing-card.invert {
+  background-color: #111;
+  color: #eee;
+  border-color: black;
+}
+
+.playing-card .symbol {
+  float: left;
+  font-size: 15mm;
+  line-height: 15mm;
+}
+
+.playing-card .title {
+  display: block;
+  line-height: 15mm;
+  font-style: italic;
+  font-weight: 200;
+  text-align: center;
+}
+
+.playing-card .text {
+  display: block;
+  margin-top: 2mm;
+  line-height: 1.1;
+}
+
+/* Simple Form widget */
+form.simple-form {
+  background-color: #eee;
+  border-radius: 2mm;
+  padding: 4mm;
+}
+
+form.simple-form > h1 {
+  color: inherit;
+  font-weight: 200;
+  font-style: italic;
+  font-size: 2em;
+  margin: 0;
+}
+
+form.simple-form > dl {
+  /* no styles yet */
+}
+
+form.simple-form > dl > dt {
+  word-wrap: none;
+}
+
+form.simple-form > dl > dd {
+  margin: 0;
+}
+
+form.simple-form > button[type="submit"] {
+  display: block;
+  margin-left: auto;
+}
+
+/* Source Code widget */
+pre.source-code {
+  line-height: 1.3;
+  
+  /* solarized light theme */
+  background-color: #fdf6e3;
+  --comment:  #93a1a1;
+  --jsdoc:    #657b83;
+  --keyword:  #859900;
+  --value:    #2aa198;
+  --strlit:   #2aa198;
+  --template: #268bd2;
+  --regexp:   #cb4b16;
+  --operator: #6c71c4;
+  --punctual: #073642;
+  --fn-name:  #b58900;
+}
+
+pre.source-code .c /* comment */ { color: var(--comment) }
+pre.source-code .d /* JSDoc tag (only in comment) */ { color: var(--jsdoc) }
+pre.source-code .k /* keyword */ { color: var(--keyword) }
+pre.source-code .v /* value (number literal, boolean and some constants) */ { color: var(--value) }
+pre.source-code .s /* string literal (also means a template string) */ { color: var(--strlit) }
+pre.source-code .i /* interpolation content (only in template string) */ { color: var(--template) }
+pre.source-code .r /* regexp literal */ { color: var(--regexp) }
+pre.source-code .o /* operator symbol */ { color: var(--operator) }
+pre.source-code .p /* punctual symbol */ { color: var(--punctual) }
+pre.source-code .f /* function name */ { color: var(--fn-name) }
+
+/* Styled Text widget */
+.styled-text.glitch {
+  text-shadow: 0.2ex 0.15ex 1px magenta, -0.2ex -0.15ex 1px cyan;
+  font-weight: 400;
+}
+
+/* Toolbar widget */
+.toolbar {
+  background: white;
+  border-bottom: 1px solid #eee;
+  box-shadow: 0 2mm 3mm rgba(0, 0, 0, 20%);
+  padding: 2mm 2mm 2mm 2mm;
+}
