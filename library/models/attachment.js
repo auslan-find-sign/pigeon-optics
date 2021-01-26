@@ -62,6 +62,14 @@ class Attachment extends AttachmentReference {
   encodeCBOR (gen) {
     return gen.pushAny(new cbor.Tagged(27, ['dataset/Attachment', this.data, this.mimeType]))
   }
+
+  /**
+   * Returns a Data URI containing the embedded resource
+   * @returns {string}
+   */
+  toURL () {
+    return `data:${this.mimeType};base64,${this.data.toString('base64')}`
+  }
 }
 
 module.exports.AttachmentReference = AttachmentReference

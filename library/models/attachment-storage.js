@@ -12,11 +12,15 @@ const { Attachment, AttachmentReference } = require('./attachment')
  * @returns {string} - local filesystem path
  */
 module.exports.getPath = (hashOrAttachment) => {
-  let hash = hashOrAttachment
+  let hash
   if (Buffer.isBuffer(hashOrAttachment)) {
-    hash = hashOrAttachment.toString('hex')
+    hash = hashOrAttachment.toString('hex').toLowerCase()
   } else if (hashOrAttachment instanceof AttachmentReference) {
-    hash = hashOrAttachment.hash
+    hash = hashOrAttachment.hash.toString('hex').toLowerCase()
+  } else if (typeof hashOrAttachment === 'string') {
+    hash = hashOrAttachment.toLowerCase()
+  } else {
+    throw new Error('Invalid input')
   }
 
   return path.join(defaults.data, 'attachments', `${hash}`)
