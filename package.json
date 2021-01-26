@@ -1,8 +1,10 @@
 {
-  "name": "sign-data",
-  "version": "0.8.0",
-  "description": "A system for managing multiple sign language datasets",
+  "name": "datasets-db",
+  "version": "0.1.0",
+  "description": "A system for managing small research datasets",
   "main": "server.js",
+  "repo": "https://github.com/auslan-find-sign/datasets-database.git",
+  "homepage": "https://github.com/auslan-find-sign/datasets-database/",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -41,5 +43,8 @@
     "data": "./.data",
     "url": "https://data.auslan.fyi",
     "lensTimeout": 10
+  },
+  "devDependencies": {
+    "standard": "^16.0.3"
   }
 }

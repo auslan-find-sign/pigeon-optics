@@ -7,6 +7,7 @@ const process = require('process')
 // Phoenix's UI toolkit
 // const ui = require('./library/ui')
 const serverTools = require('./library/server-tools')
+const standardPage = require('./library/views/standard-page')
 // const Bell = require('./library/bell')
 
 // const html = require('nanohtml')
@@ -33,8 +34,12 @@ app.use(express.static('public'))
 app.use(serverTools.clientScriptsMiddleware())
 
 app.get('/', (req, res) => {
-  // foo
-  res.send('foo')
+  serverTools.sendWebpage(req, res, {
+    title: 'Datasets',
+    contents: standardPage(req, [
+      'Hello World'
+    ])
+  })
 })
 
 // datasets controller
@@ -42,6 +47,7 @@ app.use(require('./library/controllers/auth-controller'))
 // app.use(require('./library/controllers/dataset-controller'))
 // app.use(require('./library/controllers/lens-controller'))
 
-app.listen(process.env.PORT || 3000, () => {
-  console.log('Application Server ready')
+const port = process.env.PORT || 3000
+app.listen(port, () => {
+  console.log(`Application Server ready at http://localhost:${port}/`)
 })
