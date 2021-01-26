@@ -2,7 +2,7 @@
  * Dataset Model - provides access to a dataset stored on the service
  */
 const file = require('./cbor-file')
-const objectHash = require('object-hash')
+const codec = require('./codec')
 const auth = require('./auth')
 const { default: PQueue } = require('p-queue')
 
@@ -18,12 +18,14 @@ module.exports = {
   /** read an entry from a dataset
    * @param {string} username - user who owns dataset
    * @param {string} dataset - name of dataset
-   * @param {string} entryID - the dataset record's name
+   * @param {string} recordID - the dataset record's name
    * @returns {object} - parsed dataset record data
    * @async
    */
-  async readEntry (user, dataset, entryID) {
-    return await file.read(this.path(user, dataset, 'records', entryID))
+  async readEntry (user, dataset, recordID) {
+    const index = queue.add(() => file.read(this.path(user, dataset, 'index')))
+    if (!index[recordID]) throw new Error('Dataset doesn’t contain specified record')
+    return await queue.add(() => file.read(this.path(user, dataset, 'objects', index[recordID].toString('hex'))))
   },
 
   /** write an entry to a dataset
@@ -40,21 +42,37 @@ module.exports = {
   /** delete an entry from a dataset
    * @param {string} username - user who owns dataset
    * @param {string} dataset - name of dataset
-   * @param {string} entryID - the dataset record's name
+   * @param {string} recordID - the dataset record's name
    * @async
    */
-  async deleteEntry (user, dataset, entryID) {
-    return await file.delete(this.path(user, dataset, 'records', entryID))
+  async deleteEntry (user, dataset, recordID) {
+    await queue.add(async () => {
+      const path = await this.path(user, dataset, 'index')
+      const index = await file.read(path)
+      delete index[recordID]
+      await file.write(path, index)
+    })
+    await this.garbageCollect(user, dataset)
   },
 
-  /** list all the entries in a dataset
+  /** list all the recordIDs in a dataset
    * @param {string} username - user who owns dataset
    * @param {string} dataset - name of dataset
    * @returns {string[]} - dataset entry id's
    * @async
    */
   async listEntries (user, dataset) {
-    return await file.list(this.path(user, dataset, 'records')).map(x => decodeURIComponent(x))
+    return Object.keys(await this.listEntryHashes(user, dataset))
+  },
+
+  /** plain object mapping recordIDs to object hashes
+   * @param {string} username - user who owns dataset
+   * @param {string} dataset - name of dataset
+   * @returns {string[]} - dataset entry id's
+   * @async
+   */
+  async listEntryHashes (user, dataset) {
+    return await queue.add(() => file.read(this.path(user, dataset, 'index')))
   },
 
   /** list all the entries in a dataset
@@ -62,7 +80,7 @@ module.exports = {
    * @returns {string[]} - dataset names
    * @async
    */
-  async list (user) {
+  async listDatasets (user) {
     return await file.list(this.path(user)).map(x => decodeURIComponent(x))
   },
 
@@ -72,18 +90,11 @@ module.exports = {
    * @async
    */
   async create (user, dataset, config = {}) {
-    await file.write(this.path(user, dataset, 'config'), { created: Date.now(), ...config })
-    await file.write(this.path(user, dataset, 'hash-table'), {})
-  },
-
-  /** create a dataset with a specific name
-   * @param {string} username - string username
-   * @param {string} dataset - string name of dataset
-   * @returns {object} - keys are entryIDs, values are object hashes
-   * @async
-   */
-  async readHashTable (user, dataset) {
-    return await file.read(this.path(user, dataset, 'hash-table'))
+    if (await file.exists(this.path(user, dataset))) throw new Error('Dataset with this name already exists')
+    await queue.add(() => Promise.all(
+      file.write(this.path(user, dataset, 'config'), { created: Date.now(), ...config }),
+      file.write(this.path(user, dataset, 'index'), {})
+    ))
   },
 
   /** delete a dataset to from user's data folder
@@ -92,7 +103,7 @@ module.exports = {
    * @async
    */
   async delete (user, dataset) {
-    await file.delete(this.path(user, dataset))
+    await queue.add(() => file.delete(this.path(user, dataset)))
   },
 
   /** overwrite all the entries in a dataset, removing any straglers
@@ -102,13 +113,8 @@ module.exports = {
    * @async
    */
   async overwrite (user, dataset, entries) {
-    const updated = await this.merge(user, dataset, entries)
-    const list = await this.listEntries(user, dataset)
-    for (const id of list) {
-      if (!updated.includes(id)) {
-        await this.deleteEntry(user, dataset, id)
-      }
-    }
+    await queue.add(() => file.write(this.path(user, dataset, 'index'), {}))
+    return await this.merge(user, dataset, entries)
   },
 
   /** overwrite all the listed entries in a dataset, leaving any unmentioned entries in tact
@@ -119,48 +125,48 @@ module.exports = {
    * @async
    */
   async merge (user, dataset, entries) {
-    const updated = []
+    const updatedIDs = []
+    const idMapRewrites = {}
+
+    for await (const [id, data] of entries) {
+      const hash = codec.objectHash(data)
+      await queue.add(() => file.write(this.path(user, dataset, 'objects', hash.toString('hex')), data))
+      updatedIDs.push(id)
+      idMapRewrites[id] = hash
+    }
+
+    // update the index
     await queue.add(async () => {
-      let hashTable = {}
-      if (await file.exists(this.path(user, dataset, 'hash-table'))) {
-        hashTable = await file.read(this.path(user, dataset, 'hash-table'))
-      }
-
-      for await (const [id, data] of entries) {
-        await file.write(this.path(user, dataset, 'records', id), data)
-        hashTable[id] = objectHash(data, { algorithm: 'sha256', encoding: 'buffer' })
-        updated.push(id)
-      }
-
-      await file.write(this.path(user, dataset, 'hash-table'), hashTable)
+      const path = this.path(user, dataset, 'index')
+      await file.write(path, {
+        ...(await file.read(path)),
+        ...idMapRewrites
+      })
     })
 
-    return updated
+    // do garbage collection
+    await this.garbageCollect(user, dataset)
+
+    return updatedIDs
   },
 
-  /** does garbage collection tasks, like clearing out unused hash-table entries
+  /** does garbage collection tasks, like removing any orphaned objects from disk storage
+   * @param {string} username - dataset owner
+   * @param {string} dataset - dataset name
    * @async
    */
-  async garbageCollect () {
-    const users = await auth.listUsers()
-    for (const user of users) {
-      const datasets = this.list(user)
-      for (const dataset of datasets) {
-        if (await file.exists(this.path(user, dataset, 'hash-table'))) {
-          await queue.add(async () => {
-            const [hashTable, entryList] = await Promise.all([
-              file.read(this.path(user, dataset, 'hash-table')),
-              this.listEntries(user, dataset)
-            ])
-
-            const missing = Object.keys(hashTable).filter(x => !entryList.includes(x))
-            for (const missingID of missing) {
-              delete hashTable[missingID]
-            }
-            await file.write(this.path(user, dataset, 'hash-table'))
-          })
-        }
-      }
-    }
+  async garbageCollect (user, dataset) {
+    await queue.add(async () => {
+      const index = await queue.add(() => file.read(this.path(user, dataset, 'index')))
+      const objectList = await queue.add(() => file.list(this.path(user, dataset, 'objects')))
+      const keepObjects = Object.values(index).map(x => x.toString('hex'))
+      await Promise.all(
+        objectList.filter(objectID =>
+          !keepObjects.includes(objectID)
+        ).map(objectID =>
+          file.delete(this.path(user, dataset, 'objects', objectID))
+        )
+      )
+    })
   }
 }

@@ -2,6 +2,7 @@
  * CBOR codec, implementing custom tagged type for attachments
  */
 const cbor = require('borc')
+const objectHash = require('object-hash')
 const { Attachment, AttachmentReference } = require('./attachment')
 
 module.exports.cbor = {
@@ -83,4 +84,23 @@ module.exports.json = {
 
     return JSON.stringify(object, replacer, spaces)
   }
+}
+
+/**
+ * uses object-hash npm package to hash a complex object, like those stored in datasets or viewports
+ * @param {any} object - input object to hash, maybe containing attachments
+ * @returns {Buffer} - sha256 hash (32 bytes) in a nodejs Buffer
+ * */
+module.exports.objectHash = (object) => {
+  return objectHash(object, {
+    algorithm: 'sha256',
+    encoding: 'buffer',
+    replacer: (key, value) => {
+      if (value instanceof AttachmentReference) {
+        // don't bother trying to hash data, and treat Attachment and AttachmentReference as equivilent since the real data hasn't changed
+        return [value.mimeType, value.hash]
+      }
+      return value
+    }
+  })
 }

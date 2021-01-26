@@ -23,7 +23,7 @@ app.use(express.json())
 // Give the users a crypto signed cookie, to store session information
 // If you'd like your cookies to keep working between app edits, make sure to check out the .env file!
 app.use(cookieSession({
-  secret: process.env.COOKIE_SECRET || crypto.randomBytes(64).toString('base64')
+  secret: process.env.SECRET || crypto.randomBytes(64).toString('base64')
 }))
 
 // make all the files in 'public' available
@@ -33,6 +33,11 @@ app.use(express.static('public'))
 // this allows web browsers to download a compiled version of the UI toolkit's javascript code
 app.use(serverTools.clientScriptsMiddleware())
 
+app.use(require('./library/controllers/auth-controller'))
+app.use(require('./library/controllers/attachment-controller'))
+// app.use(require('./library/controllers/dataset-controller'))
+// app.use(require('./library/controllers/lens-controller'))
+
 app.get('/', (req, res) => {
   serverTools.sendWebpage(req, res, {
     title: 'Datasets',
@@ -41,11 +46,6 @@ app.get('/', (req, res) => {
     ])
   })
 })
-
-// datasets controller
-app.use(require('./library/controllers/auth-controller'))
-// app.use(require('./library/controllers/dataset-controller'))
-// app.use(require('./library/controllers/lens-controller'))
 
 const port = process.env.PORT || 3000
 app.listen(port, () => {
