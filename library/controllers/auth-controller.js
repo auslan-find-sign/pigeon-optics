@@ -95,4 +95,9 @@ router.post('/auth/register', async (req, res) => {
   }
 })
 
+router.get('/auth/logout', (req, res) => {
+  delete req.session.auth
+  res.redirect(req.get('Referrer') || '/')
+})
+
 module.exports = router
