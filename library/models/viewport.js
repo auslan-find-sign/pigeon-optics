@@ -4,17 +4,12 @@
  * in the changelog and can be used as inputs to other viewports or potentially monitored by external
  * observers for changes
  */
-const file = require('./cbor-file')
 const auth = require('./auth')
 const jsLens = require('./javascript-lens')
 const webhook = require('../workers/webhook')
 const dataset = require('./dataset')
 const readPath = require('./read-path')
 const defaults = require('../../package.json').defaults
-
-function path (user, ...path) {
-  return `${auth.userFolder(user)}/viewports${path.map(x => `/${encodeURIComponent(x)}`).join('')}`
-}
 
 module.exports = {
   ...dataset, // import dataset functions
@@ -24,29 +19,11 @@ module.exports = {
     return `${auth.userFolder(user)}/viewports${path.map(x => `/${encodeURIComponent(x)}`).join('')}`
   },
 
-  /** reads a viewport config
-   * @param {string} username - string username
-   * @param {string} viewport - string name of viewport
-   * @returns {object} - viewport config
-   * @async
+  /** Load a viewport
+   * @param {string} user - owner of viewport
+   * @param {string} viewport - name of viewport under user
+   * @returns {Viewport}
    */
-  async readConfig (user, viewport) {
-    await file.read(path(user, viewport, 'config'))
-  },
-
-  /** writes a lens to the user's data folder
-   * @param {string} username - string username
-   * @param {string} viewport - string name of viewport
-   * @param {object} config - viewport configuration
-   * @async
-   */
-  async writeConfig (user, viewport, config) {
-    await file.write(path(user, viewport, 'config'), {
-      config,
-      updated: Date.now()
-    })
-  },
-
   async load (user, viewport) {
     const config = await this.readConfig(user, viewport)
     let getFilter
