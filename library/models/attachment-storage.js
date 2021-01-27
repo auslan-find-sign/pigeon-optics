@@ -46,7 +46,7 @@ module.exports.read = async (hash, mimeType = 'application/octet-stream') => {
 module.exports.write = async (attachment) => {
   if (!(attachment instanceof Attachment)) throw new Error('argument must be an Attachment')
   const path = module.exports.getPath(attachment)
-  await fs.writeFile(path, attachment.data)
+  if (!await fs.pathExists(path)) await fs.writeFile(path, attachment.data)
   return new AttachmentReference(attachment.hash, attachment.mimeType)
 }
 

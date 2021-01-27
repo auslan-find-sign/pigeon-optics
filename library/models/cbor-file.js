@@ -41,7 +41,7 @@ module.exports.write = async (dataPath, data) => {
   await fs.ensureDir(folderPath)
 
   const rand = crypto.randomBytes(32).toString('hex')
-  const tempPath = path.join(os.tmpdir(), `writing-${rand}.cbor.tmp`)
+  const tempPath = path.join(os.tmpdir(), `datasets-writing-${rand}.tmp.cbor`)
   await fs.writeFile(tempPath, encoded)
 
   // update backup with a copy of what was here previously if something old exists

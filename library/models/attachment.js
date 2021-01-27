@@ -37,7 +37,7 @@ class AttachmentReference {
    * @returns {string}
    */
   toURL () {
-    return `${defaults.url}/attachments/${this.toString()}?type=${encodeURIComponent(this.timeType)}`
+    return `${defaults.url}/attachments/${this.toString()}?type=${encodeURIComponent(this.mimeType)}`
   }
 
   // internal, handles cbor encoding
