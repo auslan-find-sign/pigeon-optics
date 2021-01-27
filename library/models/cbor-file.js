@@ -83,5 +83,5 @@ module.exports.exists = async (dataPath) => {
  */
 module.exports.list = async (dataPath) => {
   const files = await fs.readdir(path.join(defaults.data, dataPath))
-  return files.filter(x => x.endsWith('.cbor')).map(x => x.slice(0, -4))
+  return files.map(x => x.replace(/\.cbor$/, ''))
 }
