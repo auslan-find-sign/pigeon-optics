@@ -30,12 +30,20 @@ class SimpleForm extends widget {
       if (typeof options === 'string' || options instanceof Nanocomponent) {
         // maybe it's text, a nanocomponent/basic-widget, or a html string literal of some fancy form stuff. just render it
         input = html`<dd>${render(options)}</dd>`
-      } else {
+      } else if (options.type === 'textarea') {
+        input = html`<dd><textarea id="${fieldID}" rows="${options.rows}" cols="${options.cols}" name="${name}">${options.value}</textarea></dd>`
+      } else if (options.type !== 'hidden') {
         // looks like options describing a form input, use it!
         input = html`<dd><input id="${fieldID}" type="${options.type || 'text'}" name="${name}" value="${options.value}"></dd>`
+      } else {
+        input = html`<input id="${fieldID}" type="hidden" name="${name}" value="${options.value}">`
       }
 
-      return [label, input]
+      if (options.type !== 'hidden' && options.label !== false) {
+        return [label, input]
+      } else {
+        return [input]
+      }
     })
 
     const fieldList = html`<dl>${fields}</dl>`
