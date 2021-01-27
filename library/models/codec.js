@@ -4,6 +4,9 @@
 const cbor = require('borc')
 const objectHash = require('object-hash')
 const { Attachment, AttachmentReference } = require('./attachment')
+const serverTools = require('../server-tools')
+const ui = require('../ui')
+const standardPage = require('../views/standard-page')
 
 module.exports.cbor = {
   /**
@@ -103,4 +106,27 @@ module.exports.objectHash = (object) => {
       return value
     }
   })
+}
+
+/**
+ * Respond to an expressjs web request, with an object encoded as JSON, CBOR, or a stylised webpage according to Accepts header
+ * @param {Request} req - expressjs http request object
+ * @param {Response} res - expressjs http response object
+ * @param {*} object - object to send back as JSON, CBOR, or a stylised webpage
+ */
+module.exports.respond = (req, res, object) => {
+  const bestMatch = req.accepts(['application/cbor', 'application/json', 'text/html'])
+  if (bestMatch === 'application/cbor') {
+    res.type(bestMatch).send(module.exports.cbor.encode(object))
+  } else if (bestMatch === 'application/json') {
+    res.type(bestMatch).send(module.exports.json.encode(object))
+  } else {
+    serverTools.sendWebpage(req, res, {
+      title: 'API Object Response',
+      contents: standardPage(req, [
+        ui.heading({ contents: 'API Object Response:' }),
+        ui.sourceCode({ contents: module.exports.json.encode(object, 2) })
+      ])
+    })
+  }
 }
