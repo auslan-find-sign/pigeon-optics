@@ -31,12 +31,12 @@ module.exports = {
   /** write an entry to a dataset
    * @param {string} username - user who owns dataset
    * @param {string} dataset - name of dataset
-   * @param {string} entryID - the dataset record's name
+   * @param {string} recordID - the dataset record's name
    * @param {object} data - record data
    * @async
    */
-  async writeEntry (user, dataset, entryID, data) {
-    return await this.merge(user, dataset, [entryID, data])
+  async writeEntry (user, dataset, recordID, data) {
+    return await this.merge(user, dataset, [recordID, data])
   },
 
   /** delete an entry from a dataset
@@ -81,7 +81,7 @@ module.exports = {
    * @async
    */
   async listDatasets (user) {
-    return await file.list(this.path(user)).map(x => decodeURIComponent(x))
+    return (await file.list(this.path(user))).map(x => decodeURIComponent(x))
   },
 
   /** create a dataset with a specific name
@@ -90,11 +90,47 @@ module.exports = {
    * @async
    */
   async create (user, dataset, config = {}) {
-    if (await file.exists(this.path(user, dataset))) throw new Error('Dataset with this name already exists')
+    if (!dataset.match(/^[^!*'();:@&=+$,/?%#[]]+$/i)) {
+      throw new Error('Name must not contain any of ! * \' ( ) ; : @ & = + $ , / ? % # [ ]')
+    }
+
+    if (dataset.length < 1) {
+      throw new Error('Name cannot be empty')
+    }
+
+    if (dataset.length < 60) {
+      throw new Error('Name must be less than 60 characters long')
+    }
+
+    if (await file.exists(this.path(user, dataset))) {
+      throw new Error('This name already exists')
+    }
+
     await queue.add(() => Promise.all(
       file.write(this.path(user, dataset, 'config'), { created: Date.now(), ...config }),
       file.write(this.path(user, dataset, 'index'), {})
     ))
+  },
+
+  /** read config of existing dataset
+   * @param {string} username - string username
+   * @param {string} dataset - string name of dataset
+   * @returns {object}
+   * @async
+   */
+  async readConfig (user, dataset) {
+    return await queue.add(() => file.read(this.path(user, dataset, 'config')))
+  },
+
+  /** write config of existing dataset
+   * @param {string} username - string username
+   * @param {string} dataset - string name of dataset
+   * @param {object} configData - object containing config data
+   * @returns {object}
+   * @async
+   */
+  async writeConfig (user, dataset, configData) {
+    await queue.add(() => file.write(this.path(user, dataset, 'config'), configData))
   },
 
   /** delete a dataset to from user's data folder
