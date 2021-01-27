@@ -15,6 +15,12 @@ const standardPage = require('./library/views/standard-page')
 // create web server
 const app = express()
 
+// allow non-credentialed cors requests to anything by default
+app.use((req, res, next) => {
+  res.set('Access-Control-Allow-Origin', '*')
+  next()
+})
+
 // If forms are submitted, parse the data in to request.query and request.body
 app.use(express.urlencoded({ extended: true }))
 // If JSON is submitted, parse that in to request.body
@@ -35,7 +41,7 @@ app.use(serverTools.clientScriptsMiddleware())
 
 app.use(require('./library/controllers/auth-controller'))
 app.use(require('./library/controllers/attachment-controller'))
-// app.use(require('./library/controllers/dataset-controller'))
+app.use(require('./library/controllers/dataset-controller'))
 // app.use(require('./library/controllers/lens-controller'))
 
 app.get('/', (req, res) => {
