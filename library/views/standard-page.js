@@ -11,11 +11,11 @@ module.exports = (req, body) => {
     authLinks = [
       ui.link({ url: uri`/users/${req.session.auth.user}`, contents: html`${req.session.auth.user}` }),
       ' ',
-      ui.link({ url: '/auth/logout', contents: 'Logout' })
+      ui.link({ url: uri`/auth/logout?return=${req.originalUrl.split('?')[0]}`, contents: 'Logout' })
     ]
   } else {
     authLinks = [
-      ui.link({ url: '/auth/login', contents: 'Login' })
+      ui.link({ url: uri`/auth/login?return=${req.originalUrl.split('?')[0]}`, contents: 'Login' })
     ]
   }
 
