@@ -12,7 +12,7 @@ router.get('/auth/login', (req, res) => {
     ui.paragraph({
       contents: [
         'Login with an existing account here, or ',
-        ui.link({ url: 'register', contents: 'register a new account' })
+        ui.link({ url: uri`register?return=${req.query.return || '/'}`, contents: 'register a new account' })
       ]
     })
   ]
@@ -27,7 +27,7 @@ router.get('/auth/login', (req, res) => {
       ui.simpleForm({
         title: 'Login to Datasets',
         memo,
-        url: 'login',
+        url: uri`login?return=${req.query.return || '/'}`,
         method: 'POST',
         fields: {
           username: { type: 'text', value: req.query.username },
@@ -42,9 +42,9 @@ router.get('/auth/login', (req, res) => {
 router.post('/auth/login', async (req, res) => {
   try {
     req.session.auth = await auth.login(req.body.username, req.body.password)
-    res.redirect('/')
+    res.redirect(req.query.return)
   } catch (err) {
-    res.redirect(uri`/auth/login?username=${req.body.username}&err=${err.message}`)
+    res.redirect(uri`/auth/login?username=${req.body.username}&err=${err.message}&return=${req.query.return}`)
   }
 })
 
@@ -54,7 +54,7 @@ router.get('/auth/register', (req, res) => {
     ui.paragraph({
       contents: [
         'Create a new account, or ',
-        ui.link({ url: 'login', contents: 'login to an existing account' })
+        ui.link({ url: uri`login?return=${req.query.return || '/'}`, contents: 'login to an existing account' })
       ]
     })
   ]
@@ -69,7 +69,7 @@ router.get('/auth/register', (req, res) => {
       ui.simpleForm({
         title: 'Register with Datasets',
         memo,
-        url: 'register',
+        url: `register?return=${req.query.return || '/'}`,
         method: 'POST',
         fields: {
           username: { type: 'text', value: req.query.username },
@@ -84,20 +84,20 @@ router.get('/auth/register', (req, res) => {
 router.post('/auth/register', async (req, res) => {
   try {
     req.session.auth = await auth.register(req.body.username, req.body.password)
-    res.redirect('/')
+    res.redirect(req.query.return)
   } catch (err) {
     try {
       req.session.auth = await auth.login(req.body.username, req.body.password)
-      res.redirect('/')
+      res.redirect(req.query.return)
     } catch (err2) {
-      res.redirect(uri`/auth/register?username=${req.body.username}&err=${err.message}`)
+      res.redirect(uri`/auth/register?username=${req.body.username}&err=${err.message}&return=${req.query.return}`)
     }
   }
 })
 
 router.get('/auth/logout', (req, res) => {
   delete req.session.auth
-  res.redirect(req.get('Referrer') || '/')
+  res.redirect(req.query.return || req.get('Referrer') || '/')
 })
 
 module.exports = router
