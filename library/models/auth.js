@@ -1,11 +1,9 @@
 const file = require('./cbor-file')
 const nacl = require('tweetnacl')
 const uri = require('encodeuricomponent-tag')
+const codec = require('./codec')
 
-/**
- * Express middleware to require auth and redirect users to login
- */
-module.exports.required = async (req, res, next) => {
+module.exports.basicAuthMiddleware = async (req, res, next) => {
   // handle http basic auth
   if (req.get('Authorization')) {
     const authHeader = req.get('Authorization')
@@ -19,7 +17,13 @@ module.exports.required = async (req, res, next) => {
       }
     }
   }
+  next()
+}
 
+/**
+ * Express middleware to require auth and redirect users to login
+ */
+module.exports.required = (req, res, next) => {
   if (!req.session || !req.session.auth || !req.session.auth.user) {
     if (req.accepts('html')) {
       return res.redirect(uri`/auth/login?return=${req.originalUrl}`)
@@ -30,6 +34,30 @@ module.exports.required = async (req, res, next) => {
     }
   } else {
     next()
+  }
+}
+
+/**
+ * Express Middleware that requires the owner specified in a resource url is authenticated, or an admin role
+ * @param {string|function} ownerParam - named parameter string containing owner, or function that returns owner for this resource when called with req
+ */
+module.exports.requireOwnerOrAdmin = (ownerParam) => {
+  return (req, res, next) => {
+    if (req.session.auth && req.session.auth.auth === 'admin') {
+      return next()
+    }
+
+    const owner = typeof ownerParam === 'string' ? req.params[ownerParam] : ownerParam(req)
+    if (req.session && req.session.auth && req.session.auth.user === owner) {
+      return next()
+    } else {
+      const msg = { err: 'You need to login as this thing’s owner or an admin to access this' }
+      if (req.accepts('html')) {
+        return res.redirect(uri`/auth/login?err=${'msg.err'}&return=${req.originalUrl}`)
+      } else {
+        return codec.respond(req, res.status(403), msg)
+      }
+    }
   }
 }
 
@@ -51,8 +79,10 @@ module.exports.userAccountPath = (username) => `${module.exports.userFolder(user
  * @returns {object} - { user: "string username", auth: "string authorization level" }
  */
 module.exports.login = async (user, pass) => {
+  let account
+
   try {
-    var account = await file.read(module.exports.userAccountPath(user))
+    account = await file.read(module.exports.userAccountPath(user))
   } catch (err) {
     throw new Error('Account not found: ' + err.message)
   }
@@ -80,6 +110,18 @@ module.exports.register = async (user, pass, auth = 'user') => {
 
   if (await file.exists(path)) {
     throw new Error('This username is already in use')
+  }
+
+  if (!user.match(/^[^!*'();:@&=+$,/?%#[]]+$/i)) {
+    throw new Error('Username name must not contain any of ! * \' ( ) ; : @ & = + $ , / ? % # [ ]')
+  }
+
+  if (user.length < 3) {
+    throw new Error('Username must be at least 3 characters long')
+  }
+
+  if (user.length < 30) {
+    throw new Error('Username must be less than 30 characters long')
   }
 
   const salt = Buffer.from(nacl.randomBytes(64))
