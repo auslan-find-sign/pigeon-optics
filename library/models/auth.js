@@ -53,7 +53,7 @@ module.exports.requireOwnerOrAdmin = (ownerParam) => {
     } else {
       const msg = { err: 'You need to login as this thing’s owner or an admin to access this' }
       if (req.accepts('html')) {
-        return res.redirect(uri`/auth/login?err=${'msg.err'}&return=${req.originalUrl}`)
+        return res.redirect(uri`/auth/login?err=${msg.err}&return=${req.originalUrl}`)
       } else {
         return codec.respond(req, res.status(403), msg)
       }
