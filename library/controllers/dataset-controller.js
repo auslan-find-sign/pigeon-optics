@@ -141,9 +141,14 @@ router.get('/datasets/create-record/:user\\::dataset', auth.requireOwnerOrAdmin(
   })
 })
 
+// create a new record
 router.post('/datasets/:user\\::dataset/', auth.requireOwnerOrAdmin('user'), async (req, res) => {
   if (req.body.parseData === 'json') {
-    req.body.data = codec.json.decode(req.body.data)
+    try {
+      req.body.data = codec.json.decode(req.body.data)
+    } catch (err) {
+      return res.redirect(uri`/datasets/create-record/${req.params.user}:${req.params.dataset}?recordID=${req.body.recordID}&data=${req.body.data}&err=${err.message}`)
+    }
   }
 
   await dataset.writeEntry(req.params.user, req.params.dataset, req.body.recordID, req.body.data)
