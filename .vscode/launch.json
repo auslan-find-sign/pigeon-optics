@@ -8,7 +8,7 @@
       "type": "pwa-node",
       "request": "launch",
       "name": "Launch Program",
-      "env": "SECRET=localtesting",
+      "env": { "SECRET": "localtesting" },
       "skipFiles": [
         "<node_internals>/**"
       ],
