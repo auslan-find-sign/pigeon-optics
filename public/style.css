@@ -177,10 +177,6 @@ form.simple-form > h1 {
   margin: 0;
 }
 
-form.simple-form > dl {
-  /* no styles yet */
-}
-
 form.simple-form > dl > dt {
   word-wrap: none;
 }
@@ -195,38 +191,105 @@ form.simple-form > button[type="submit"] {
 }
 
 /* Source Code widget */
-pre.source-code {
-  line-height: 1.3;
+.source-code {
+  /*  theme: FlatUI Dark */
+  --background: #222;
+  --background-selected: #3c424c;
+  --gutter-background: #222;
+  --gutter-foreground: #ddd;
+  --gutter-background-selected: #555;
+  --gutter-foreground-selected: #ccc;
+  --default:  #ccc;
+  --comment:  #5c6370;
+  --jsdoc:    #5C6370;
+  --keyword:  #e06c75;
+  --value:    #d19a66;
+  --strlit:   #67a058;
+  --template: #e06c75;
+  --regexp:   #57B6C2;
+  --operator: #abb2bf;
+  --punctual: #ccc;
+  --fn-name:  #3193c6;
   
-  /* solarized light theme */
-  background-color: #fdf6e3;
-  --comment:  #93a1a1;
-  --jsdoc:    #657b83;
-  --keyword:  #859900;
-  --value:    #2aa198;
-  --strlit:   #2aa198;
-  --template: #268bd2;
-  --regexp:   #cb4b16;
-  --operator: #6c71c4;
-  --punctual: #073642;
-  --fn-name:  #b58900;
+  line-height: 1.3;
+  border-radius: 2mm;
+  overflow-x: scroll;
+  font-family: monospace;
+  counter-reset: line-number;
+  background-color: var(--background);
+  color: var(--default);
 }
 
-pre.source-code .c /* comment */ { color: var(--comment) }
-pre.source-code .d /* JSDoc tag (only in comment) */ { color: var(--jsdoc) }
-pre.source-code .k /* keyword */ { color: var(--keyword) }
-pre.source-code .v /* value (number literal, boolean and some constants) */ { color: var(--value) }
-pre.source-code .s /* string literal (also means a template string) */ { color: var(--strlit) }
-pre.source-code .i /* interpolation content (only in template string) */ { color: var(--template) }
-pre.source-code .r /* regexp literal */ { color: var(--regexp) }
-pre.source-code .o /* operator symbol */ { color: var(--operator) }
-pre.source-code .p /* punctual symbol */ { color: var(--punctual) }
-pre.source-code .f /* function name */ { color: var(--fn-name) }
+.source-code .c /* comment */ { color: var(--comment) }
+.source-code .d /* JSDoc tag (only in comment) */ { color: var(--jsdoc) }
+.source-code .k /* keyword */ { color: var(--keyword) }
+.source-code .v /* value (number literal, boolean and some constants) */ { color: var(--value) }
+.source-code .s /* string literal (also means a template string) */ { color: var(--strlit) }
+.source-code .i /* interpolation content (only in template string) */ { color: var(--template) }
+.source-code .r /* regexp literal */ { color: var(--regexp) }
+.source-code .o /* operator symbol */ { color: var(--operator) }
+.source-code .p /* punctual symbol */ { color: var(--punctual) }
+.source-code .f /* function name */ { color: var(--fn-name) }
+
+
+.source-code code {
+  display: block;
+  font-size: inherit;
+  font-family: inherit;
+  font-weight: inherit;
+  white-space: pre;
+}
+
+.source-code > code:first-child::before {
+  padding-top: 1mm;
+}
+.source-code > code:last-child::before {
+  padding-bottom: 1mm;
+}
+.source-code > code:hover {
+  background-color: var(--background-selected);
+}
+
+.source-code > code::before {
+  content: counter(line-number);
+  counter-increment: line-number;
+  display: inline-block;
+  background-color: var(--gutter-background);
+  color: var(--gutter-foreground);
+  text-align: right;
+  width: calc(1ex * var(--digits) + 2ex);
+  padding-left: 1ex;
+  padding-right: 1ex;
+  margin-right: 1ex;
+}
+
+.source-code > code:hover::before {
+  background-color: var(--gutter-background-selected);
+  color: var(--gutter-foreground-selected);
+}
+
+
 
 /* Styled Text widget */
+.styled-text.italic { font-style: italic; }
+.styled-text.bold { font-weight: bold; }
+.styled-text.retro {
+  text-align: center;
+  color: #fcedd8;
+  text-shadow: 0.1em 0.1em 0px #eb452b,
+               0.2em 0.2em 0px #efa032,
+               0.3em 0.3em 0px #46b59b,
+               0.4em 0.4em 0px #017e7f,
+               0.5em 0.5em 0px #052939,
+               0.6em 0.6em 0px #c11a2b,
+               0.7em 0.7em 0px #c11a2b,
+               0.8em 0.8em 0px #c11a2b,
+               0.9em 0.9em 0px #c11a2b;
+}
 .styled-text.glitch {
-  text-shadow: 0.2ex 0.15ex 1px magenta, -0.2ex -0.15ex 1px cyan;
   font-weight: 400;
+  text-shadow: 0.4em  0.1em 0px lightgreen,
+              -0.3em -0.1em 0px magenta;
 }
 
 /* Toolbar widget */
