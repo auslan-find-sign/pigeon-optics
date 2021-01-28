@@ -112,7 +112,7 @@ router.get('/datasets/:user\\::dataset/:recordID', async (req, res) => {
     serverTools.sendWebpage(req, res, {
       title: 'Form Information Recieved',
       contents: standardPage(req, ui.noticePanel({
-        title: `Record ID: ${req.params.entry}`,
+        title: `Record ID: ${req.params.recordID}`,
         contents: ui.sourceCode({ contents: `${codec.json.encode(record, 2)}` })
       }))
     })
@@ -146,7 +146,7 @@ router.post('/datasets/:user\\::dataset/', auth.requireOwnerOrAdmin('user'), asy
     req.body.data = codec.json.decode(req.body.data)
   }
 
-  await dataset.writeEntry(req.params.user, req.params.dataset, req.body.recordID, codec.req.body.data)
+  await dataset.writeEntry(req.params.user, req.params.dataset, req.body.recordID, req.body.data)
   const path = uri`/datasets/${req.params.user}:${req.params.dataset}/${req.body.recordID}`
 
   if (req.accepts('html')) {

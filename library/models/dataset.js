@@ -23,7 +23,7 @@ module.exports = {
    * @async
    */
   async readEntry (user, dataset, recordID) {
-    const index = queue.add(() => file.read(this.path(user, dataset, 'index')))
+    const index = await queue.add(() => file.read(this.path(user, dataset, 'index')))
     if (!index[recordID]) throw new Error('Dataset doesn’t contain specified record')
     return await queue.add(() => file.read(this.path(user, dataset, 'objects', index[recordID].toString('hex'))))
   },
@@ -36,7 +36,7 @@ module.exports = {
    * @async
    */
   async writeEntry (user, dataset, recordID, data) {
-    return await this.merge(user, dataset, [recordID, data])
+    return await this.merge(user, dataset, [[recordID, data]])
   },
 
   /** delete an entry from a dataset
@@ -193,8 +193,8 @@ module.exports = {
    */
   async garbageCollect (user, dataset) {
     await queue.add(async () => {
-      const index = await queue.add(() => file.read(this.path(user, dataset, 'index')))
-      const objectList = await queue.add(() => file.list(this.path(user, dataset, 'objects')))
+      const index = await file.read(this.path(user, dataset, 'index'))
+      const objectList = await file.list(this.path(user, dataset, 'objects'))
       const keepObjects = Object.values(index).map(x => x.toString('hex'))
       await Promise.all(
         objectList.filter(objectID =>
