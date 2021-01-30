@@ -98,10 +98,10 @@ module.exports.objectHash = (object) => {
   return objectHash(object, {
     algorithm: 'sha256',
     encoding: 'buffer',
-    replacer: (key, value) => {
+    replacer: value => {
       if (value instanceof AttachmentReference) {
         // don't bother trying to hash data, and treat Attachment and AttachmentReference as equivilent since the real data hasn't changed
-        return [value.mimeType, value.hash]
+        return ['datasets/Attachment', value.mimeType, value.hash]
       }
       return value
     }
