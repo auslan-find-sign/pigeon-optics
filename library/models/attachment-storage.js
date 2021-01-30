@@ -5,6 +5,8 @@ const fs = require('fs-extra')
 const path = require('path')
 const defaults = require('../../package.json').defaults
 const { Attachment, AttachmentReference } = require('./attachment')
+const { default: PQueue } = require('p-queue')
+const writeQueue = new PQueue({ concurrency: 1 })
 
 /**
  * Gets filesystem path to attachment, regardless if it exists
@@ -46,7 +48,9 @@ module.exports.read = async (hash, mimeType = 'application/octet-stream') => {
 module.exports.write = async (attachment) => {
   if (!(attachment instanceof Attachment)) throw new Error('argument must be an Attachment')
   const path = module.exports.getPath(attachment)
-  if (!await fs.pathExists(path)) await fs.writeFile(path, attachment.data)
+  if (!await fs.pathExists(path)) {
+    await writeQueue.add(x => fs.writeFile(path, attachment.data))
+  }
   return new AttachmentReference(attachment.hash, attachment.mimeType)
 }
 
