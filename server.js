@@ -54,6 +54,7 @@ app.use(require('./library/controllers/auth-controller'))
 app.use(require('./library/controllers/attachment-controller'))
 app.use(require('./library/controllers/dataset-controller'))
 // app.use(require('./library/controllers/lens-controller'))
+app.use(require('./library/controllers/export-controller'))
 
 app.get('/', (req, res) => {
   Vibe.docStream('Datasets Project', homepageView(req)).pipe(res.type('html'))
