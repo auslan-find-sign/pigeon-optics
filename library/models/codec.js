@@ -89,6 +89,60 @@ module.exports.json = {
   }
 }
 
+// cloneable/transferrable encoding, inputs and outputs objects, but encodes
+// Attachments and Buffers in to something cloneable. Unlike the JSON codec this
+// doesn't depend on having a base64 codec available, and doesn't aim to have compact
+// or efficient or compressable output when serialized to JSON
+// It's just used internally for passing data between virtual machine boundaries
+module.exports.cloneable = {
+  decode (object) {
+    if (Array.isArray(object)) {
+      return object.map(entry => this.decode(entry))
+    } else if (typeof object === 'object') {
+      if ('_bufferArrayBytes' in object) {
+        return Buffer.from(object._bufferArrayBytes)
+      } else if (object._class === 'Attachment') {
+        return new Attachment(Buffer.from(object._bytes), object._mimeType)
+      } else if (object._class === 'AttachmentReference') {
+        return new AttachmentReference(Buffer.from(object._hashBytes), object._mimeType)
+      }
+
+      return Object.fromEntries(Object.entries(object).map(([key, value]) => {
+        return [key, this.decode(value)]
+      }))
+    } else {
+      return object
+    }
+  },
+
+  encode (object) {
+    if (Array.isArray(object)) {
+      return object.map(entry => this.encode(entry))
+    } else if (Buffer.isBuffer(object)) {
+      return { _bufferArrayBytes: [...object] }
+    } else if (object instanceof Attachment) {
+      return {
+        _class: 'Attachment',
+        _bytes: [...object.data],
+        _mimeType: object.mimeType,
+        _hash: [...object.hash]
+      }
+    } else if (object instanceof AttachmentReference) {
+      return {
+        _class: 'AttachmentReference',
+        _mimeType: object.mimeType,
+        _hash: [...object.hash]
+      }
+    } else if (typeof object === 'object') {
+      return Object.fromEntries(Object.entries(object).map(([key, value]) => {
+        return [key, this.decode(value)]
+      }))
+    }
+
+    return object
+  }
+}
+
 /**
  * uses object-hash npm package to hash a complex object, like those stored in datasets or viewports
  * @param {any} object - input object to hash, maybe containing attachments
