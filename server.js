@@ -5,14 +5,9 @@ const express = require('express')
 const cookieSession = require('cookie-session')
 const crypto = require('crypto')
 const process = require('process')
-// Phoenix's UI toolkit
-// const ui = require('./library/ui')
-const serverTools = require('./library/server-tools')
-const standardPage = require('./library/views/standard-page')
 const codec = require('./library/models/codec')
-// const Bell = require('./library/bell')
-
-// const html = require('nanohtml')
+const Vibe = require('./library/vibe/rich-builder')
+const homepageView = require('./library/views/homepage')
 
 // create web server
 const app = express()
@@ -55,21 +50,13 @@ app.use(cookieSession({
 // https://expressjs.com/en/starter/static-files.html
 app.use(express.static('public'))
 
-// this allows web browsers to download a compiled version of the UI toolkit's javascript code
-app.use(serverTools.clientScriptsMiddleware())
-
 app.use(require('./library/controllers/auth-controller'))
 app.use(require('./library/controllers/attachment-controller'))
 app.use(require('./library/controllers/dataset-controller'))
 // app.use(require('./library/controllers/lens-controller'))
 
 app.get('/', (req, res) => {
-  serverTools.sendWebpage(req, res, {
-    title: 'Datasets',
-    contents: standardPage(req, [
-      'Hello World'
-    ])
-  })
+  Vibe.docStream('Datasets Project', homepageView(req)).pipe(res.type('html'))
 })
 
 const port = process.env.PORT || 3000
