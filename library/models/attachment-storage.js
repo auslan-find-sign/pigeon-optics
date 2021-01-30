@@ -79,3 +79,30 @@ module.exports.list = async () => {
   const files = await fs.readdir(path.join(defaults.data, 'attachments'))
   return files.map(x => Buffer.from(x, 'hex'))
 }
+
+/**
+ * takes a complex object, and converts any Attachments in to AttachmentReferences, writing them to disk
+ * @param {Object|Array|Number|string|boolean|null|undefined} input - any input object/array/primitive
+ * @async
+ */
+module.exports.storeAttachments = async (input) => {
+  if (Array.isArray(input)) {
+    return input.map(x => module.exports.storeAttachments(x))
+  } else if (input instanceof Map) {
+    const output = new Map()
+    input.forEach((value, key) => output.set(key, module.exports.storeAttachments(value)))
+    return output
+  } else if (input instanceof Set) {
+    const output = new Set()
+    input.forEach((value) => output.set(module.exports.storeAttachments(value)))
+    return output
+  } else if (input instanceof Attachment) {
+    return await module.exports.write(input)
+  } else if (typeof input === 'object') {
+    return Object.fromEntries(Object.entries(input).map(([key, value]) => {
+      return [key, module.exports.storeAttachments(value)]
+    }))
+  }
+
+  return input
+}
