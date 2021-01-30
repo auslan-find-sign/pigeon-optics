@@ -75,7 +75,16 @@ module.exports = {
     return await queue.add(() => file.read(this.path(user, dataset, 'index')))
   },
 
-  /** list all the entries in a dataset
+  /** tests if a dataset or specific record exists */
+  async exists (user, dataset, recordID = undefined) {
+    if (recordID === undefined) {
+      return file.exists(this.path(user, dataset, 'index'))
+    } else {
+      return (await this.listEntries(user, dataset)).includes(recordID)
+    }
+  },
+
+  /** list all datasets owned by a user
    * @param {string} username - user who owns dataset
    * @returns {string[]} - dataset names
    * @async
@@ -165,6 +174,9 @@ module.exports = {
     const idMapRewrites = {}
 
     for await (const [id, data] of entries) {
+      if (!(typeof id === 'string')) throw new Error('Record ID must be a string')
+      if (id.length < 1) throw new Error('Record ID must be at least one character long')
+      if (id.length > 250) throw new Error('Record ID must be less than 250 characters long')
       const hash = codec.objectHash(data)
       await queue.add(() => file.write(this.path(user, dataset, 'objects', hash.toString('hex')), data))
       updatedIDs.push(id)

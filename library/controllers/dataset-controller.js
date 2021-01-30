@@ -4,29 +4,33 @@ const router = express.Router()
 const auth = require('../models/auth')
 const codec = require('../models/codec')
 const dataset = require('../models/dataset')
-const ui = require('../ui')
-const html = require('nanohtml')
-const serverTools = require('../server-tools')
-const standardPage = require('../views/standard-page')
 const uri = require('encodeuricomponent-tag')
 
-router.get('/datasets/create', auth.required, (req, res) => {
-  const memo = [ui.paragraph({ contents: 'New dataset will be created under your account and owned by you' })]
-  if (req.query.err) memo.push(ui.paragraph({ contents: [ui.glitch('Error: '), req.query.err] }))
+const Vibe = require('../vibe/rich-builder')
+const layout = require('../views/layout')
+const editorView = require('../views/dataset-record-editor')
 
-  serverTools.sendWebpage(req, res, {
-    title: 'Create a Dataset',
-    contents: standardPage(req, ui.simpleForm({
-      title: 'Create a new dataset',
-      memo,
-      url: '/datasets/',
-      fields: {
-        name: { label: 'Name', value: req.query.name },
-        memo: { label: 'Short Description', value: req.query.memo }
-      },
-      buttonLabel: 'Create'
-    }))
-  })
+router.get('/datasets/create', auth.required, (req, res) => {
+  Vibe.docStream('Create a Dataset', layout(req, v => {
+    v.form({ class: 'simple-form', action: '/datasets/', method: 'POST' }, v => {
+      v.heading('Create a new dataset')
+      v.p('New dataset will be created under your account and owned by you')
+
+      if (req.query.err) { // display error if one is included in the url
+        v.p(v => {
+          v.glitch('Error: ')
+          v.text(req.query.err)
+        })
+      }
+
+      v.dl(v => {
+        v.dt('Name'); v.dd(v => v.input({ name: 'name', value: req.query.name }))
+        v.dt('Short Description'); v.dd(v => v.input({ name: 'memo', value: req.query.memo }))
+      })
+
+      v.button('Create', { type: 'submit' })
+    })
+  })).pipe(res.type('html'))
 })
 
 router.post('/datasets/', auth.required, async (req, res) => {
@@ -60,15 +64,12 @@ router.get('/datasets/:user\\:', async (req, res) => {
   const datasets = await dataset.listDatasets(req.params.user)
 
   if (req.accepts('html')) {
-    serverTools.sendWebpage(req, res, {
-      title: `User’s Datasets: ${req.params.user}`,
-      contents: standardPage(req, [
-        ui.heading({ contents: 'Datasets:' }),
-        ...datasets.map(x =>
-          html`<div><a href="${uri`/datasets/${req.params.user}:${x}/`}">${x}</a></div>`
-        )
-      ])
-    })
+    Vibe.docStream(`${req.params.user}’s Datasets`, layout(req, v => {
+      v.heading('Datasets:')
+      for (const dataset of datasets) {
+        v.div(v => v.a(dataset, { href: uri`/datasets/${req.params.user}:${dataset}/` }))
+      }
+    })).pipe(res.type('html'))
   } else {
     codec.respond(req, res, datasets)
   }
@@ -80,17 +81,14 @@ router.get('/datasets/:user\\::dataset/', async (req, res) => {
 
   if (req.accepts('html')) {
     const recordIDs = await dataset.listEntries(req.params.user, req.params.dataset)
-    serverTools.sendWebpage(req, res, {
-      title: `User’s Datasets: ${req.params.user}`,
-      contents: standardPage(req, [
-        ui.heading({ contents: `Dataset: ${req.params.dataset}` }),
-        ui.paragraph({ contents: config.memo }),
-        ui.heading({ contents: 'Records:', level: 3 }),
-        ...recordIDs.map(x =>
-          html`<div><a href="${uri`/datasets/${req.params.user}:${req.params.dataset}/${x}`}">${x}</a></div>`
-        )
-      ])
-    })
+    Vibe.docStream(`${req.params.user}’s “${req.params.dataset}” Datasets`, layout(req, v => {
+      v.heading(`Dataset: ${req.params.dataset}`)
+      if (config.memo) v.p(config.memo)
+      v.heading('Records:', { level: 3 })
+      for (const recordID of recordIDs) {
+        v.div(v => v.a(recordID, { href: uri`/datasets/${req.params.user}:${req.params.dataset}/${recordID}` }))
+      }
+    })).pipe(res.type('html'))
   } else {
     const records = await dataset.listEntryHashes(req.params.user, req.params.dataset)
     codec.respond(req, res, {
@@ -107,70 +105,86 @@ router.get('/datasets/:user\\::dataset/:recordID', async (req, res) => {
   const record = await dataset.readEntry(req.params.user, req.params.dataset, req.params.recordID)
 
   if (req.accepts('html')) {
-    serverTools.sendWebpage(req, res, {
-      title: 'Form Information Recieved',
-      contents: standardPage(req, ui.noticePanel({
-        title: `Record ID: ${req.params.recordID}`,
-        contents: ui.sourceCode({ contents: `${codec.json.encode(record, 2)}` })
-      }))
-    })
+    Vibe.docStream(`${req.params.user}:${req.params.dataset}/${req.params.recordID}`, layout(req, v => {
+      v.heading(`Record ID: ${req.params.recordID}`)
+      v.sourceCode(codec.json.encode(record, 2))
+    })).pipe(res.type('html'))
   } else {
     codec.respond(req, res, record)
   }
 })
 
-router.get('/datasets/create-record/:user\\::dataset', auth.requireOwnerOrAdmin('user'), (req, res) => {
-  const memo = [ui.paragraph({ contents: 'New record will be added to dataset' })]
-  if (req.query.err) memo.push(ui.paragraph({ contents: [ui.glitch('Error: '), req.query.err] }))
+// UI to edit a record from a user's dataset
+router.get('/datasets/:user\\::dataset/:recordID/edit', async (req, res) => {
+  const record = await dataset.readEntry(req.params.user, req.params.dataset, req.params.recordID)
 
-  serverTools.sendWebpage(req, res, {
-    title: 'Add record',
-    contents: standardPage(req, ui.simpleForm({
-      title: `Add record to dataset ${req.params.user}:${req.params.dataset}`,
-      memo,
-      url: uri`/datasets/${req.params.user}:${req.params.dataset}/`,
-      fields: {
-        recordID: { label: 'Label', value: req.query.recordID },
-        data: { label: 'JSON Data', value: req.query.data },
-        parseData: { type: 'hidden', value: 'json' }
-      },
-      buttonLabel: 'Create'
-    }))
-  })
+  const title = `Editing ${req.params.user}:${req.params.dataset}/${req.params.recordID}`
+  const state = {
+    create: false,
+    recordID: req.params.recordID,
+    recordData: codec.json.encode(record, 2)
+  }
+  Vibe.docStream(title, editorView(req, state)).pipe(res.type('html'))
+})
+
+router.post('/datasets/:user\\::dataset/:recordID/save', auth.requireOwnerOrAdmin('user'), async (req, res) => {
+  try {
+    const data = codec.json.decode(req.body.recordData)
+    await dataset.writeEntry(req.params.user, req.params.dataset, req.params.recordID, data)
+    res.redirect(uri`/datasets/${req.params.user}:${req.params.dataset}/${req.params.recordID}`)
+  } catch (error) {
+    const title = `Editing ${req.params.user}:${req.params.dataset}/${req.params.recordID}`
+    const state = {
+      create: false,
+      recordID: req.params.recordID,
+      recordData: req.body.recordData
+    }
+    Vibe.docStream(title, editorView(req, state, error.message)).pipe(res.type('html'))
+  }
+})
+
+router.post('/datasets/:user\\::dataset/:recordID/delete', auth.requireOwnerOrAdmin('user'), async (req, res) => {
+  try {
+    await dataset.deleteEntry(req.params.user, req.params.dataset, req.params.recordID)
+    res.redirect(uri`/datasets/${req.params.user}:${req.params.dataset}/`)
+  } catch (error) {
+    const title = `Editing ${req.params.user}:${req.params.dataset}/${req.params.recordID}`
+    const state = {
+      create: true,
+      recordID: req.params.recordID,
+      recordData: req.body.recordData
+    }
+    Vibe.docStream(title, editorView(req, state, error.message)).pipe(res.type('html'))
+  }
+})
+
+router.get('/datasets/create-record/:user\\::dataset/', auth.requireOwnerOrAdmin('user'), (req, res) => {
+  const title = `Creating a record inside ${req.params.user}:${req.params.dataset}/`
+  const state = {
+    create: true,
+    recordID: '',
+    recordData: '{}'
+  }
+  Vibe.docStream(title, editorView(req, state)).pipe(res.type('html'))
 })
 
 // create a new record
-router.post('/datasets/:user\\::dataset/', auth.requireOwnerOrAdmin('user'), async (req, res) => {
-  if (req.body.parseData === 'json') {
-    try {
-      req.body.data = codec.json.decode(req.body.data)
-    } catch (err) {
-      return res.redirect(uri`/datasets/create-record/${req.params.user}:${req.params.dataset}?recordID=${req.body.recordID}&data=${req.body.data}&err=${err.message}`)
-    }
-  }
-
-  await dataset.writeEntry(req.params.user, req.params.dataset, req.body.recordID, req.body.data)
-  const path = uri`/datasets/${req.params.user}:${req.params.dataset}/${req.body.recordID}`
-
-  if (req.accepts('html')) {
+router.post('/datasets/create-record/:user\\::dataset/save', auth.requireOwnerOrAdmin('user'), async (req, res) => {
+  try {
+    req.body.data = codec.json.decode(req.body.recordData)
+    await dataset.writeEntry(req.params.user, req.params.dataset, req.body.recordID, req.body.data)
+    const path = uri`/datasets/${req.params.user}:${req.params.dataset}/${req.body.recordID}`
     res.redirect(path)
-  } else {
-    codec.respond(req, res.status(201).set('Location', path), { created: true, path })
-  }
-})
-
-router.delete('/datasets/:user\\::dataset/:recordID', auth.requireOwnerOrAdmin('user'), async (req, res) => {
-  await dataset.deleteEntry(req.params.user, req.params.dataset, req.params.recordID)
-
-  if (req.accepts('html')) {
-    res.redirect(uri`/datasets/${req.params.user}:${req.params.dataset}/`)
-  } else {
-    codec.respond(req, res.status(200), { deleted: true })
-  }
-})
-
-
+  } catch (err) {
+    const title = `Creating a record inside ${req.params.user}:${req.params.dataset}/`
+    const state = {
+      create: true,
+      recordID: req.body.recordID,
+      recordData: req.body.recordData
     }
+    Vibe.docStream(title, editorView(req, state, err.message)).pipe(res.type('html'))
+  }
+})
 
 router.delete('/datasets/:user\\::dataset/:recordID', auth.requireOwnerOrAdmin('user'), async (req, res) => {
   try {

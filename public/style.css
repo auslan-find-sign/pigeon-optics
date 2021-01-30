@@ -10,7 +10,7 @@ body {
   line-height: 1.5em;
 }
 
-input {
+input, textarea {
   border: 1px solid silver;
   display: block;
   font-size: 16px;
@@ -185,9 +185,13 @@ form.simple-form > dl > dd {
   margin: 0;
 }
 
+form.simple-form > dl > dd > textarea {
+  resize: none;
+}
+
 form.simple-form > button[type="submit"] {
   display: block;
-  margin-left: auto;
+  margin-left: 1ex;
 }
 
 /* Source Code widget */

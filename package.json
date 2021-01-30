@@ -25,6 +25,8 @@
     "fs-extra": "^9.1.0",
     "got": "^11.8.1",
     "h.js": "^5.1.0",
+    "html-tags": "^3.1.0",
+    "isolated-vm": "^3.3.10",
     "multer": "^1.4.2",
     "nanocomponent": "^6.5.3",
     "nanohtml": "^1.9.1",
@@ -33,11 +35,8 @@
     "param-case": "^3.0.4",
     "path-to-regexp": "^6.2.0",
     "sse-writer": "^3.0.4",
-    "stream-from-promise": "^1.0.0",
-    "streamqueue": "^1.1.2",
     "tweetnacl": "^1.0.3",
     "uglify-es": "^3.3.9",
-    "vm2": "^3.9.2",
     "xbytes": "^1.7.0"
   },
   "defaults": {

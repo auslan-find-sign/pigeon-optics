@@ -5,26 +5,34 @@ const datasets = require('./dataset')
 const viewports = require('./viewport')
 
 const ptr = require('path-to-regexp')
-const pathDecode = ptr.match('/:source/:user\\::name/:entryID?')
+const pathDecode = ptr.match('/:source(viewports|datasets)/:user\\::name/:recordID?')
+const sources = { datasets, viewports }
 
 async function * readPath (path) {
   const { params } = pathDecode(path)
-  const sources = { datasets, viewports }
   const source = sources[params.source]
 
   if (source !== undefined) {
-    if (params.entryID !== undefined) {
+    if (params.recordID !== undefined) {
       // just yield the specific entry
-      yield await source.readEntry(params.user, params.name, params.entryID)
+      yield [params.recordID, await source.readEntry(params.user, params.name, params.recordID)]
     } else {
       // do the whole dataset
-      for (const entryID of await source.listEntries(params.user, params.name)) {
-        yield await source.readEntry(params.user, params.name, entryID)
+      for (const recordID of await source.listEntries(params.user, params.name)) {
+        yield [recordID, await source.readEntry(params.user, params.name, recordID)]
       }
     }
   } else {
     throw new Error('root directory of path is not known to readPath()')
   }
+}
+
+readPath.exists = async function (path) {
+  const decoded = pathDecode(path)
+  if (!decoded) return false
+  const params = decoded.params
+  const source = sources[params.source]
+  return source.exists(params.user, params.name, params.recordID)
 }
 
 module.exports = readPath
