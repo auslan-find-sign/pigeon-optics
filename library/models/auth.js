@@ -112,16 +112,20 @@ module.exports.register = async (user, pass, auth = 'user') => {
     throw new Error('This username is already in use')
   }
 
-  if (!user.match(/^[^!*'();:@&=+$,/?%#[]]+$/i)) {
-    throw new Error('Username name must not contain any of ! * \' ( ) ; : @ & = + $ , / ? % # [ ]')
+  if (!user.match(/^[^!*'();:@&=+$,/?%#[\]\r\n\t ]+$/i)) {
+    throw new Error('Username name must not contain any of ! * \' ( ) ; : @ & = + $ , / ? % # [ ] or whitespace')
   }
 
   if (user.length < 3) {
     throw new Error('Username must be at least 3 characters long')
   }
 
-  if (user.length < 30) {
-    throw new Error('Username must be less than 30 characters long')
+  if (user.length > 30) {
+    throw new Error('Username must not be longer than 30 characters')
+  }
+
+  if (pass.length < 8) {
+    throw new Error('Password must be at least 8 characters long')
   }
 
   const salt = Buffer.from(nacl.randomBytes(64))
@@ -160,11 +164,24 @@ module.exports.changeAuth = async (user, auth) => {
   await file.write(path, account)
 }
 
+/** get a user's profile */
+module.exports.getProfile = async (user) => {
+  const account = await file.read(module.exports.userAccountPath(user))
+  return account
+}
+
 /** delete a user
  * @param {string} username
  */
 module.exports.delete = async (user) => {
   await file.delete(module.exports.userFolder(user))
+}
+
+/** check if user account exists
+ * @param {string} username
+ */
+module.exports.exists = async (user) => {
+  return await file.exists(module.exports.userAccountPath(user))
 }
 
 /** list all users known to the system
