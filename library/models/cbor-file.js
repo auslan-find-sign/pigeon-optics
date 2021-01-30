@@ -82,6 +82,14 @@ module.exports.exists = async (dataPath) => {
  * @async
  */
 module.exports.list = async (dataPath) => {
-  const files = await fs.readdir(path.join(defaults.data, dataPath))
-  return files.filter(x => !x.endsWith('.backup.cbor')).map(x => x.replace(/\.cbor$/, ''))
+  let files
+  try {
+    files = await fs.readdir(path.join(defaults.data, dataPath))
+    return files.filter(x => !x.endsWith('.backup.cbor')).map(x => x.replace(/\.cbor$/, ''))
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return []
+    }
+    throw err
+  }
 }
