@@ -72,5 +72,22 @@ class Attachment extends AttachmentReference {
   }
 }
 
+// crawls a structure of arrays and objects to find all attachments referenced
+function listReferences (input) {
+  if (Array.isArray(input)) {
+    return input.flatMap(x => listReferences(x))
+  } else if (typeof input === 'object') {
+    if (input.constructor === AttachmentReference) {
+      return [input]
+    } else if (typeof input.values === 'function') {
+      return input.values().flatMap(x => listReferences(x))
+    } else if (input.constructor === Object) {
+      return Object.values(input).flatMap(x => listReferences(x))
+    }
+  }
+  return []
+}
+
 module.exports.AttachmentReference = AttachmentReference
 module.exports.Attachment = Attachment
+module.exports.listReferences = listReferences
