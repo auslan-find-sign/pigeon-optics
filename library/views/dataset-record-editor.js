@@ -1,9 +1,9 @@
 const layout = require('./layout')
 
 /**
- * block to build a login/register form page
+ * block to build a dataset manual record editor
  * @param {Request} req - express Request
- * @param {string} mode - either 'login' or 'register'
+ * @param {string} data - object with state info for the form
  * @param {null|string} error - null or a string with an error message
  */
 module.exports = (req, data, error = null) => {

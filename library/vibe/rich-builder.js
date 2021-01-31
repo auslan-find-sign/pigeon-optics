@@ -133,6 +133,18 @@ class RichVibeBuilder extends VibeBuilder {
       this.input({ type: 'hidden', name: key, value: value })
     }
   }
+
+  /** emits a ul.link-list with links to each thing in the data array
+   * @param {Array} list - array of entries
+   * @param {function} [getURL] - returns url for entry in array
+   */
+  linkList (list, getURL = encodeURIComponent) {
+    this.ul({ class: 'link-list' }, v => {
+      for (const entry of list) {
+        v.li(v => v.a(entry.toString(), { href: getURL(entry) }))
+      }
+    })
+  }
 }
 
 /** Builds a html doc with a title and some contents */
