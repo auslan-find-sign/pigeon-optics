@@ -1,137 +1,98 @@
 const express = require('express')
 const router = express.Router()
-const streamqueue = require('streamqueue')
-const streamFromPromise = require('stream-from-promise')
+
+const Vibe = require('../vibe/rich-builder')
+const layout = require('../views/layout')
+const uri = require('encodeuricomponent-tag')
+const lensEditor = require('../views/lens-code-editor')
+const lensViewer = require('../views/lens-viewer')
+
+const auth = require('../models/auth')
 const codec = require('../models/codec')
 const dataset = require('../models/dataset')
 const jsLens = require('../models/javascript-lens')
-const ui = require('../ui')
-const serverTools = require('../server-tools')
-const { pipeline } = require('stream')
 
-/**
- * Runs a lens chain, returning output datas
- * final element must be a dataset, all previous elements must be a lens
- * returns in Object.entries format an iterator that outputs [recordID, [recordDataObject, ...]]
- * @param {string} path - in the format user:lens/user:lens/user:dataset
- * @param {Array} inputs - optional, entryIDs from source dataset to lookup, defaults to everything in dataset
- */
-async function * runLensChain (path, recordIDs = false) {
-  const globals = {}
-  const timeout = 10
-  const steps = path.split('/')
-  const [user, name] = steps[0].split(':')
+const mapCodeExample = `// example, simply copies the underlying dataset, but adds a property lensed: true
+const [realm, store, recordID] = recordPath.slice(1).split('/').map(x => decodeURIComponent(x))
+output(recordID, {
+  ...recordData,
+  lensed: true
+})`
+const mergeCodeExample = `// example, overlays the objects overwriting properties
+return { ...left, ...right }`
 
-  if (steps.length > 1) {
-    // iterate next level through this lens
-    const lens = await jsLens.load(user, name, globals, timeout)
-    for await (const [entryID, entryData] of runLensChain(steps.slice(1).join('/'))) {
-      // run user supplied lookup function
-      let requests = lens.lookup(entryID, entryData)
-      if (!requests) requests = []
-      // do any requested lookups
-      const lookups = await Promise.all(requests.map(x => x.split(':')).map(async ([user, name, record]) =>
-        [`${user}:${name}:${record}`, await dataset.readEntry(user, name, record)]
-      ))
-
-      const output = lens.transform(entryID, entryData, Object.fromEntries(lookups))
-      if (output) {
-        if (Array.isArray(output)) {
-          for (const [id, data] of output) {
-            yield [id, data]
-          }
-        } else if (typeof output === 'object') {
-          yield [entryID, output]
-        }
-      }
-    }
-  } else {
-    // iterate dataset
-    if (recordIDs === false) {
-      recordIDs = await dataset.listEntries(user, name)
-    }
-    for (const recordID of recordIDs) {
-      yield [`${user}:${name}:${recordID}`, [await dataset.readEntry(user, name, recordID)]]
-    }
+router.get('/lenses/create', auth.required, (req, res) => {
+  const state = {
+    name: '',
+    mapCode: mapCodeExample,
+    mergeCode: mergeCodeExample,
+    create: true
   }
-}
+  Vibe.docStream('Create a Lens', lensEditor(req, state)).pipe(res.type('html'))
+})
+
+router.post('/lenses/save', auth.required, async (req, res) => {
+  try {
+    await jsLens.write(req.session.auth.user, req.body.name, req.body.mapCode, req.body.mergeCode)
+  } catch (err) {
+    return codec.respond(req, res, { error: err.message })
+  }
+  res.redirect(uri`/lenses/${req.session.auth.user}:${req.body.name}/`)
+})
 
 // get a list of lenses owned by a specific user
-router.get('/users/:user/lenses/', async (req, res) => {
+router.get('/lenses/:user\\:', async (req, res) => {
   const lenses = await jsLens.list(req.params.user)
 
   if (req.accepts('html')) {
-    // TODO: UI with html view
-    res.send('Not yet implemented')
-  } else if (req.accepts('application/cbor')) {
-    res.type('application/cbor').send(codec.cbor.encode(lenses))
-  } else if (req.accepts('json')) {
-    res.type('json').send(codec.json.encode(lenses))
-  }
-})
-
-// get a list of records owned by a user's dataset
-router.get('/lens/:lensPath+', async (req, res) => {
-  const lensPath = req.params.lensPath
-  const recordIDs = req.query.id ? [req.query.id] : false
-  const output = runLensChain(lensPath, recordIDs)
-
-  if (req.accepts('html')) {
-    const results = [...output]
-    // TODO: UI with html view
-    res.send('Not yet implemented')
-  } else if (req.accepts('application/cbor') || req.query.encoding === 'cbor') {
-    res.type('application/cbor').send(codec.cbor.encode(results))
-  } else if (req.accepts('json') || req.query.encoding === 'json') {
-    res.type('json').send(codec.json.encode(results))
-  } else if (req.accepts('text/plain') || req.query.encoding === 'json-lines') {
-    res.type('json').send(codec.json.encode(results))
-  }
-})
-
-// export a dataset
-// query string must specify encoding as one of the following:
-//  - cbor: returns a cbor stream of arrays containing [entryID, entryData]
-//  - json-lines: returns a text file, where each line is a json array in the same format as cbor, followed by newlines \n
-//  - json: returns a json object where each key is an entryID and each value is entry data
-// json-lines maybe easier to process with large datasets, as you can just read a line in at a time
-router.get('/users/:user/datasets/:dataset/export', async (req, res) => {
-  const entryIDs = dataset.listEntries(req.params.user, req.params.dataset)
-
-  if (req.query.encoding === 'cbor') {
-    const encoder = async (entryID) => {
-      const entry = await dataset.readEntry(req.params.user, req.params.dataset, entryID)
-      return streamFromPromise(codec.cbor.encode([entryID, entry]))
-    }
-
-    const queue = streamqueue(entryIDs.map(id => () => encoder(id)))
-    res.type('application/cbor')
-    pipeline(queue, res)
-  } else if (req.query.encoding === 'json-lines') {
-    const encoder = async (entryID) => {
-      const entry = await dataset.readEntry(req.params.user, req.params.dataset, entryID)
-      return streamFromPromise(Buffer.from(codec.json.encode([entryID, entry]) + '\n'))
-    }
-
-    const queue = streamqueue(entryIDs.map(id => () => encoder(id)))
-    res.type('text/plain')
-    pipeline(queue, res)
-  } else if (req.query.encoding === 'json') {
-    const encoder = async (entryID) => {
-      const entry = await dataset.readEntry(req.params.user, req.params.dataset, entryID)
-      const line = `  ${JSON.stringify(entryID)}: ${JSON.stringify(entry, jsonBufferEncode)}\n`
-      return streamFromPromise(Buffer.from(line))
-    }
-
-    const queue = streamqueue([
-      streamFromPromise(async () => '{'),
-      ...entryIDs.map(id => () => encoder(id)),
-      streamFromPromise(async () => '}')
-    ])
-    res.type('application/json')
-    pipeline(queue, res)
+    Vibe.docStream(`${req.params.user}’s Javascript Lenses`, layout(req, v => {
+      v.heading(`${req.params.user}’s Javascript Lenses:`)
+      for (const lens of lenses) {
+        v.div(v => v.a(dataset, { href: uri`/lenses/${req.params.user}:${lens}/` }))
+      }
+    })).pipe(res.type('html'))
   } else {
-    return res.status(500).send('Unsupported encoding')
+    codec.respond(req, res, lenses)
+  }
+})
+
+router.get('/lenses/:user\\::name/', async (req, res) => {
+  try {
+    const lens = await jsLens.read(req.params.user, req.params.name)
+    Vibe.docStream(
+      `${req.params.user}’s lens “${req.params.name}”`,
+      lensViewer(req, lens)
+    ).pipe(res.type('html'))
+  } catch (err) {
+    return codec.respond(req, res, { error: err.message })
+  }
+})
+
+router.get('/lenses/:user\\::name/edit', auth.requireOwnerOrAdmin('user'), async (req, res) => {
+  try {
+    const lens = await jsLens.read(req.params.user, req.params.name)
+    lens.name = req.params.name
+    Vibe.docStream('Editing Lens', lensEditor(req, lens)).pipe(res.type('html'))
+  } catch (err) {
+    return codec.respond(req, res, { error: err.message })
+  }
+})
+
+router.post('/lenses/:user\\::name/save', auth.requireOwnerOrAdmin('user'), async (req, res) => {
+  try {
+    await jsLens.write(req.params.user, req.params.name, req.body.mapCode, req.body.mergeCode)
+    res.redirect(uri`/lenses/${req.params.user}:${req.params.name}/`)
+  } catch (err) {
+    return codec.respond(req, res, { error: err.message })
+  }
+})
+
+router.post('/lenses/:user\\::name/delete', auth.requireOwnerOrAdmin('user'), async (req, res) => {
+  try {
+    await jsLens.delete(req.params.user, req.params.name)
+    res.redirect(uri`/lenses/${req.params.user}:`)
+  } catch (err) {
+    return codec.respond(req, res, { error: err.message })
   }
 })
 

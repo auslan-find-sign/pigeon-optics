@@ -28,6 +28,19 @@ module.exports = {
     return await queue.add(() => file.read(this.path(user, dataset, 'objects', index[recordID].toString('hex'))))
   },
 
+  /** reads each record of this dataset sequentially as an async iterator
+   * @param {string} username - user who owns dataset
+   * @param {string} dataset - name of dataset
+   * @yields {Array} - [recordID string, recordData any, hash Buffer]
+   */
+  async * iterateEntries (user, dataset) {
+    const index = await queue.add(() => file.read(this.path(user, dataset, 'index')))
+    for (const [recordID, hash] of Object.entries(index)) {
+      const recordData = await queue.add(() => file.read(this.path(user, dataset, 'objects', index[recordID].toString('hex'))))
+      yield [recordID, recordData, hash]
+    }
+  },
+
   /** write an entry to a dataset
    * @param {string} username - user who owns dataset
    * @param {string} dataset - name of dataset
@@ -170,7 +183,7 @@ module.exports = {
    * @async
    */
   async merge (user, dataset, entries) {
-    const updatedIDs = []
+    let updatedIDs = []
     const idMapRewrites = {}
 
     for await (const [id, data] of entries) {
@@ -186,8 +199,11 @@ module.exports = {
     // update the index
     await queue.add(async () => {
       const path = this.path(user, dataset, 'index')
+      const index = await file.read(path)
+      // remove any elements from updatedIDs where the data didn't actually change
+      updatedIDs = Object.entries(idMapRewrites).filter(([id, hash]) => !index[id] || hash.equals(index[id])).map(x => x[0])
       await file.write(path, {
-        ...(await file.read(path)),
+        ...index,
         ...idMapRewrites
       })
     })

@@ -8,6 +8,7 @@ const ivm = require('isolated-vm')
 const codec = require('./codec')
 const fs = require('fs-extra')
 const defaults = require('../../package.json').defaults
+const readPath = require('./read-path')
 // Setup a VM for executing javascript lenses
 const Isolate = new ivm.Isolate({ memoryLimit: 64 })
 // Precompile the codec-lite.ivm init code
@@ -27,13 +28,13 @@ module.exports = {
    * @param {string} username - string username
    * @param {string} lens - string name of lens
    * @param {string} mapCode - lens code which returns an array of datasets/views to query
-   * @param {string} reduceCode - lens code which returns an array of outputs
+   * @param {string} mergeCode - lens code which given 'left' and 'right' outputs returns the result
    * @async
    */
-  async write (user, lens, mapCode, reduceCode) {
+  async write (user, lens, mapCode, mergeCode) {
     await file.write(`${auth.userFolder(user)}/javascript-lenses/${encodeURIComponent(lens)}/lens`, {
       mapCode,
-      reduceCode,
+      mergeCode,
       updated: Date.now()
     })
   },
@@ -45,7 +46,7 @@ module.exports = {
    * @async
    */
   async read (user, lens) {
-    await file.read(`${auth.userFolder(user)}/javascript-lenses/${encodeURIComponent(lens)}/lens`)
+    return await file.read(`${auth.userFolder(user)}/javascript-lenses/${encodeURIComponent(lens)}/lens`)
   },
 
   /** delete a lens to from user's data folder
@@ -59,13 +60,15 @@ module.exports = {
 
   /**
    * async generator function which accepts an async iterable input that emits [recordPath, recordData]
-   * and outputs [recordID, recordData, dependencies]. dependencies will be an object with recordPath keys
+   * and outputs { outputs, dependencies }. dependencies will be an object with recordPath keys
    * and buffer hash values. This object will always contain the input recordPath, and may contain extra
-   * mutable dependancies (/datasets/ and /viewports/ data paths) if the code used lookup() to fetch extra
+   * mutable dependencies (/datasets/ and /viewports/ data paths) if the code used lookup() to fetch extra
    * resources. Optional second argument logger can be set to a function which logs text out for debugging
    * if set, logger must be a function which accepts logger('log'|'info'|'error'|'warn', ...args) and is
    * otherwise similar to console.log/warn/error etc
    * @typedef {function} LensMapFunction
+   * @param {async function*} iterator - async iterator that yields [recordPath, recordData] to process
+   * @param {null|function} logger - optional logger function accepts same input as console.log but first arg is info|warn|log|error string
    */
 
   /** load a javascript lens against an input data
@@ -85,25 +88,47 @@ module.exports = {
       for await (const [recordPath, recordData] of iterator) {
         const context = await Isolate.createContext()
         const outputs = []
+        const dependencies = [recordPath] // list of data paths used
 
         // load embedded codec library
         await codecScript.run(context)
 
         // Adjust the jail to have a console.log/warn/error/info api, and to remove some non-deterministic features
         if (!logger) logger = (type, ...args) => console.info(`Lens ${user}:${lens}/map console.${type}:`, ...args)
-        const emit = (recordID, recordData) => outputs.push([recordID, codec.cloneable.decode(recordData)])
+        const emit = (key, recordData) => outputs.push(key, codec.cloneable.decode(recordData))
+        // read in data from other dataPath's adding them to dependencies
+        async function * read (dataPath) {
+          if (!dependencies.includes(dataPath)) {
+            dependencies.push(dataPath)
+          }
+          for await (const [path, data] of readPath(dataPath)) {
+            yield [path, codec.cloneable.encode(data)]
+          }
+        }
         await context.evalClosure(`
         Math.random = function () { throw new Error('Math.random is non-deterministic and disallowed') }
-        function output(recordID, recordData) {
-          if (typeof recordID !== 'string' || recordID === '') throw new Error('recordID must be a non-empty string')
-          $1.applyIgnored(undefined, [recordID, codec.cloneable.encode(recordData)])
+        function output(key, recordData) {
+          $1.applyIgnored(undefined, [key, codec.cloneable.encode(recordData)])
+        }
+        // makes readPath fake syncronous
+        function * read(dataPath) {
+          const asyncGeneratorRef = $2.applySync(null, [dataPath], { arguments: { copy: true } })
+          const nextRef = asyncGeneratorRef.getSync('next', { reference: true })
+          while (true) {
+            const { value, done } = nextRef.applySyncPromise(asyncGeneratorRef, [], { result: { copy: true }})
+            if (done === false) {
+              yield [value[0], codec.cloneable.decode(value[1])]
+            } else {
+              return
+            }
+          }
         }
         const console = Object.freeze({
           log:   (...args) => $0.applyIgnored(undefined, ['log',   ...args], { arguments: { copy: true } }),
           warn:  (...args) => $0.applyIgnored(undefined, ['warn',  ...args], { arguments: { copy: true } }),
           error: (...args) => $0.applyIgnored(undefined, ['error', ...args], { arguments: { copy: true } }),
           info:  (...args) => $0.applyIgnored(undefined, ['info',  ...args], { arguments: { copy: true } })
-        });`, [logger, emit], { arguments: { reference: true } })
+        });`, [logger, emit, read], { arguments: { reference: true } })
 
         // copy data in to context
         await context.evalClosure(
@@ -120,22 +145,42 @@ module.exports = {
 
         // ask v8 to free this context's memory
         context.release()
+
+        yield { outputs, dependencies }
       }
     }
   },
 
-  /**
-   * async function which accepts (recordID, data[]) as input
-   * and merges all the outputs of LensMapFunction that output the same recordID string, in to one value
-   * for use in a viewport, returns an arbitrary type
-   * @typedef {function} LensReduceFunction
-   */
-
   /** load a javascript lens to use to reduce LensMapFunction outputs in to a final dataset
    * @param {*} user - user who owns lens
    * @param {*} lens - name of javascript lens
-   * @returns {function} LensReduceFunction
+   * @returns {async function} - function accepts two entries and returns one
    */
-  async loadReduce (user, lens) {
+  async loadMerge (user, lens) {
+    const config = await this.read(user, lens)
+
+    return async function (left, right) {
+      const context = await Isolate.createContext()
+      // load embedded codec library
+      await codecScript.run(context)
+
+      const result = await context.evalClosure(`codec.cloneable.encode((function (left, right) {
+        const $0 = undefined, $1 = undefined;
+        ${config.mergeCode}
+      })(...codec.cloneable.decode([$0, $1]))`,
+      codec.cloneable.encode([left, right]), {
+        timeout: defaults.lensTimeout,
+        arguments: { copy: true },
+        result: { copy: true },
+        lineOffset: -2,
+        columnOffset: -8,
+        filename: `${defaults.url}/lenses/${user}:${lens}/functions/merge.js`
+      })
+
+      // ask v8 to free this context's memory
+      context.release()
+
+      return codec.cloneable.decode(result)
+    }
   }
 }

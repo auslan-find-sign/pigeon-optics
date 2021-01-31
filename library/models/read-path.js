@@ -10,6 +10,7 @@ const sources = { datasets, viewports }
 
 async function * readPath (path) {
   const { params } = pathDecode(path)
+  /** @type datasets */
   const source = sources[params.source]
 
   if (source !== undefined) {
@@ -18,8 +19,8 @@ async function * readPath (path) {
       yield [params.recordID, await source.readEntry(params.user, params.name, params.recordID)]
     } else {
       // do the whole dataset
-      for (const recordID of await source.listEntries(params.user, params.name)) {
-        yield [recordID, await source.readEntry(params.user, params.name, recordID)]
+      for await (const [recordID, recordData] of source.iterateEntries(params.user, params.name)) {
+        yield [recordID, recordData]
       }
     }
   } else {
