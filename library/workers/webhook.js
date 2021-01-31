@@ -2,10 +2,6 @@ const got = require('got')
 const codec = require('../models/codec')
 const defaults = require('../../package.json').defaults
 const objectHash = require('object-hash')
-const crypto = require('crypto')
-
-// establish a secret key that's used to sign async responses
-const secret = process.env.SECRET ? Buffer.from(process.env.SECRET) : crypto.getRandomValues(64)
 
 module.exports = (webhookURL, viewportUser, viewportName, format = 'json') => {
   return {
@@ -50,13 +46,4 @@ module.exports = (webhookURL, viewportUser, viewportName, format = 'json') => {
       }
     }
   }
-}
-
-// generates a signature key to allow write access to webhook response without auth
-module.exports.keyGen = (path, user, name) => {
-  const hasher = crypto.createHash('sha256')
-  hasher.update(secret)
-  hasher.update(Buffer.from(`${user}:${name}@${path}`))
-  hasher.update(secret)
-  return hasher.digest().toString('hex')
 }

@@ -53,7 +53,8 @@ app.use(express.static('public'))
 app.use(require('./library/controllers/auth-controller'))
 app.use(require('./library/controllers/attachment-controller'))
 app.use(require('./library/controllers/dataset-controller'))
-// app.use(require('./library/controllers/lens-controller'))
+app.use(require('./library/controllers/viewport-controller'))
+app.use(require('./library/controllers/lens-controller'))
 app.use(require('./library/controllers/export-controller'))
 
 app.get('/', (req, res) => {
