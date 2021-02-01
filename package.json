@@ -22,7 +22,7 @@
     "compression": "^1.7.4",
     "cookie-session": "^1.4.0",
     "encodeuricomponent-tag": "^1.0.1",
-    "express": "^4.17.1",
+    "express": "^5.0.0-alpha.8",
     "fs-extra": "^9.1.0",
     "got": "^11.8.1",
     "h.js": "^5.1.0",

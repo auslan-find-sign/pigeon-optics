@@ -8,6 +8,7 @@ const process = require('process')
 const codec = require('./library/models/codec')
 const Vibe = require('./library/vibe/rich-builder')
 const homepageView = require('./library/views/homepage')
+const errorView = require('./library/views/error-handler')
 
 // create web server
 const app = express()
@@ -59,6 +60,22 @@ app.use(require('./library/controllers/export-controller'))
 
 app.get('/', (req, res) => {
   Vibe.docStream('Datasets Project', homepageView(req)).pipe(res.type('html'))
+})
+
+app.use((error, req, res, next) => {
+  if (error.code === 'ENOENT') {
+    res.status(404) // something tried to read a file that doesn't exist
+  } else if (error.name === 'SyntaxError' || error.stack.includes('/borc/src/decoder.js')) {
+    res.status(400) // parse errors are likely to be clients sending malformed data
+  } else {
+    res.status(500)
+  }
+
+  if (req.accepts('html')) {
+    Vibe.docStream('Request Error', errorView(req, error)).pipe(res.type('html'))
+  } else {
+    codec.respond(req, res, { error: error.message })
+  }
 })
 
 const port = process.env.PORT || 3000
