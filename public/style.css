@@ -292,8 +292,8 @@ form.simple-form > button[type="submit"] {
 }
 .styled-text.glitch {
   font-weight: 400;
-  text-shadow: 0.4em  0.1em 0px lightgreen,
-              -0.3em -0.1em 0px magenta;
+  text-shadow: 0.25ex -0.15ex 0px lightgreen,
+              -0.3ex   0.15ex 0px magenta;
 }
 
 /* Toolbar widget */
