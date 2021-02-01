@@ -19,7 +19,7 @@ module.exports = (req, data, error = null) => {
       v.dl(v => {
         v.dt('Viewport Name')
         if (data.create) {
-          v.dd(v => v.input({ name: 'name', value: data.name, minlength: 1, maxlength: 250 }))
+          v.dd(v => v.input({ name: 'name', value: data.name, minlength: 1, maxlength: 60, pattern: "[^!*'();:@&=+$,/?%#[\\]]+" }))
         } else {
           v.dd(data.name)
           v.hiddenFormData({ name: data.name })
