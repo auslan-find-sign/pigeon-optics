@@ -17,6 +17,14 @@ module.exports.basicAuthMiddleware = async (req, res, next) => {
       }
     }
   }
+
+  // helper to determine if logged in user owns this resource and can edit it or whatever
+  if (req.session.auth) {
+    if ((req.params.user && req.params.user === req.session.auth.user) || req.session.auth.auth === 'admin') {
+      req.owner = true
+    }
+  }
+
   next()
 }
 
