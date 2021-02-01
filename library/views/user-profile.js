@@ -12,18 +12,12 @@ module.exports = (req, profile, datasets, viewports, lenses) => {
     v.heading(`${profile.auth}: ${profile.user}`)
 
     v.heading('Datasets:', { level: 3 })
-    for (const dataset of datasets) {
-      v.div(v => v.a(dataset, { href: uri`/datasets/${profile.user}:${dataset}/` }))
-    }
+    v.linkList(datasets, name => uri`/datasets/${profile.user}:${name}/`)
 
     v.heading('Viewports:', { level: 3 })
-    for (const viewport of viewports) {
-      v.div(v => v.a(viewport, { href: uri`/viewports/${profile.user}:${viewport}/` }))
-    }
+    v.linkList(viewports, name => uri`/viewports/${profile.user}:${name}/`)
 
     v.heading('Javascript Lenses:', { level: 3 })
-    for (const lens of lenses) {
-      v.div(v => v.a(lens, { href: uri`/lenses/${profile.user}:${lens}/` }))
-    }
+    v.linkList(lenses, name => uri`/lenses/${profile.user}:${name}/`)
   })
 }
