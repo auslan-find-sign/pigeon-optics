@@ -25,7 +25,8 @@ const encodingMimeTypes = {
  */
 async function * encodePath (path, encoding) {
   if (encoding === 'json') yield '{\n'
-  for await (const [recordID, recordData] of readPath(path)) {
+  for await (const [recordPath, recordData] of readPath(path)) {
+    const { recordID } = path.decode(recordPath)
     if (encoding === 'cbor') {
       yield codec.cbor.encode([recordID, recordData])
     } else if (encoding === 'json') {
@@ -66,7 +67,8 @@ function streamArchive (path, archiveType, includeAttachments) {
     await entry(null, { name: '/json/' })
     if (includeAttachments) await entry(null, { name: '/attachments/' })
 
-    for await (const [recordID, recordData] of readPath(path)) {
+    for await (const [recordPath, recordData] of readPath(path)) {
+      const { recordID } = codec.path.decode(recordPath)
       // zip-stream support for entry contents being strings or buffers seems broken
       // but stream inputs works, so just make streams
       // output cbor version

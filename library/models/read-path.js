@@ -3,9 +3,7 @@
  */
 const datasets = require('./dataset')
 const viewports = require('./viewport')
-
-const ptr = require('path-to-regexp')
-const pathDecode = ptr.match('/:source(viewports|datasets)/:user\\::name/:recordID?')
+const codec = require('./codec')
 const sources = { datasets, viewports }
 
 /** reads a data path, which could be one specific record, or a whole dataset/viewport
@@ -19,18 +17,21 @@ async function * readPath (path) {
       }
     }
   } else if (typeof path === 'string') {
-    const { params } = pathDecode(path)
+    const params = codec.path.decode(path)
     /** @type datasets */
     const source = sources[params.source]
 
     if (source !== undefined) {
       if (params.recordID !== undefined) {
         // just yield the specific entry
-        yield [params.recordID, await source.readEntry(params.user, params.name, params.recordID)]
+        yield [
+          codec.path.encode(params.source, params.user, params.name, params.recordID),
+          await source.readEntry(params.user, params.name, params.recordID)
+        ]
       } else {
         // do the whole dataset
         for await (const [recordID, recordData] of source.iterateEntries(params.user, params.name)) {
-          yield [recordID, recordData]
+          yield [codec.path.encode(params.source, params.user, params.name, recordID), recordData]
         }
       }
     } else {
@@ -42,9 +43,8 @@ async function * readPath (path) {
 }
 
 readPath.exists = async function (path) {
-  const decoded = pathDecode(path)
-  if (!decoded) return false
-  const params = decoded.params
+  const params = codec.path.decode(path)
+  if (!params) return false
   const source = sources[params.source]
   return source.exists(params.user, params.name, params.recordID)
 }
