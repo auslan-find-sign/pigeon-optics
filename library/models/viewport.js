@@ -24,6 +24,18 @@ module.exports = {
     return `${auth.userFolder(user)}/viewports${path.map(x => `/${encodeURIComponent(x)}`).join('')}`
   },
 
+  async validateConfig (config) {
+    dataset.validateConfig(config)
+    console.assert(typeof config.lens === 'object', 'lens must be an object')
+    console.assert(typeof config.lens.user === 'string', 'lens must have a string user property')
+    console.assert(typeof config.lens.name === 'string', 'lens must have a string user property')
+    console.assert(Array.isArray(config.inputs), 'inputs must be an array')
+    for (const input of config.inputs) {
+      console.assert(await readPath.exists(input), `${input} doesn’t exist`)
+    }
+    console.assert(config.inputs.every(x => typeof x === 'string'), 'inputs entries must be strings')
+  },
+
   // (re)build a specified viewport
   async build (user, viewport) {
     const config = await this.readConfig(user, viewport)

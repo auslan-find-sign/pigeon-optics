@@ -107,6 +107,10 @@ module.exports = {
     return (await file.list(this.path(user))).map(x => decodeURIComponent(x))
   },
 
+  async validateConfig (config) {
+    console.assert(typeof config.memo === 'string', 'memo must be a string')
+  },
+
   /** create a dataset with a specific name
    * @param {string} username - string username
    * @param {string} dataset - string name of dataset
@@ -128,6 +132,8 @@ module.exports = {
     if (await file.exists(this.path(user, dataset))) {
       throw new Error('This name already exists')
     }
+
+    await this.validateConfig(config)
 
     await queue.add(() => Promise.all([
       file.write(this.path(user, dataset, 'config'), { created: Date.now(), ...config }),
@@ -153,6 +159,7 @@ module.exports = {
    * @async
    */
   async writeConfig (user, dataset, configData) {
+    await this.validateConfig(configData)
     await queue.add(() => file.write(this.path(user, dataset, 'config'), configData))
   },
 
