@@ -17,7 +17,7 @@ router.get('/viewports/create', auth.required, (req, res) => {
     owner: req.session.auth.user,
     name: '',
     memo: '',
-    inputList: '',
+    inputs: '',
     lens: 'owner-user:lens-name'
   }
   Vibe.docStream('Create a Viewport', viewportEditor(req, state)).pipe(res.type('html'))
@@ -31,7 +31,7 @@ router.post('/viewports/create', auth.required, async (req, res) => {
         user: req.body.lens.split(':')[0],
         name: req.body.lens.split(':')[1]
       },
-      inputs: req.body.inputList.split('\n').map(x => x.trim()).filter(x => !!x)
+      inputs: req.body.inputs.split('\n').map(x => x.trim()).filter(x => !!x)
     })
     // rebuild since settings may have changed
     await viewport.build(req.session.auth.user, req.body.name)
@@ -53,7 +53,7 @@ router.post('/viewports/save', auth.required, async (req, res) => {
         user: req.body.lens.split(':')[0],
         name: req.body.lens.split(':')[1]
       },
-      inputs: req.body.inputList.split('\n').map(x => x.trim()).filter(x => !!x)
+      inputs: req.body.inputs.split('\n').map(x => x.trim()).filter(x => !!x)
     })
     // rebuild since settings may have changed
     await viewport.build(req.session.auth.user, req.body.name)

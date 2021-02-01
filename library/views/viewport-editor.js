@@ -29,7 +29,7 @@ module.exports = (req, data, error = null) => {
         v.dd(v => v.textarea(data.memo, { name: 'memo', spellcheck: 'true', wrap: 'off' }))
 
         v.dt('Inputs (one data path per line)')
-        v.dd(v => v.textarea(data.inputList, { name: 'inputs', spellcheck: 'false', wrap: 'off' }))
+        v.dd(v => v.textarea(data.inputs, { name: 'inputs', spellcheck: 'false', wrap: 'off' }))
 
         v.dt('Javascript Lens')
         v.dd(v => v.input({ name: 'lens', value: data.lens, minlength: 5, maxlength: 250, pattern: '[^:]+:[^:]+' }))

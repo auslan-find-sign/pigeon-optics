@@ -27,7 +27,7 @@ module.exports = (req, data, error = null) => {
           v.dd(data.name)
         }
 
-        v.dt('Short Description')
+        v.dt('Memo (short description)')
         v.dd(v => v.textarea(data.memo, { name: 'memo', spellcheck: 'true', wrap: 'off' }))
       })
 
