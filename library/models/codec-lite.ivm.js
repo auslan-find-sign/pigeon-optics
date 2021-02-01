@@ -22,55 +22,53 @@ class Attachment extends AttachmentReference {
   }
 }
 
-const codec = {
-  cloneable: {
-    decode (object) {
-      if (Array.isArray(object)) {
-        return object.map(entry => this.decode(entry))
-      } else if (typeof object === 'object') {
-        if ('_bufferArrayBytes' in object) {
-          return Uint8Array.from(object._bufferArrayBytes)
-        } else if (object._class === 'Attachment') {
-          const attachment = new Attachment(Uint8Array.from(object._bytes), object._mimeType)
-          attachment.hash = Uint8Array.from(object._hash)
-          return Object.freeze(attachment)
-        } else if (object._class === 'AttachmentReference') {
-          return Object.freeze(new AttachmentReference(Uint8Array.from(object._hashBytes), object._mimeType))
-        }
-
-        return Object.fromEntries(Object.entries(object).map(([key, value]) => {
-          return [key, this.decode(value)]
-        }))
-      } else {
-        return object
-      }
-    },
-
-    encode (object) {
-      if (Array.isArray(object)) {
-        return object.map(entry => this.encode(entry))
-      } else if (object instanceof ArrayBuffer) {
-        return { _bufferArrayBytes: [...object] }
-      } else if (object instanceof Attachment) {
-        return {
-          _class: 'Attachment',
-          _bytes: [...object.data],
-          _mimeType: object.mimeType,
-          _hash: [...object.hash]
-        }
-      } else if (object instanceof AttachmentReference) {
-        return {
-          _class: 'AttachmentReference',
-          _mimeType: object.mimeType,
-          _hash: [...object.hash]
-        }
-      } else if (typeof object === 'object') {
-        return Object.fromEntries(Object.entries(object).map(([key, value]) => {
-          return [key, this.decode(value)]
-        }))
-      }
-
-      return object
+const codec = {}
+codec.cloneable = {}
+codec.cloneable.decode = function (object) {
+  if (Array.isArray(object)) {
+    return object.map(entry => codec.cloneable.decode(entry))
+  } else if (typeof object === 'object') {
+    if ('_bufferArrayBytes' in object) {
+      return Uint8Array.from(object._bufferArrayBytes)
+    } else if (object._class === 'Attachment') {
+      const attachment = new Attachment(Uint8Array.from(object._bytes), object._mimeType)
+      attachment.hash = Uint8Array.from(object._hash)
+      return Object.freeze(attachment)
+    } else if (object._class === 'AttachmentReference') {
+      return Object.freeze(new AttachmentReference(Uint8Array.from(object._hashBytes), object._mimeType))
     }
+
+    return Object.fromEntries(Object.entries(object).map(([key, value]) => {
+      return [key, codec.cloneable.decode(value)]
+    }))
+  } else {
+    return object
   }
+}
+
+codec.cloneable.encode = function (object) {
+  if (Array.isArray(object)) {
+    return object.map(entry => codec.cloneable.encode(entry))
+  } else if (object instanceof ArrayBuffer) {
+    return { _bufferArrayBytes: [...object] }
+  } else if (object instanceof Attachment) {
+    return {
+      _class: 'Attachment',
+      _bytes: [...object.data],
+      _mimeType: object.mimeType,
+      _hash: [...object.hash]
+    }
+  } else if (object instanceof AttachmentReference) {
+    return {
+      _class: 'AttachmentReference',
+      _mimeType: object.mimeType,
+      _hash: [...object.hash]
+    }
+  } else if (typeof object === 'object') {
+    return Object.fromEntries(Object.entries(object).map(([key, value]) => {
+      return [key, codec.cloneable.encode(value)]
+    }))
+  }
+
+  return object
 }
