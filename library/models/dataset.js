@@ -112,7 +112,7 @@ module.exports = {
    * @async
    */
   async create (user, dataset, config = {}) {
-    if (!dataset.match(/^[^!*'();:@&=+$,/?%#[]]+$/i)) {
+    if (!dataset.match(/^[^!*'();:@&=+$,/?%#[\]]+$/i)) {
       throw new Error('Name must not contain any of ! * \' ( ) ; : @ & = + $ , / ? % # [ ]')
     }
 
@@ -120,7 +120,7 @@ module.exports = {
       throw new Error('Name cannot be empty')
     }
 
-    if (dataset.length < 60) {
+    if (dataset.length > 60) {
       throw new Error('Name must be less than 60 characters long')
     }
 
@@ -128,10 +128,10 @@ module.exports = {
       throw new Error('This name already exists')
     }
 
-    await queue.add(() => Promise.all(
+    await queue.add(() => Promise.all([
       file.write(this.path(user, dataset, 'config'), { created: Date.now(), ...config }),
       file.write(this.path(user, dataset, 'index'), {})
-    ))
+    ]))
   },
 
   /** read config of existing dataset
