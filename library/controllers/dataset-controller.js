@@ -69,37 +69,29 @@ router.get('/datasets/:user\\::dataset/', async (req, res) => {
 
 // get a record from a user's dataset
 router.get('/datasets/:user\\::dataset/:recordID', async (req, res) => {
-  try {
-    const record = await dataset.readEntry(req.params.user, req.params.dataset, req.params.recordID)
+  const record = await dataset.readEntry(req.params.user, req.params.dataset, req.params.recordID)
 
-    if (req.accepts('html')) {
-      Vibe.docStream(`${req.params.user}:${req.params.dataset}/${req.params.recordID}`, layout(req, v => {
-        v.heading(`Record ID: ${req.params.recordID}`)
-        v.sourceCode(codec.json.encode(record, 2))
-      })).pipe(res.type('html'))
-    } else {
-      codec.respond(req, res, record)
-    }
-  } catch (err) {
-    codec.respond(req, res.status(404), { error: err.message })
+  if (req.accepts('html')) {
+    Vibe.docStream(`${req.params.user}:${req.params.dataset}/${req.params.recordID}`, layout(req, v => {
+      v.heading(`Record ID: ${req.params.recordID}`)
+      v.sourceCode(codec.json.encode(record, 2))
+    })).pipe(res.type('html'))
+  } else {
+    codec.respond(req, res, record)
   }
 })
 
 // UI to edit a record from a user's dataset
-router.get('/datasets/:user\\::dataset/:recordID/edit', async (req, res) => {
-  try {
-    const record = await dataset.readEntry(req.params.user, req.params.dataset, req.params.recordID)
+router.get('/datasets/:user\\::dataset/:recordID/edit', auth.requireOwnerOrAdmin('user'), async (req, res) => {
+  const record = await dataset.readEntry(req.params.user, req.params.dataset, req.params.recordID)
 
-    const title = `Editing ${req.params.user}:${req.params.dataset}/${req.params.recordID}`
-    const state = {
-      create: false,
-      recordID: req.params.recordID,
-      recordData: codec.json.encode(record, 2)
-    }
-    Vibe.docStream(title, editorView(req, state)).pipe(res.type('html'))
-  } catch (err) {
-    codec.respond(req, res.status(404), { error: err.message })
+  const title = `Editing ${req.params.user}:${req.params.dataset}/${req.params.recordID}`
+  const state = {
+    create: false,
+    recordID: req.params.recordID,
+    recordData: codec.json.encode(record, 2)
   }
+  Vibe.docStream(title, editorView(req, state)).pipe(res.type('html'))
 })
 
 router.post('/datasets/:user\\::dataset/:recordID/save', auth.requireOwnerOrAdmin('user'), async (req, res) => {
@@ -162,12 +154,8 @@ router.post('/datasets/create-record/:user\\::dataset/save', auth.requireOwnerOr
 })
 
 router.delete('/datasets/:user\\::dataset/:recordID', auth.requireOwnerOrAdmin('user'), async (req, res) => {
-  try {
-    await dataset.deleteEntry(req.params.user, req.params.dataset, req.params.recordID)
-    codec.respond(req, res.status(200), { deleted: true })
-  } catch (err) {
-    codec.respond(req, res.status(500), { deleted: false, error: err.message })
-  }
+  await dataset.deleteEntry(req.params.user, req.params.dataset, req.params.recordID)
+  codec.respond(req, res.status(200), { deleted: true })
 })
 
 module.exports = router
