@@ -42,9 +42,8 @@ module.exports = {
     const resultsMap = {}
 
     // run the map over the whole dataset, transforming to map output objects on disk
-    const mapFn = jsLens.loadMap(config.lens.user, config.lens.name)
-    const inputFeed = readPath(config.input)
-    for await (const { outputs, dependencies } of mapFn(inputFeed)) {
+    const mapFn = await jsLens.loadMap(config.lens.user, config.lens.name)
+    for await (const { input, outputs } of mapFn(readPath(config.inputs))) {
       for (const [recordID, recordData] of outputs) {
         const hash = codec.objectHash(recordData)
         await file.write(this.path(user, viewport, 'map-output', hash.toString('hex')), recordData)
@@ -54,7 +53,7 @@ module.exports = {
     }
 
     // reduce the results using the merge function in to entries in this viewport dataset
-    const mergeFn = jsLens.loadMerge(config.lens.user, config.lens.name)
+    const mergeFn = await jsLens.loadMerge(config.lens.user, config.lens.name)
     async function * entryIter () {
       const read = async (hash) => file.read(this.path(user, viewport, 'map-output', hash.toString('hex')))
       for (const [recordID, recordHashList] of Object.entries(resultsMap)) {

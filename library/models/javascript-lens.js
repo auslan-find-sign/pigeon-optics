@@ -8,7 +8,6 @@ const ivm = require('isolated-vm')
 const codec = require('./codec')
 const fs = require('fs-extra')
 const defaults = require('../../package.json').defaults
-const readPath = require('./read-path')
 // Setup a VM for executing javascript lenses
 const Isolate = new ivm.Isolate({ memoryLimit: 64 })
 // Precompile the codec-lite.ivm init code
@@ -78,17 +77,16 @@ module.exports = {
    * @async
    */
   async loadMap (user, lens) {
-    return async function * (iterator, logger = null) {
-      const config = await this.read(user, lens)
-      const mapScript = await Isolate.compileScript(`(function () {\n${config.mapCode}\n})()`, {
-        filename: `${defaults.url}/lenses/${user}:${lens}/functions/map.js`,
-        lineOffset: -1
-      })
+    const config = await this.read(user, lens)
+    const mapScript = await Isolate.compileScript(`(function () {\n${config.mapCode}\n})()`, {
+      filename: `${defaults.url}/lenses/${user}:${lens}/functions/map.js`,
+      lineOffset: -1
+    })
 
+    return async function * (iterator, logger = null) {
       for await (const [recordPath, recordData] of iterator) {
         const context = await Isolate.createContext()
         const outputs = []
-        const dependencies = [recordPath] // list of data paths used
 
         // load embedded codec library
         await codecScript.run(context)
@@ -96,39 +94,15 @@ module.exports = {
         // Adjust the jail to have a console.log/warn/error/info api, and to remove some non-deterministic features
         if (!logger) logger = (type, ...args) => console.info(`Lens ${user}:${lens}/map console.${type}:`, ...args)
         const emit = (key, recordData) => outputs.push(key, codec.cloneable.decode(recordData))
-        // read in data from other dataPath's adding them to dependencies
-        async function * read (dataPath) {
-          if (!dependencies.includes(dataPath)) {
-            dependencies.push(dataPath)
-          }
-          for await (const [path, data] of readPath(dataPath)) {
-            yield [path, codec.cloneable.encode(data)]
-          }
-        }
         await context.evalClosure(`
         Math.random = function () { throw new Error('Math.random is non-deterministic and disallowed') }
-        function output(key, recordData) {
-          $1.applyIgnored(undefined, [key, codec.cloneable.encode(recordData)])
-        }
-        // makes readPath fake syncronous
-        function * read(dataPath) {
-          const asyncGeneratorRef = $2.applySync(null, [dataPath], { arguments: { copy: true } })
-          const nextRef = asyncGeneratorRef.getSync('next', { reference: true })
-          while (true) {
-            const { value, done } = nextRef.applySyncPromise(asyncGeneratorRef, [], { result: { copy: true }})
-            if (done === false) {
-              yield [value[0], codec.cloneable.decode(value[1])]
-            } else {
-              return
-            }
-          }
-        }
+        function output(key, recordData) { $1.applySync(undefined, [key, codec.cloneable.encode(recordData)]) }
         const console = Object.freeze({
           log:   (...args) => $0.applyIgnored(undefined, ['log',   ...args], { arguments: { copy: true } }),
           warn:  (...args) => $0.applyIgnored(undefined, ['warn',  ...args], { arguments: { copy: true } }),
           error: (...args) => $0.applyIgnored(undefined, ['error', ...args], { arguments: { copy: true } }),
           info:  (...args) => $0.applyIgnored(undefined, ['info',  ...args], { arguments: { copy: true } })
-        });`, [logger, emit, read], { arguments: { reference: true } })
+        });`, [logger, emit], { arguments: { reference: true } })
 
         // copy data in to context
         await context.evalClosure(
@@ -146,7 +120,7 @@ module.exports = {
         // ask v8 to free this context's memory
         context.release()
 
-        yield { outputs, dependencies }
+        yield { input: recordPath, outputs }
       }
     }
   },
