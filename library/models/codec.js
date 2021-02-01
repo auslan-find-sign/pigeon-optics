@@ -4,9 +4,8 @@
 const cbor = require('borc')
 const objectHash = require('object-hash')
 const { Attachment, AttachmentReference } = require('./attachment')
-const serverTools = require('../server-tools')
-const ui = require('../ui')
-const standardPage = require('../views/standard-page')
+const Vibe = require('../vibe/rich-builder')
+const layout = require('../views/layout')
 
 module.exports.cbor = {
   /**
@@ -175,12 +174,9 @@ module.exports.respond = (req, res, object) => {
   } else if (bestMatch === 'application/json') {
     res.type(bestMatch).send(module.exports.json.encode(object))
   } else {
-    serverTools.sendWebpage(req, res, {
-      title: 'API Object Response',
-      contents: standardPage(req, [
-        ui.heading({ contents: 'API Object Response:' }),
-        ui.sourceCode({ contents: module.exports.json.encode(object, 2) })
-      ])
-    })
+    Vibe.docStream('API Object Response', layout(req, v => {
+      v.heading('API Object Response:')
+      v.sourceCode(module.exports.json.encode(object, 2))
+    })).pipe(res)
   }
 }
