@@ -78,43 +78,44 @@ module.exports = {
    */
   async loadMap (user, lens) {
     const config = await this.read(user, lens)
-    const mapScript = await Isolate.compileScript(`(function () {\n${config.mapCode}\n})()`, {
-      filename: `${defaults.url}/lenses/${user}:${lens}/functions/map.js`,
-      lineOffset: -1
-    })
 
     return async function * (iterator, logger = null) {
       for await (const [recordPath, recordData] of iterator) {
         const context = await Isolate.createContext()
         const outputs = []
 
+        // Adjust the jail to have a console.log/warn/error/info api, and to remove some non-deterministic features
+        if (!logger) logger = (type, ...args) => console.info(`Lens ${user}:${lens}/map console.${type}:`, ...args)
+        const emit = (key, recordData) => {
+          outputs.push([key, codec.cloneable.decode(recordData)])
+        }
+
         // load embedded codec library
         await codecScript.run(context)
 
-        // Adjust the jail to have a console.log/warn/error/info api, and to remove some non-deterministic features
-        if (!logger) logger = (type, ...args) => console.info(`Lens ${user}:${lens}/map console.${type}:`, ...args)
-        const emit = (key, recordData) => outputs.push(key, codec.cloneable.decode(recordData))
-        await context.evalClosure(`
-        Math.random = function () { throw new Error('Math.random is non-deterministic and disallowed') }
-        function output(key, recordData) { $1.applySync(undefined, [key, codec.cloneable.encode(recordData)]) }
-        const console = Object.freeze({
-          log:   (...args) => $0.applyIgnored(undefined, ['log',   ...args], { arguments: { copy: true } }),
-          warn:  (...args) => $0.applyIgnored(undefined, ['warn',  ...args], { arguments: { copy: true } }),
-          error: (...args) => $0.applyIgnored(undefined, ['error', ...args], { arguments: { copy: true } }),
-          info:  (...args) => $0.applyIgnored(undefined, ['info',  ...args], { arguments: { copy: true } })
-        });`, [logger, emit], { arguments: { reference: true } })
-
-        // copy data in to context
-        await context.evalClosure(
-          'const recordPath = $0, recordData = codec.cloneable.decode($1);',
-          [recordPath, codec.cloneable.encode(recordData)],
-          { arguments: { copy: true } }
-        )
-
-        // run user script
-        mapScript.run(context, {
+        // run user script with data
+        const lines = [
+          'const recordPath = $0.copySync();',
+          'const recordData = codec.cloneable.decode($1.copySync());',
+          'Math.random = function () { throw new Error("Math.random() is non-deterministic and disallowed") };',
+          'function output(key, recordData) {',
+          '  if (typeof key !== "string") throw new Error("first argument key must be a string");',
+          '  if (recordData === null || recordData === undefined) throw new Error("second argument recordData must not be null or undefined");',
+          '  $3.applySync(undefined, [key, codec.cloneable.encode(recordData)], { arguments: { copy: true } })',
+          '};',
+          'const console = Object.freeze(Object.fromEntries(["log", "warn", "error", "info"].map(kind => {',
+          '  return [kind, (...args) => $2.applyIgnored(undefined, [kind, ...args], { arguments: { copy: true } })]',
+          '})));',
+          '{',
+          'const $0 = undefined, $1 = undefined, $2 = undefined, $3 = undefined',
+          config.mapCode,
+          '}'
+        ]
+        await context.evalClosure(lines.join('\n'), [recordPath, codec.cloneable.encode(recordData), logger, emit], {
           timeout: defaults.lensTimeout,
-          arguments: { reference: true }
+          arguments: { reference: true },
+          filename: `${defaults.url}/lenses/${user}:${lens}/map.js`,
+          lineOffset: (-lines.length)
         })
 
         // ask v8 to free this context's memory
@@ -138,10 +139,10 @@ module.exports = {
       // load embedded codec library
       await codecScript.run(context)
 
-      const result = await context.evalClosure(`codec.cloneable.encode((function (left, right) {
+      const result = await context.evalClosure(`return codec.cloneable.encode((function (left, right) {
         const $0 = undefined, $1 = undefined;
         ${config.mergeCode}
-      })(...codec.cloneable.decode([$0, $1]))`,
+      })(...codec.cloneable.decode([$0, $1])))`,
       codec.cloneable.encode([left, right]), {
         timeout: defaults.lensTimeout,
         arguments: { copy: true },
@@ -154,7 +155,9 @@ module.exports = {
       // ask v8 to free this context's memory
       context.release()
 
-      return codec.cloneable.decode(result)
+      console.log('merge result', result)
+
+      return codec.cloneable.decode(result.result)
     }
   }
 }
