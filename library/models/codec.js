@@ -142,6 +142,26 @@ module.exports.cloneable = {
   }
 }
 
+const ptr = require('path-to-regexp')
+const path = '/:source(viewports|datasets)/:user\\::name/:recordID?'
+const pathMatch = ptr.match(path)
+const pathCompile = ptr.compile(path)
+
+module.exports.path = {
+  decode (string) {
+    const out = pathMatch(string)
+    return out ? out.params : out
+  },
+  encode (...args) {
+    if (args.length === 1) {
+      return pathCompile(args[0])
+    } else {
+      const [source, user, name, recordID] = args
+      return pathCompile({ source, user, name, recordID })
+    }
+  }
+}
+
 /**
  * uses object-hash npm package to hash a complex object, like those stored in datasets or viewports
  * @param {any} object - input object to hash, maybe containing attachments
