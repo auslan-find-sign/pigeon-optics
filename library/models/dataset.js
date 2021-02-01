@@ -2,6 +2,7 @@
  * Dataset Model - provides access to a dataset stored on the service
  */
 const file = require('./cbor-file')
+const attachmentStore = require('./attachment-storage')
 const codec = require('./codec')
 const auth = require('./auth')
 const { default: PQueue } = require('p-queue')
@@ -190,8 +191,10 @@ module.exports = {
       if (!(typeof id === 'string')) throw new Error('Record ID must be a string')
       if (id.length < 1) throw new Error('Record ID must be at least one character long')
       if (id.length > 250) throw new Error('Record ID must be less than 250 characters long')
-      const hash = codec.objectHash(data)
-      await queue.add(() => file.write(this.path(user, dataset, 'objects', hash.toString('hex')), data))
+
+      const processedData = await attachmentStore.storeAttachments(data)
+      const hash = codec.objectHash(processedData)
+      await queue.add(() => file.write(this.path(user, dataset, 'objects', hash.toString('hex')), processedData))
       updatedIDs.push(id)
       idMapRewrites[id] = hash
     }

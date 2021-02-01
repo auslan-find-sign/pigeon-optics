@@ -98,6 +98,8 @@ module.exports.storeAttachments = async (input) => {
     return output
   } else if (input instanceof Attachment) {
     return await module.exports.write(input)
+  } else if (input instanceof AttachmentReference) {
+    return input
   } else if (typeof input === 'object') {
     return Object.fromEntries(Object.entries(input).map(([key, value]) => {
       return [key, module.exports.storeAttachments(value)]
