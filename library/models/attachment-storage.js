@@ -87,23 +87,23 @@ module.exports.list = async () => {
  */
 module.exports.storeAttachments = async (input) => {
   if (Array.isArray(input)) {
-    return input.map(x => module.exports.storeAttachments(x))
+    return await Promise.all(input.map(x => module.exports.storeAttachments(x)))
   } else if (input instanceof Map) {
     const output = new Map()
-    input.forEach((value, key) => output.set(key, module.exports.storeAttachments(value)))
+    for (const [key, value] of input.entries()) output.set(key, await module.exports.storeAttachments(value))
     return output
   } else if (input instanceof Set) {
     const output = new Set()
-    input.forEach((value) => output.set(module.exports.storeAttachments(value)))
+    for (const value of input.values()) output.set(await module.exports.storeAttachments(value))
     return output
   } else if (input instanceof Attachment) {
     return await module.exports.write(input)
   } else if (input instanceof AttachmentReference) {
-    return input
+    return await input
   } else if (typeof input === 'object') {
-    return Object.fromEntries(Object.entries(input).map(([key, value]) => {
-      return [key, module.exports.storeAttachments(value)]
-    }))
+    return Object.fromEntries(await Promise.all(Object.entries(input).map(async ([key, value]) => {
+      return [key, await module.exports.storeAttachments(value)]
+    })))
   }
 
   return input
