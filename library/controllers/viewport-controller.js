@@ -10,6 +10,7 @@ const Vibe = require('../vibe/rich-builder')
 const layout = require('../views/layout')
 const viewportEditor = require('../views/viewport-editor')
 const soloList = require('../views/solo-list')
+const viewportView = require('../views/viewport')
 
 router.get('/viewports/create', auth.required, (req, res) => {
   const state = {
@@ -17,7 +18,7 @@ router.get('/viewports/create', auth.required, (req, res) => {
     owner: req.session.auth.user,
     name: '',
     memo: '',
-    inputs: '',
+    inputs: '/datasets/owner-user:dataset-name',
     lens: 'owner-user:lens-name'
   }
   Vibe.docStream('Create a Viewport', viewportEditor(req, state)).pipe(res.type('html'))
@@ -41,13 +42,26 @@ router.post('/viewports/create', auth.required, async (req, res) => {
       create: true,
       ...req.body
     }
+    console.log('Stack:', err.stack)
     Vibe.docStream('Create a Viewport', viewportEditor(req, state, err.message)).pipe(res.type('html'))
   }
 })
 
-router.post('/viewports/save', auth.required, async (req, res) => {
+router.get('/viewports/edit/:user\\::name/', auth.requireOwnerOrAdmin('user'), async (req, res) => {
+  const config = await viewport.readConfig(req.params.user, req.params.name)
+  const state = {
+    create: false,
+    ...config,
+    lens: `${config.lens.user}:${config.lens.name}`,
+    inputs: config.inputs.join('\n'),
+    name: req.params.name
+  }
+  Vibe.docStream('Edit a Viewport', viewportEditor(req, state)).pipe(res.type('html'))
+})
+
+router.post('/viewports/edit/:user\\::name/', auth.requireOwnerOrAdmin('user'), async (req, res) => {
   try {
-    await viewport.writeConfig(req.session.auth.user, req.body.name, {
+    await viewport.writeConfig(req.params.user, req.params.name, {
       memo: req.body.memo,
       lens: {
         user: req.body.lens.split(':')[0],
@@ -61,16 +75,18 @@ router.post('/viewports/save', auth.required, async (req, res) => {
     res.redirect(uri`/viewports/${req.session.auth.user}:${req.body.name}/`)
   } catch (err) {
     const state = {
-      create: true,
+      create: false,
+      name: req.params.name,
       ...req.body
     }
-    Vibe.docStream('Create a Viewport', viewportEditor(req, state, err.message)).pipe(res.type('html'))
+    console.log(err.stack)
+    Vibe.docStream('Edit a Viewport', viewportEditor(req, state, err.message)).pipe(res.type('html'))
   }
 })
 
-router.post('/viewports/delete', auth.required, async (req, res) => {
+router.post('/viewports/edit/:user\\::name/delete', auth.requireOwnerOrAdmin('user'), async (req, res) => {
   try {
-    await viewport.delete(req.session.auth.user, req.body.name)
+    await viewport.delete(req.params.user, req.params.name)
     res.redirect(`/viewports/${req.session.auth.user}:`)
   } catch (err) {
     codec.respond(req, res.status(404), { error: err.message })
@@ -94,47 +110,34 @@ router.get('/viewports/:user\\:', async (req, res) => {
 })
 
 // list contents of dataset
-router.get('/viewports/:user\\::dataset/', async (req, res) => {
-  try {
-    const config = await viewport.readConfig(req.params.user, req.params.dataset)
+router.get('/viewports/:user\\::name/', async (req, res) => {
+  const config = await viewport.readConfig(req.params.user, req.params.name)
 
-    if (req.accepts('html')) {
-      const recordIDs = await viewport.listEntries(req.params.user, req.params.dataset)
-      Vibe.docStream(`${req.params.user}’s “${req.params.dataset}” Datasets`, layout(req, v => {
-        v.heading(`Viewport: ${req.params.dataset}`)
-        if (config.memo) v.p(config.memo)
-        v.heading('Records:', { level: 3 })
-        v.linkList(recordIDs, recordID => uri`/datasets/${req.params.user}:${req.params.dataset}/${recordID}`)
-      })).pipe(res.type('html'))
-    } else {
-      const records = await viewport.listEntryHashes(req.params.user, req.params.dataset)
-      codec.respond(req, res, {
-        owner: req.params.user,
-        name: req.params.dataset,
-        config,
-        records: Object.fromEntries(Object.entries(records).map(([key, value]) => [uri`/viewports/${req.params.user}:${req.params.dataset}/${key}`, value]))
-      })
-    }
-  } catch (err) {
-    codec.respond(req, res.status(404), err.message)
+  if (req.accepts('html')) {
+    const recordIDs = await viewport.listEntries(req.params.user, req.params.name)
+    Vibe.docStream(`${req.params.user}’s “${req.params.name}” Datasets`, viewportView(req, config, recordIDs)).pipe(res.type('html'))
+  } else {
+    const records = await viewport.listEntryHashes(req.params.user, req.params.name)
+    codec.respond(req, res, {
+      owner: req.params.user,
+      name: req.params.name,
+      config,
+      records: Object.fromEntries(Object.entries(records).map(([key, value]) => [codec.path.encode('viewports', req.params.user, req.params.name, key), value]))
+    })
   }
 })
 
 // get a record from a user's dataset
 router.get('/viewports/:user\\::dataset/:recordID', async (req, res) => {
-  try {
-    const record = await viewport.readEntry(req.params.user, req.params.dataset, req.params.recordID)
+  const record = await viewport.readEntry(req.params.user, req.params.dataset, req.params.recordID)
 
-    if (req.accepts('html')) {
-      Vibe.docStream(`${req.params.user}:${req.params.dataset}/${req.params.recordID}`, layout(req, v => {
-        v.heading(`Record ID: ${req.params.recordID}`)
-        v.sourceCode(codec.json.encode(record, 2))
-      })).pipe(res.type('html'))
-    } else {
-      codec.respond(req, res, record)
-    }
-  } catch (err) {
-    codec.respond(req, res.status(404), err.message)
+  if (req.accepts('html')) {
+    Vibe.docStream(`${req.params.user}:${req.params.dataset}/${req.params.recordID}`, layout(req, v => {
+      v.heading(`Record ID: ${req.params.recordID}`)
+      v.sourceCode(codec.json.encode(record, 2))
+    })).pipe(res.type('html'))
+  } else {
+    codec.respond(req, res, record)
   }
 })
 

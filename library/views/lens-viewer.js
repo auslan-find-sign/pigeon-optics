@@ -8,16 +8,16 @@ const layout = require('./layout')
  */
 module.exports = (req, data, error = null) => {
   return layout(req, v => {
-    v.flexRow(v => {
-      v.heading(`${req.params.user}’s “${req.params.name}” Lens Code:`)
-      v.flexSpacer(5)
-      v.button('Edit', { href: 'edit' })
-    })
+    v.heading(`${req.params.user}’s “${req.params.name}” Lens Code:`)
 
     v.heading('Map Code:', { level: 3 })
     v.sourceCode(data.mapCode)
 
     v.heading('Merge Code:', { level: 3 })
     v.sourceCode(data.mergeCode)
+
+    if (req.owner) {
+      v.flexRow(v => { v.flexSpacer(5); v.button('Edit', { href: 'edit' }) })
+    }
   })
 }

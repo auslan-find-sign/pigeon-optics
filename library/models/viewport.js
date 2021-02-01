@@ -55,12 +55,13 @@ module.exports = {
     // reduce the results using the merge function in to entries in this viewport dataset
     const mergeFn = await jsLens.loadMerge(config.lens.user, config.lens.name)
     async function * entryIter () {
-      const read = async (hash) => file.read(this.path(user, viewport, 'map-output', hash.toString('hex')))
+      const read = async (hash) => file.read(module.exports.path(user, viewport, 'map-output', hash.toString('hex')))
       for (const [recordID, recordHashList] of Object.entries(resultsMap)) {
-        let recordData = read(recordHashList.shift())
+        let recordData = await read(recordHashList.shift())
         while (recordHashList.length) {
-          recordData = await mergeFn(recordData, read(recordHashList.shift()))
+          recordData = await mergeFn(recordData, await read(recordHashList.shift()))
         }
+        console.log('merging', recordID, recordData)
         yield [recordID, recordData]
       }
     }

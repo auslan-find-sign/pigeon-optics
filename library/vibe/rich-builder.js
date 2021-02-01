@@ -145,6 +145,23 @@ class RichVibeBuilder extends VibeBuilder {
       }
     })
   }
+
+  /** calls callback to insert elements for each item in an iterable, and writes commas and 'and' in between
+   * @param {Array} list
+   * @param {function} block - defaults to emiting text
+   */
+  inlineList (list, block = x => this.text(`${x}`)) {
+    if (list.length > 1) {
+      for (const item of list.slice(0, -1)) {
+        block.call(this, item)
+        this.text(', ')
+      }
+      this.text('and ')
+      block.call(this, list.slice(-1)[0])
+    } else {
+      block.call(this, list[0])
+    }
+  }
 }
 
 /** Builds a html doc with a title and some contents */

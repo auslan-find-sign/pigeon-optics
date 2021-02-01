@@ -8,7 +8,7 @@ const layout = require('./layout')
  */
 module.exports = (req, data, error = null) => {
   return layout(req, v => {
-    v.form({ class: 'simple-form', method: 'POST', action: data.create ? '/viewports/create' : '/viewports/save' }, v => {
+    v.form({ class: 'simple-form', method: 'POST' }, v => {
       if (data.create) v.heading('Create a Viewport')
       else v.heading(`Editing Viewport “${req.params.name}”`)
 
@@ -38,10 +38,10 @@ module.exports = (req, data, error = null) => {
       v.flexRow(v => {
         v.flexSpacer(5)
         if (data.create) {
-          v.button('Create', { type: 'submit', formaction: '/viewports/create' })
+          v.button('Create', { type: 'submit' })
         } else {
-          v.button('Delete', { type: 'submit', formaction: '/viewports/delete' })
-          v.button('Save', { type: 'submit', formaction: '/viewports/save' })
+          v.button('Delete', { type: 'submit', formaction: 'delete' })
+          v.button('Save', { type: 'submit' })
         }
       })
     })
