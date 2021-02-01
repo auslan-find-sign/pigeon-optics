@@ -13,6 +13,17 @@ const errorView = require('./library/views/error-handler')
 // create web server
 const app = express()
 
+// add sendVibe helper
+app.use((req, res, next) => {
+  res.sendVibe = (viewName, title, ...args) => {
+    Vibe.docStream(title, v => {
+      const view = require(`./library/views/${viewName}`)
+      view.call(v, req, ...args).call(v, v)
+    }).pipe(res.type('html'))
+  }
+  next()
+})
+
 // If forms are submitted, parse the data in to request.query and request.body
 app.use(express.urlencoded({ extended: true }))
 // If JSON is submitted, parse that in to request.body
