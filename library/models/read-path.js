@@ -33,7 +33,8 @@ async function * readPath (path) {
       } else {
         // do the whole dataset
         for await (const [recordID, recordData, recordHash] of source.iterateEntries(params.user, params.name)) {
-          yield [codec.path.encode(params.source, params.user, params.name, recordID), recordData, recordHash]
+          const recordPath = codec.path.encode(params.source, params.user, params.name, recordID)
+          yield [recordPath, recordData, recordHash]
         }
       }
     } else {
