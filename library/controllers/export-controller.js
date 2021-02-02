@@ -26,7 +26,7 @@ const encodingMimeTypes = {
 async function * encodePath (path, encoding) {
   if (encoding === 'json') yield '{\n'
   for await (const [recordPath, recordData] of readPath(path)) {
-    const { recordID } = path.decode(recordPath)
+    const { recordID } = codec.path.decode(recordPath)
     if (encoding === 'cbor') {
       yield codec.cbor.encode([recordID, recordData])
     } else if (encoding === 'json') {
@@ -130,6 +130,10 @@ router.get('/export/:realm(datasets|viewports)/:user\\::name', async (req, res) 
  */
 router.get('/export/:realm(datasets|viewports)/:user\\::name/zip', async (req, res) => {
   const path = uri`/${req.params.realm}/${req.params.user}:${req.params.name}`
+
+  if (!await readPath.exists(path)) {
+    return res.status('404').send('Underlying data not found')
+  }
 
   streamArchive(path, 'zip', !!req.query.attachments).pipe(res.type('application/zip'))
 })
