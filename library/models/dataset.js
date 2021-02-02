@@ -24,9 +24,32 @@ module.exports = {
    * @async
    */
   async readEntry (user, dataset, recordID) {
+    return await this.readEntryByHash(this.readEntryHash(user, dataset, recordID))
+  },
+
+  /** read an entry from a dataset
+   * @param {string} username - user who owns dataset
+   * @param {string} dataset - name of dataset
+   * @param {Buffer|string} hash - the dataset's object hash
+   * @returns {object} - parsed dataset record data
+   * @async
+   */
+  async readEntryByHash (user, dataset, hash) {
+    if (Buffer.isBuffer(hash)) hash = hash.toString('hex')
+    return await queue.add(() => file.read(this.path(user, dataset, 'objects', hash)))
+  },
+
+  /** read an entry's hash from this dataset
+   * @param {string} username - user who owns dataset
+   * @param {string} dataset - name of dataset
+   * @param {string} recordID - the dataset record's name
+   * @returns {Buffer} - hash of recordID's object contents
+   * @async
+   */
+  async readEntryHash (user, dataset, recordID) {
     const index = await queue.add(() => file.read(this.path(user, dataset, 'index')))
     if (!index[recordID]) throw new Error('Dataset doesn’t contain specified record')
-    return await queue.add(() => file.read(this.path(user, dataset, 'objects', index[recordID].toString('hex'))))
+    return index[recordID]
   },
 
   /** reads each record of this dataset sequentially as an async iterator

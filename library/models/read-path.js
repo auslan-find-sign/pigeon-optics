@@ -24,14 +24,16 @@ async function * readPath (path) {
     if (source !== undefined) {
       if (params.recordID !== undefined) {
         // just yield the specific entry
+        const recordHash = await source.readEntryHash(params.user, params.name, params.recordID)
         yield [
           codec.path.encode(params.source, params.user, params.name, params.recordID),
-          await source.readEntry(params.user, params.name, params.recordID)
+          await source.readEntryByHash(params.user, params.name, recordHash),
+          recordHash
         ]
       } else {
         // do the whole dataset
-        for await (const [recordID, recordData] of source.iterateEntries(params.user, params.name)) {
-          yield [codec.path.encode(params.source, params.user, params.name, recordID), recordData]
+        for await (const [recordID, recordData, recordHash] of source.iterateEntries(params.user, params.name)) {
+          yield [codec.path.encode(params.source, params.user, params.name, recordID), recordData, recordHash]
         }
       }
     } else {
