@@ -58,7 +58,7 @@ class VibeBuilder {
     // emit opening tag
     const attribsString = Object.entries(attribs || {}).map(([key, value]) => {
       if (key === 'style' && typeof value === 'object') {
-        value = Object.entries(value).map(([prop, cssValue]) => `${hyphenate(prop)}: ${cssValue};`).join(' ')
+        value = Object.entries(value).map(([prop, cssValue]) => `${hyphenate(prop)}:${cssValue}`).join(';')
       }
 
       if (key === 'innerHTML') {
