@@ -2,9 +2,9 @@
  * Read data from a dataset or viewport or anything else that can show up in the changelog
  */
 const datasets = require('./dataset')
-const viewports = require('./viewport')
+const lenses = require('./lens')
 const codec = require('./codec')
-const sources = { datasets, viewports }
+const sources = { datasets, lenses }
 
 /** reads a data path, which could be one specific record, or a whole dataset/viewport
  * @param {string|Array} path - can be a path, or array of paths to read sequentially

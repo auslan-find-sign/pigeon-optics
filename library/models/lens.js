@@ -1,5 +1,5 @@
 /**
- * Viewports are instances of lenses which are established and exist on the system. Viewports run
+ * Lenses are code which runs  run
  * automatically and have a precomputed output that is written to disk. Viewport outputs exist
  * in the changelog and can be used as inputs to other viewports or potentially monitored by external
  * observers for changes
@@ -26,14 +26,13 @@ Object.assign(module.exports, {
 
   async validateConfig (config) {
     dataset.validateConfig(config)
-    console.assert(typeof config.lens === 'object', 'lens must be an object')
-    console.assert(typeof config.lens.user === 'string', 'lens must have a string user property')
-    console.assert(typeof config.lens.name === 'string', 'lens must have a string user property')
+    console.assert(typeof config.mapCode === 'string', 'map code must be a string')
+    console.assert(typeof config.reduceCode === 'string', 'reduce code must be a string')
     console.assert(Array.isArray(config.inputs), 'inputs must be an array')
+    console.assert(config.inputs.every(x => typeof x === 'string'), 'inputs entries must be strings')
     for (const input of config.inputs) {
       console.assert(await readPath.exists(input), `${input} doesn’t exist`)
     }
-    console.assert(config.inputs.every(x => typeof x === 'string'), 'inputs entries must be strings')
   },
 
   // (re)build a specified viewport
@@ -43,12 +42,42 @@ Object.assign(module.exports, {
 
     // run the map over the whole dataset, transforming to map output objects on disk
     const mapFn = await jsLens.loadMap(config.lens.user, config.lens.name)
-    for await (const { input, outputs } of mapFn(readPath(config.inputs))) {
+
+    // wrap it with a caching system so same hashed inputs skip running
+    const path = this.path
+    const usedInputHashKeys = [] // keep track of which cache entries are still in use in the output
+    let mapOutputIndex = {}
+    if (await file.exists(path(user, viewport, 'map-outputs', 'index'))) {
+      mapOutputIndex = await file.read(path(user, viewport, 'map-outputs', 'index'))
+    }
+    async function * cacheMaps (inputs) {
+      for await (const entry of inputs) {
+        const inputHash = codec.objectHash(entry)
+        const inputHashString = inputHash.toString('hex')
+        if (mapOutputIndex[inputHashString]) {
+          for (const [recordID, recordHash] of mapOutputIndex[inputHashString]) {
+            if (!resultsMap[recordID]) resultsMap[recordID] = []
+            resultsMap[recordID].push(recordHash)
+          }
+          usedInputHashKeys.push(inputHashString)
+        } else {
+          // if cache hit failed, yield the entry to the map function to process
+          yield entry
+        }
+      }
+    }
+
+    for await (const { input, outputs } of mapFn(cacheMaps(readPath(config.inputs)))) {
+      const inputHash = codec.objectHash(input)
+      const inputHashString = inputHash.toString('hex')
+
+      const indexEntry = mapOutputIndex[inputHashString] = []
       for (const [recordID, recordData] of outputs) {
-        const hash = codec.objectHash(recordData)
-        await file.write(this.path(user, viewport, 'map-output', hash.toString('hex')), recordData)
+        const recordHash = codec.objectHash(recordData)
+        await file.write(this.path(user, viewport, 'map-output', recordHash.toString('hex')), recordData)
+        indexEntry.push([recordID, recordHash])
         if (!resultsMap[recordID]) resultsMap[recordID] = []
-        resultsMap[recordID].push(hash)
+        resultsMap[recordID].push(recordHash)
       }
     }
 
