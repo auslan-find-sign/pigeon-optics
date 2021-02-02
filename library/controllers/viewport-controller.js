@@ -128,11 +128,11 @@ router.get('/viewports/:user\\::name/', async (req, res) => {
 })
 
 // get a record from a user's dataset
-router.get('/viewports/:user\\::dataset/:recordID', async (req, res) => {
-  const record = await viewport.readEntry(req.params.user, req.params.dataset, req.params.recordID)
+router.get('/viewports/:user\\::name/:recordID', async (req, res) => {
+  const record = await viewport.readEntry(req.params.user, req.params.name, req.params.recordID)
 
   if (req.accepts('html')) {
-    Vibe.docStream(`${req.params.user}:${req.params.dataset}/${req.params.recordID}`, layout(req, v => {
+    Vibe.docStream(`${req.params.user}:${req.params.name}/${req.params.recordID}`, layout(req, v => {
       v.heading(`Record ID: ${req.params.recordID}`)
       v.sourceCode(codec.json.encode(record, 2))
     })).pipe(res.type('html'))

@@ -24,7 +24,8 @@ module.exports = {
    * @async
    */
   async readEntry (user, dataset, recordID) {
-    return await this.readEntryByHash(this.readEntryHash(user, dataset, recordID))
+    const hash = await this.readEntryHash(user, dataset, recordID)
+    return await this.readEntryByHash(user, dataset, hash)
   },
 
   /** read an entry from a dataset
