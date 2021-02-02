@@ -16,7 +16,7 @@ const readPath = require('./read-path')
 
 // const ioMapQueue = new PQueue({ concurrency: 1 })
 
-module.exports = {
+Object.assign(module.exports, {
   ...dataset, // import dataset functions
 
   // resolve path inside this - override with viewports path in user folder
@@ -106,4 +106,4 @@ module.exports = {
   //     }
   //   }
   // }
-}
+})
