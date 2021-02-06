@@ -187,16 +187,45 @@ module.exports.objectHash = (object) => {
  * @param {Response} res - expressjs http response object
  * @param {*} object - object to send back as JSON, CBOR, or a stylised webpage
  */
-module.exports.respond = (req, res, object) => {
+module.exports.respond = async (req, res, object) => {
   const bestMatch = req.accepts(['application/cbor', 'application/json', 'text/html'])
-  if (bestMatch === 'application/cbor') {
-    res.type(bestMatch).send(module.exports.cbor.encode(object))
-  } else if (bestMatch === 'application/json') {
-    res.type(bestMatch).send(module.exports.json.encode(object))
+
+  if (object[Symbol.asyncIterator]) { // AsyncIterators will stream out
+    if (bestMatch === 'application/cbor') {
+      res.type(bestMatch)
+      for await (const entry of object) {
+        res.write(module.exports.cbor.encode(entry))
+      }
+      res.write(null)
+    } else if (bestMatch === 'application/json') {
+      res.type(bestMatch)
+      res.write('[\n')
+      let first = true
+      for await (const entry of object) {
+        if (!first) res.write(',\n')
+        res.write(module.exports.json.encode(entry))
+        first = false
+      }
+      res.write('\n]\n')
+      res.write(null)
+    } else {
+      Vibe.docStream('API Object Response Stream', layout(req, async v => {
+        v.heading('API Object Response Stream:')
+        for await (const entry of object) {
+          v.sourceCode(module.exports.json.encode(entry, 2))
+        }
+      })).pipe(res)
+    }
   } else {
-    Vibe.docStream('API Object Response', layout(req, v => {
-      v.heading('API Object Response:')
-      v.sourceCode(module.exports.json.encode(object, 2))
-    })).pipe(res)
+    if (bestMatch === 'application/cbor') {
+      res.type(bestMatch).send(module.exports.cbor.encode(object))
+    } else if (bestMatch === 'application/json') {
+      res.type(bestMatch).send(module.exports.json.encode(object))
+    } else {
+      Vibe.docStream('API Object Response', layout(req, v => {
+        v.heading('API Object Response:')
+        v.sourceCode(module.exports.json.encode(object, 2))
+      })).pipe(res)
+    }
   }
 }
