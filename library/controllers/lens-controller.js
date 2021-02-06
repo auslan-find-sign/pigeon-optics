@@ -12,6 +12,9 @@ const lensEditorView = require('../views/lens-editor')
 const soloList = require('../views/solo-list')
 const lensView = require('../views/lens')
 
+// add req.owner boolean for any routes with a :user param
+router.param('user', auth.ownerParam)
+
 const mapCodeExample = `// example, simply copies the underlying dataset, but adds a property lensed: true
 const [realm, store, recordID] = recordPath.slice(1).split('/').map(x => decodeURIComponent(x))
 output(recordID, {

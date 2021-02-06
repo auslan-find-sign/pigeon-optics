@@ -18,13 +18,12 @@ module.exports.basicAuthMiddleware = async (req, res, next) => {
     }
   }
 
-  // helper to determine if logged in user owns this resource and can edit it or whatever
-  if (req.session.auth) {
-    if ((req.params.user && req.params.user === req.session.auth.user) || req.session.auth.auth === 'admin') {
-      req.owner = true
-    }
-  }
+  next()
+}
 
+/** app.param handler to populate req.owner with a boolean for if this resource should be editable */
+module.exports.ownerParam = (req, res, next, value, id) => {
+  req.owner = req.session.auth && (req.session.auth.user === req.params[id] || req.session.auth.auth === 'admin')
   next()
 }
 

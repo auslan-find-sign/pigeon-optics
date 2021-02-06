@@ -17,8 +17,8 @@ module.exports = (req, config, records) => {
     if (req.session.auth) {
       v.flexRow(v => {
         v.flexSpacer(5)
-        if (req.owner) v.button('Edit', { href: uri`/lenses/${req.params.user}:${req.params.name}/edit` })
-        v.button('clone', { href: uri`/lenses/create?clone=${req.params.user}:${req.params.name}` })
+        if (req.owner) v.button('Edit', { href: uri`/lenses/edit/${req.params.user}:${req.params.name}` })
+        v.button('Clone', { href: uri`/lenses/create?clone=${req.params.user}:${req.params.name}` })
       })
     }
 
