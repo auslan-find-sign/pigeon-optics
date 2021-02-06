@@ -73,13 +73,13 @@ module.exports.requireOwnerOrAdmin = (ownerParam) => {
  * @param {string} username
  * @returns {string}
 */
-module.exports.userFolder = (username) => `users/${encodeURIComponent(username)}`
+module.exports.userFolder = (username) => ['users', username]
 
 /** Helper function, path inside cbor-file database, where user's account is stored
  * @param {string} username
  * @returns {string}
 */
-module.exports.userAccountPath = (username) => `${module.exports.userFolder(username)}/account`
+module.exports.userAccountPath = (username) => [...module.exports.userFolder(username), 'account']
 
 /** check a login attempt for a user account
  * @param {string} username
@@ -196,5 +196,5 @@ module.exports.exists = async (user) => {
  * @returns {string[]} - account names array
  */
 module.exports.listUsers = async () => {
-  return await file.list('users')
+  return await file.listFolders(['users'])
 }

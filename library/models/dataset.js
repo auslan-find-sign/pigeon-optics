@@ -13,7 +13,7 @@ const queue = new PQueue({ concurrency: 1 })
 module.exports = {
   // resolve dataset paths
   path (user, ...path) {
-    return `${auth.userFolder(user)}/datasets${path.map(x => `/${encodeURIComponent(x)}`).join('')}`
+    return [...auth.userFolder(user), 'datasets', ...path]
   },
 
   /** read an entry from a dataset
@@ -122,15 +122,33 @@ module.exports = {
     }
   },
 
-  /** list all datasets owned by a user
+  /** iterates all datasets owned by a user
+   * @param {string} username - user who owns dataset
+   * @yields {string} - dataset name
+   * @async
+   */
+  async * iterateDatasets (user) {
+    for (const dataset of file.listFolders(this.path(user))) {
+      yield dataset
+    }
+  },
+
+  /** returns an array of all datasets owned by a user
    * @param {string} username - user who owns dataset
    * @returns {string[]} - dataset names
    * @async
    */
   async listDatasets (user) {
-    return (await file.list(this.path(user))).map(x => decodeURIComponent(x))
+    const output = []
+    for await (const datasetName of this.iterateDatasets(user)) {
+      output.push(datasetName)
+    }
+    return output
   },
 
+  /** validates config object for dataset/lens is valid
+   * @returns {boolean}
+   */
   async validateConfig (config) {
     console.assert(typeof config.memo === 'string', 'memo must be a string')
   },
@@ -256,15 +274,12 @@ module.exports = {
   async garbageCollect (user, dataset) {
     await queue.add(async () => {
       const index = await file.read(this.path(user, dataset, 'index'))
-      const objectList = await file.list(this.path(user, dataset, 'objects'))
       const keepObjects = Object.values(index).map(x => x.toString('hex'))
-      await Promise.all(
-        objectList.filter(objectID =>
-          !keepObjects.includes(objectID)
-        ).map(objectID =>
-          file.delete(this.path(user, dataset, 'objects', objectID))
-        )
-      )
+      for await (const objectID of file.list(this.path(user, dataset, 'objects'))) {
+        if (!keepObjects.includes(objectID)) {
+          await file.delete(this.path(user, dataset, 'objects', objectID))
+        }
+      }
     })
   }
 }

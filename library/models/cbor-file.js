@@ -5,13 +5,22 @@ const os = require('os')
 const crypto = require('crypto')
 const defaults = require('../../package.json').defaults
 
+// encodes a string to be a valid filename but not use meaningful characters like . or /
+// takes a brutalist approach, using decodeURIComponent format, but encoding anything that isn't [a-zA-Z0-9-_]
+function encodePathSegment (string) {
+  return encodeURIComponent(string).replace('.', '%2e')
+}
+function decodePathSegment (string) {
+  return decodeURIComponent(string)
+}
+
 // normalise and check path for danger
-function fullPath (dataPath, suffix = '.cbor') {
-  if (`/${dataPath.join('/')}/`.includes('/../')) throw new Error('".." path segments aren\'t allowed for security')
+function fullPath (dataPath, suffix = '') {
   const jail = path.resolve(defaults.data)
-  const segments = [defaults.data, dataPath].flat()
+  dataPath = [dataPath].flat().map(encodePathSegment)
+  const segments = [defaults.data, ...dataPath]
   const result = `${path.resolve(...segments)}${suffix}`
-  if (!result.startsWith(jail)) throw new Error('path would escape data jail, nope!')
+  if (!result.startsWith(jail)) throw new Error('path would escape data jail somehow, nope!')
   return result
 }
 
@@ -23,16 +32,16 @@ function fullPath (dataPath, suffix = '.cbor') {
  * @async
  */
 module.exports.read = async (dataPath) => {
-  const tryRead = async (dataPath) => {
-    const buffer = await fs.readFile(fullPath(dataPath))
+  const tryRead = async (dataPath, ext) => {
+    const buffer = await fs.readFile(fullPath(dataPath, ext))
     return cbor.decode(buffer)
   }
 
   try {
-    return await tryRead(dataPath)
+    return await tryRead(dataPath, '.cbor')
   } catch (err) {
-    console.error(`Data at path ${dataPath} unavailable: ${err}, trying .backup.cbor`)
-    return await tryRead(`${dataPath}.backup`)
+    console.error(`Data at path ${dataPath} unavailable: ${err}, trying .cbor.backup`)
+    return await tryRead(dataPath, '.cbor.backup')
   }
 }
 
@@ -42,8 +51,8 @@ module.exports.read = async (dataPath) => {
  * @async
  */
 module.exports.write = async (dataPath, data) => {
-  const path1 = fullPath(dataPath)
-  const path2 = fullPath(dataPath, '.backup.cbor')
+  const path1 = fullPath(dataPath, '.cbor')
+  const path2 = fullPath(dataPath, '.cbor.backup')
   const encoded = cbor.encode(data)
 
   // ensure directory exists
@@ -68,8 +77,8 @@ module.exports.write = async (dataPath, data) => {
  * @async
  */
 module.exports.delete = async (dataPath) => {
-  await fs.remove(fullPath(dataPath))
-  await fs.remove(fullPath(dataPath, '.backup.cbor'))
+  await fs.remove(fullPath(dataPath, '.cbor'))
+  await fs.remove(fullPath(dataPath, '.cbor.backup'))
 }
 
 /** Checks a given data path for an existing record, and returns true or false async
@@ -79,26 +88,50 @@ module.exports.delete = async (dataPath) => {
  */
 module.exports.exists = async (dataPath) => {
   const results = await Promise.all([
-    fs.pathExists(fullPath(dataPath)),
-    fs.pathExists(fullPath(dataPath, '.backup.cbor'))
+    fs.pathExists(fullPath(dataPath, '.cbor')),
+    fs.pathExists(fullPath(dataPath, '.cbor.backup'))
   ])
 
   return results.some(x => x === true)
 }
 
 /** List all the records in a data path
- * @param {string|string[]} path - relative path inside data directory to a folder containing multiple records
+ * @param {string[]} path - relative path inside data directory to a folder containing multiple records
  * @returns {string[]}
  * @async
  */
-module.exports.list = async (dataPath) => {
-  let files
+module.exports.list = async function * list (dataPath) {
   try {
-    files = await fs.readdir(path.join(defaults.data, dataPath))
-    return files.filter(x => !x.endsWith('.backup.cbor')).map(x => x.replace(/\.cbor$/, ''))
+    const dir = await fs.opendir(fullPath(dataPath))
+    for await (const dirent of dir) {
+      if (dirent.isFile() && dirent.name.endsWith('.cbor')) {
+        yield decodePathSegment(dirent.name.replace(/\.cbor$/, ''))
+      }
+    }
   } catch (err) {
     if (err.code === 'ENOENT') {
-      return []
+      return
+    }
+    throw err
+  }
+}
+
+/** List all the folders in a data path
+ * @param {string[]} path - relative path inside data directory to a folder containing multiple records
+ * @returns {string[]}
+ * @async
+ */
+module.exports.listFolders = async function * list (dataPath) {
+  try {
+    const dir = await fs.opendir(fullPath(dataPath))
+    for await (const dirent of dir) {
+      if (dirent.isDirectory()) {
+        yield decodePathSegment(dirent.name)
+      }
+    }
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return
     }
     throw err
   }
