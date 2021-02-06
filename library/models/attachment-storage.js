@@ -71,13 +71,15 @@ module.exports.exists = async (attachment) => {
   await fs.pathExists(module.exports.getPath(attachment))
 }
 
-/** List all the records in a data path
- * @returns {Buffer[]}
+/** iterates all the attachments in storage, yielding buffers of their hash values
+ * @yields {Buffer}
  * @async
  */
-module.exports.list = async () => {
-  const files = await fs.readdir(path.join(defaults.data, 'attachments'))
-  return files.map(x => Buffer.from(x, 'hex'))
+module.exports.list = async function * list () {
+  const dir = await fs.opendir(path.join(defaults.data, 'attachments'))
+  for await (const dirent of dir) {
+    if (dirent.isFile()) yield Buffer.from(dirent.name, 'hex')
+  }
 }
 
 /**
