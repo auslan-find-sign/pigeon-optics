@@ -189,8 +189,12 @@ module.exports = {
    * @returns {object}
    * @async
    */
-  async readConfig (user, dataset) {
-    return await queue.add(() => file.read(this.path(user, dataset, 'config')))
+  async readConfig (user, name) {
+    return {
+      ...await queue.add(() => file.read(this.path(user, name, 'config'))),
+      user,
+      name
+    }
   },
 
   /** write config of existing dataset
