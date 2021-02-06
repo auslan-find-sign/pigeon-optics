@@ -1,7 +1,7 @@
 {
   "name": "datasets-db",
   "version": "0.1.0",
-  "description": "A system for managing small research datasets",
+  "description": "A radically low-performance unscaleable multiuser untrusted map/reducing database for tiny servers and community projects",
   "main": "server.js",
   "repo": "https://github.com/auslan-find-sign/datasets-database.git",
   "homepage": "https://github.com/auslan-find-sign/datasets-database/",

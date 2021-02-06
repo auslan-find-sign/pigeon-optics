@@ -272,6 +272,19 @@ form.simple-form > button[type="submit"] {
   color: var(--gutter-foreground-selected);
 }
 
+/* ace code editor styling */
+.code-editor.ace_editor {
+  border-radius: 1ex;
+}
+.code-editor.ace_editor .ace_gutter {
+  border-top-left-radius: 1ex;
+  border-bottom-left-radius: 1ex;
+}
+.code-editor.ace_editor .ace_scroller {
+  border-top-right-radius: 1ex;
+  border-bottom-right-radius: 1ex;
+}
+
 
 
 /* Styled Text widget */
