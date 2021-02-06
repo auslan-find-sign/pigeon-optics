@@ -9,6 +9,8 @@ const codec = require('../models/codec')
 const Vibe = require('../vibe/rich-builder')
 const loginView = require('../views/login')
 const profileView = require('../views/user-profile')
+const soloList = require('../views/solo-list')
+const uri = require('encodeuricomponent-tag')
 
 const router = express.Router()
 
@@ -43,6 +45,15 @@ router.post('/auth/register', async (req, res) => {
 router.get('/auth/logout', (req, res) => {
   delete req.session.auth
   res.redirect(req.query.return || req.get('Referrer') || '/')
+})
+
+router.get('/users/', async (req, res) => {
+  const users = auth.listUsers()
+  if (req.accepts('html')) {
+    Vibe.docStream('Users', soloList(req, 'Users', users, x => uri`/users/${x}/`)).pipe(res.type('html'))
+  } else {
+    codec.respond(req, res, users)
+  }
 })
 
 router.get('/users/:user', async (req, res) => {
