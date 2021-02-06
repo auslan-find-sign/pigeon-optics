@@ -128,7 +128,7 @@ module.exports = {
    * @async
    */
   async * iterateDatasets (user) {
-    for (const dataset of file.listFolders(this.path(user))) {
+    for await (const dataset of file.listFolders(this.path(user))) {
       yield dataset
     }
   },

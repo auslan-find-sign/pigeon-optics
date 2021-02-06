@@ -7,17 +7,14 @@ const uri = require('encodeuricomponent-tag')
  * @param {string} mode - either 'login' or 'register'
  * @param {null|string} error - null or a string with an error message
  */
-module.exports = (req, profile, datasets, viewports, lenses) => {
+module.exports = (req, profile, datasets, lenses) => {
   return layout(req, v => {
     v.heading(`${profile.auth}: ${profile.user}`)
 
     v.heading('Datasets:', { level: 3 })
     v.linkList(datasets, name => uri`/datasets/${profile.user}:${name}/`)
 
-    v.heading('Viewports:', { level: 3 })
-    v.linkList(viewports, name => uri`/viewports/${profile.user}:${name}/`)
-
-    v.heading('Javascript Lenses:', { level: 3 })
+    v.heading('Lenses:', { level: 3 })
     v.linkList(lenses, name => uri`/lenses/${profile.user}:${name}/`)
   })
 }

@@ -130,9 +130,8 @@ module.exports.listFolders = async function * list (dataPath) {
       }
     }
   } catch (err) {
-    if (err.code === 'ENOENT') {
-      return
+    if (err.code !== 'ENOENT') { // if the data is just missing, silently ignore it yielding no entries
+      throw err
     }
-    throw err
   }
 }
