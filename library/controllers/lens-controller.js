@@ -1,16 +1,16 @@
 const express = require('express')
 const router = express.Router()
 
-const Vibe = require('../vibe/rich-builder')
-const layout = require('../views/layout')
-const uri = require('encodeuricomponent-tag')
-const lensEditor = require('../views/lens-code-editor')
-const lensViewer = require('../views/lens-viewer')
-
 const auth = require('../models/auth')
 const codec = require('../models/codec')
-const dataset = require('../models/dataset')
-const jsLens = require('../models/javascript-lens')
+const lens = require('../models/lens')
+const uri = require('encodeuricomponent-tag')
+
+const Vibe = require('../vibe/rich-builder')
+const layout = require('../views/layout')
+const viewportEditor = require('../views/viewport-editor')
+const soloList = require('../views/solo-list')
+const viewportView = require('../views/viewport')
 
 const mapCodeExample = `// example, simply copies the underlying dataset, but adds a property lensed: true
 const [realm, store, recordID] = recordPath.slice(1).split('/').map(x => decodeURIComponent(x))
@@ -18,81 +18,129 @@ output(recordID, {
   ...recordData,
   lensed: true
 })`
-const mergeCodeExample = `// example, overlays the objects overwriting properties
+const reduceCodeExample = `// example, overlays the objects overwriting properties
 return { ...left, ...right }`
 
 router.get('/lenses/create', auth.required, (req, res) => {
   const state = {
+    create: true,
     name: '',
+    memo: '',
+    inputs: '/datasets/owner-user:dataset-name',
+    mapType: 'javascript',
     mapCode: mapCodeExample,
-    mergeCode: mergeCodeExample,
-    create: true
+    reduceCode: reduceCodeExample
   }
-  Vibe.docStream('Create a Lens', lensEditor(req, state)).pipe(res.type('html'))
+  Vibe.docStream('Create a Lens', viewportEditor(req, state)).pipe(res.type('html'))
 })
 
-router.post('/lenses/save', auth.required, async (req, res) => {
+router.post('/lenses/create', auth.required, async (req, res) => {
   try {
-    await jsLens.write(req.session.auth.user, req.body.name, req.body.mapCode, req.body.mergeCode)
+    await lens.create(req.session.auth.user, req.body.name, {
+      memo: req.body.memo,
+      inputs: req.body.inputs.split('\n').map(x => x.trim()).filter(x => !!x),
+      mapType: req.body.mapType,
+      mapCode: req.body.mapCode,
+      reduceCode: req.body.reduceCode
+    })
+    // rebuild since settings may have changed
+    await lens.build(req.session.auth.user, req.body.name)
+    res.redirect(uri`/lenses/${req.session.auth.user}:${req.body.name}/`)
   } catch (err) {
-    return codec.respond(req, res, { error: err.message })
-  }
-  res.redirect(uri`/lenses/${req.session.auth.user}:${req.body.name}/`)
-})
-
-// get a list of lenses owned by a specific user
-router.get('/lenses/:user\\:', async (req, res) => {
-  const lenses = await jsLens.list(req.params.user)
-
-  if (req.accepts('html')) {
-    Vibe.docStream(`${req.params.user}’s Javascript Lenses`, layout(req, v => {
-      v.heading(`${req.params.user}’s Javascript Lenses:`)
-      for (const lens of lenses) {
-        v.div(v => v.a(dataset, { href: uri`/lenses/${req.params.user}:${lens}/` }))
-      }
-    })).pipe(res.type('html'))
-  } else {
-    codec.respond(req, res, lenses)
+    const state = {
+      create: true,
+      ...req.body
+    }
+    console.log('Stack:', err.stack)
+    Vibe.docStream('Create a Lens', viewportEditor(req, state, err.message)).pipe(res.type('html'))
   }
 })
 
-router.get('/lenses/:user\\::name/', async (req, res) => {
+router.get('/lenses/edit/:user\\::name/', auth.requireOwnerOrAdmin('user'), async (req, res) => {
+  const config = await lens.readConfig(req.params.user, req.params.name)
+  const state = {
+    create: false,
+    ...config,
+    inputs: config.inputs.join('\n'),
+    name: req.params.name
+  }
+  Vibe.docStream('Edit a Lens', viewportEditor(req, state)).pipe(res.type('html'))
+})
+
+router.post('/lenses/edit/:user\\::name/', auth.requireOwnerOrAdmin('user'), async (req, res) => {
   try {
-    const lens = await jsLens.read(req.params.user, req.params.name)
-    Vibe.docStream(
-      `${req.params.user}’s lens “${req.params.name}”`,
-      lensViewer(req, lens)
-    ).pipe(res.type('html'))
-  } catch (err) {
-    return codec.respond(req, res, { error: err.message })
-  }
-})
+    await lens.writeConfig(req.params.user, req.params.name, {
+      memo: req.body.memo,
+      inputs: req.body.inputs.split('\n').map(x => x.trim()).filter(x => !!x),
+      mapType: req.body.mapType,
+      mapCode: req.body.mapCode,
+      reduceCode: req.body.reduceCode
+    })
+    // rebuild since settings may have changed
+    await lens.build(req.session.auth.user, req.body.name)
 
-router.get('/lenses/:user\\::name/edit', auth.requireOwnerOrAdmin('user'), async (req, res) => {
-  try {
-    const lens = await jsLens.read(req.params.user, req.params.name)
-    lens.name = req.params.name
-    Vibe.docStream('Editing Lens', lensEditor(req, lens)).pipe(res.type('html'))
-  } catch (err) {
-    return codec.respond(req, res, { error: err.message })
-  }
-})
-
-router.post('/lenses/:user\\::name/save', auth.requireOwnerOrAdmin('user'), async (req, res) => {
-  try {
-    await jsLens.write(req.params.user, req.params.name, req.body.mapCode, req.body.mergeCode)
     res.redirect(uri`/lenses/${req.params.user}:${req.params.name}/`)
   } catch (err) {
-    return codec.respond(req, res, { error: err.message })
+    const state = {
+      create: false,
+      name: req.params.name,
+      ...req.body
+    }
+    console.log(err.stack)
+    Vibe.docStream('Edit a Lens', viewportEditor(req, state, err.message)).pipe(res.type('html'))
   }
 })
 
-router.post('/lenses/:user\\::name/delete', auth.requireOwnerOrAdmin('user'), async (req, res) => {
+router.post('/lenses/edit/:user\\::name/delete', auth.requireOwnerOrAdmin('user'), async (req, res) => {
+  await lens.delete(req.params.user, req.params.name)
+  res.redirect(`/lenses/${req.params.user}:`)
+})
+
+// get a list of datasets owned by a specific user
+router.get('/lenses/:user\\:', async (req, res) => {
   try {
-    await jsLens.delete(req.params.user, req.params.name)
-    res.redirect(uri`/lenses/${req.params.user}:`)
+    const lenses = await lens.listDatasets(req.params.user)
+
+    if (req.accepts('html')) {
+      const title = `${req.params.user}’s Viewports`
+      Vibe.docStream(title, soloList(req, title, lenses, x => uri`/lenses/${req.params.user}:${x}/`)).pipe(res.type('html'))
+    } else {
+      codec.respond(req, res, lenses)
+    }
   } catch (err) {
-    return codec.respond(req, res, { error: err.message })
+    codec.respond(req, res.status(404), { error: err.message })
+  }
+})
+
+// list contents of dataset
+router.get('/lenses/:user\\::name/', async (req, res) => {
+  const config = await lens.readConfig(req.params.user, req.params.name)
+
+  if (req.accepts('html')) {
+    const recordIDs = await lens.listEntries(req.params.user, req.params.name)
+    Vibe.docStream(`${req.params.user}’s “${req.params.name}” Datasets`, viewportView(req, config, recordIDs)).pipe(res.type('html'))
+  } else {
+    const records = await lens.listEntryHashes(req.params.user, req.params.name)
+    codec.respond(req, res, {
+      owner: req.params.user,
+      name: req.params.name,
+      config,
+      records: Object.fromEntries(Object.entries(records).map(([key, value]) => [codec.path.encode('lenses', req.params.user, req.params.name, key), value]))
+    })
+  }
+})
+
+// get a record from a user's dataset
+router.get('/lenses/:user\\::name/:recordID', async (req, res) => {
+  const record = await lens.readEntry(req.params.user, req.params.name, req.params.recordID)
+
+  if (req.accepts('html')) {
+    Vibe.docStream(`${req.params.user}:${req.params.name}/${req.params.recordID}`, layout(req, v => {
+      v.heading(`Record ID: ${req.params.recordID}`)
+      v.sourceCode(codec.json.encode(record, 2))
+    })).pipe(res.type('html'))
+  } else {
+    codec.respond(req, res, record)
   }
 })
 

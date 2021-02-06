@@ -15,6 +15,7 @@ module.exports = (req, data, error = null) => {
       if (error) v.p(v => { v.glitch('Error: '); v.text(error) })
 
       v.hiddenFormData({ owner: data.owner || req.session.auth.user })
+      v.hiddenFormData({ mapType: data.mapType })
 
       v.dl(v => {
         v.dt('Viewport Name')
@@ -31,8 +32,24 @@ module.exports = (req, data, error = null) => {
         v.dt('Inputs (one data path per line)')
         v.dd(v => v.textarea(data.inputs, { name: 'inputs', spellcheck: 'false', wrap: 'off' }))
 
-        v.dt('Javascript Lens')
-        v.dd(v => v.input({ name: 'lens', value: data.lens, minlength: 5, maxlength: 250, pattern: '[^:]+:[^:]+' }))
+        v.dt('Javascript Map Function')
+        v.dd(v => {
+          v.p(`Map code receives recordPath string and recordData object from dataset, and can then
+          call output('recordID', { complex object }) to create a lens record with the recordID as
+          the entry's name. Values can be any JSON type, or Buffer, or Attachment instances to
+          represent file data. Buffers should only be used for small pieces of data like hashes.
+          Attachments should always be used for any large information for better performance.`)
+          v.textarea(data.mapCode, { name: 'mapCode', spellcheck: 'false', wrap: 'off' })
+        })
+
+        v.dt('Javascript Reduce Function')
+        v.dd(v => {
+          v.p(`If your map function output the same recordID string multiple times, the server will
+          use this Reduce function to merge the values together in to one final result. This function
+          will recieve two variables "left" and "right" containing two map output values. It should
+          use the return keyword to return the resulting value for this recordID`)
+          v.textarea(data.reduceCode, { name: 'reduceCode', spellcheck: 'false', wrap: 'off' })
+        })
       })
 
       v.flexRow(v => {

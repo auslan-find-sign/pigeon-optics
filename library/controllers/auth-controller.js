@@ -2,8 +2,7 @@ const express = require('express')
 
 const auth = require('../models/auth')
 const dataset = require('../models/dataset')
-const jsLens = require('../models/javascript-lens')
-const viewport = require('../models/viewport')
+const lens = require('../models/lens')
 
 const codec = require('../models/codec')
 
@@ -49,17 +48,15 @@ router.get('/auth/logout', (req, res) => {
 router.get('/users/:user', async (req, res) => {
   const profile = await auth.getProfile(req.params.user)
   const datasets = await dataset.listDatasets(req.params.user)
-  const viewports = await viewport.listDatasets(req.params.user)
-  const jsLenses = await jsLens.list(req.param.user)
+  const lenses = await lens.listDatasets(req.params.user)
 
   if (req.accepts('html')) {
-    Vibe.docStream(`${req.params.user}’s Profile`, profileView(req, profile, datasets, viewports, jsLenses)).pipe(res.type('html'))
+    Vibe.docStream(`${req.params.user}’s Profile`, profileView(req, profile, datasets, lenses)).pipe(res.type('html'))
   } else {
     codec.respond(req, res, {
       auth: profile.auth,
       datasets,
-      viewports,
-      lenses: jsLenses
+      lenses
     })
   }
 })
