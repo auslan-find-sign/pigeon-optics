@@ -2,7 +2,7 @@ const uri = require('encodeuricomponent-tag')
 const pkg = require('../../package.json')
 
 module.exports = (req, block) => {
-  return (v) => {
+  return async (v) => {
     v.toolbar(() => {
       // datasets icon
       v.a({ href: '/', class: 'home-icon' }, () => {
@@ -27,7 +27,7 @@ module.exports = (req, block) => {
       })
     })
 
-    block(v)
+    await block(v)
 
     v.flexRow({ class: 'footer' }, () => {
       v.text(`Auslan Find Sign - Datasets v${pkg.version}`)
