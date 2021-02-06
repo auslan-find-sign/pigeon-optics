@@ -193,9 +193,11 @@ module.exports.respond = async (req, res, object) => {
   if (object[Symbol.asyncIterator]) { // AsyncIterators will stream out
     if (bestMatch === 'application/cbor') {
       res.type(bestMatch)
+      res.write(Buffer.from('9F', 'hex')) // CBOR indefinite length array start
       for await (const entry of object) {
         res.write(module.exports.cbor.encode(entry))
       }
+      res.write(Buffer.from('FF', 'hex')) // CBOR break code
       res.write(null)
     } else if (bestMatch === 'application/json') {
       res.type(bestMatch)
