@@ -47,9 +47,9 @@ class VibeBuilder {
    * @param {string} tagName - the name of the xml tag
    * @param {object} attributes - keys and values to use as attributes on the tag, with special handling of style and data props
    * @param {string} body - text contents to put inside this tag
-   * @param {function} block - function which builds internal tags indented inside this one
+   * @param {function} block - function which builds internal tags indented inside this one, can be async, but if it is, be careful to await tag
    */
-  tag (tagName, ...args) {
+  async tag (tagName, ...args) {
     const block = args.find(x => typeof x === 'function')
     const attribs = args.find(x => typeof x === 'object')
     const stringContents = args.find(x => typeof x === 'string')
@@ -86,7 +86,13 @@ class VibeBuilder {
     if (attribs && attribs.innerHTML) {
       this._rawText(attribs.innerHTML)
     } else {
-      if (block) block(this)
+      if (block) {
+        if (block.constructor.name === 'AsyncFunction') {
+          await block(this)
+        } else {
+          block(this)
+        }
+      }
       if (stringContents) this.text(stringContents)
     }
 

@@ -139,8 +139,21 @@ class RichVibeBuilder extends VibeBuilder {
    * @param {function} [getURL] - returns url for entry in array
    */
   linkList (list, getURL = encodeURIComponent) {
+    if (list[Symbol.asyncIterator]) return this.asyncLinkList(list, getURL)
     this.ul({ class: 'link-list' }, v => {
       for (const entry of list) {
+        v.li(v => v.a(entry.toString(), { href: getURL(entry) }))
+      }
+    })
+  }
+
+  /** emits a ul.link-list with links to each thing in the data array
+   * @param {AsyncIterable} list - array of entries
+   * @param {function} [getURL] - returns url for entry in array
+   */
+  async asyncLinkList (list, getURL = encodeURIComponent) {
+    await this.ul({ class: 'link-list' }, async v => {
+      for await (const entry of list) {
         v.li(v => v.a(entry.toString(), { href: getURL(entry) }))
       }
     })
@@ -166,16 +179,16 @@ class RichVibeBuilder extends VibeBuilder {
 
 /** Builds a html doc with a title and some contents */
 RichVibeBuilder.docStream = (title, block) => {
-  return RichVibeBuilder.renderStream((v) => {
+  return RichVibeBuilder.renderStream(async (v) => {
     v.doctype('html')
-    v.html(() => {
+    await v.html(async () => {
       v.head(() => {
         v.title(title)
         v.meta({ charset: 'utf-8' })
         v.stylesheet('/style.css')
       })
-      v.body(() => {
-        block.call(v, v)
+      await v.body(async () => {
+        await block.call(v, v)
         v.script({ src: '/script.js', defer: true })
       })
     })

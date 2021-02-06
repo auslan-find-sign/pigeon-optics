@@ -8,8 +8,8 @@ const uri = require('encodeuricomponent-tag')
  * @param {function} [getURL] - function which returns a string url for the link to go to
  */
 module.exports = (req, heading, data, getURL = (x) => uri`${x}`) => {
-  return layout(req, v => {
+  return layout(req, async v => {
     v.heading(heading)
-    v.linkList(data, getURL)
+    await v.linkList(data, getURL)
   })
 }
