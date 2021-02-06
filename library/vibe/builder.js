@@ -31,6 +31,15 @@ class VibeBuilder {
       stream.end('')
     })()
 
+    // override pipe to detect flush method on compressed express responses and hook it up
+    const oldPipe = stream.pipe
+    stream.pipe = function (destination, ...args) {
+      if (destination.flush) {
+        v.flush = () => destination.flush()
+      }
+      return oldPipe.call(stream, destination, ...args)
+    }
+
     return stream
   }
 
@@ -126,6 +135,11 @@ class VibeBuilder {
 
   doctype (typeString = 'html') {
     this._rawText(`<!DOCTYPE ${escapeAttribute(typeString)}>\n`)
+  }
+
+  // defaults to do nothing, but can be useful for streaming output
+  flush () {
+
   }
 }
 
