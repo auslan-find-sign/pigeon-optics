@@ -28,7 +28,10 @@ module.exports = (req, data, error = null) => {
         }
 
         v.dt('Data (JSON)')
-        v.dd(v => v.textarea(data.recordData, { name: 'recordData', spellcheck: 'false', wrap: 'off' }))
+        v.dd(v => {
+          // v.textarea(data.recordData, { name: 'recordData', spellcheck: 'false', wrap: 'off' })
+          v.sourceCodeEditor('recordData', 'json', data.recordData)
+        })
       })
 
       v.flexRow(v => {

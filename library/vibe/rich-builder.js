@@ -175,6 +175,51 @@ class RichVibeBuilder extends VibeBuilder {
       block.call(this, list[0])
     }
   }
+
+  // emits an ACE editor component, hooked up to work inside a form, configured for javascript highlighting
+  sourceCodeEditor (name, language, code, options = {}) {
+    if (!this.__aceEditorPackageIncluded) {
+      this.__aceEditorPackageIncluded = true
+      this.script({ src: '/npm/ace-builds/src-min-noconflict/ace.js', type: 'text/javascript', charset: 'utf-8' })
+    }
+
+    this.pre(code, { class: 'code-editor javascript', id: `${name}-editor` })
+    this.input({ type: 'hidden', name, id: `${name}-form-input` })
+
+    const aceOptions = {
+      lightTheme: 'ace/theme/tomorrow',
+      darkTheme: 'ace/theme/tomorrow_night',
+      ace: {
+        mode: `ace/mode/${language}`,
+        autoScrollEditorIntoView: true,
+        maxLines: 30,
+        minLines: 2,
+        ...(options.ace || {})
+      }
+    }
+
+    const init = [
+      '(function () {',
+      `  const options = ${JSON.stringify(aceOptions)}`,
+      "  const darkmode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)')",
+      '  options.ace.theme = (darkmode && darkmode.matches) ? options.darkTheme : options.lightTheme',
+      `  const editor = ace.edit(${JSON.stringify(`${name}-editor`)}, options.ace)`,
+      "  if (darkmode) darkmode.addEventListener('change', function (event) {",
+      '    options.ace.theme = event.matches ? options.darkTheme : options.lightTheme',
+      '    editor.setTheme(options.ace.theme)',
+      '  })',
+      "  editor.session.setMode('ace/mode/javascript')",
+      '  editor.renderer.setScrollMargin(10, 10, 0, 0)',
+      `  const hidden = document.getElementById(${JSON.stringify(`${name}-form-input`)})`,
+      '  const updateHidden = function () { hidden.value = editor.getValue() }',
+      '  if (hidden.form) {',
+      "    hidden.form.addEventListener('submit', updateHidden)",
+      '    updateHidden()',
+      '  }',
+      '})()'
+    ]
+    this.script(init.join('\n'))
+  }
 }
 
 /** Builds a html doc with a title and some contents */

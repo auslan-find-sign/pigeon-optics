@@ -8,6 +8,7 @@ const uri = require('encodeuricomponent-tag')
 
 const Vibe = require('../vibe/rich-builder')
 const layout = require('../views/layout')
+const recordView = require('../views/dataset-record')
 const recordEditorView = require('../views/dataset-record-editor')
 const configEditView = require('../views/dataset-config-editor')
 const soloList = require('../views/solo-list')
@@ -75,10 +76,7 @@ router.get('/datasets/:user\\::name/:recordID', async (req, res) => {
   const record = await dataset.readEntry(req.params.user, req.params.name, req.params.recordID)
 
   if (req.accepts('html')) {
-    Vibe.docStream(`${req.params.user}:${req.params.dataset}/${req.params.recordID}`, layout(req, v => {
-      v.heading(`Record ID: ${req.params.recordID}`)
-      v.sourceCode(codec.json.encode(record, 2))
-    })).pipe(res.type('html'))
+    Vibe.docStream(`${req.params.user}:${req.params.name}/${req.params.recordID}`, recordView(req, record)).pipe(res)
   } else {
     codec.respond(req, res, record)
   }

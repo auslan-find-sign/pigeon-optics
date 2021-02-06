@@ -34,9 +34,8 @@ class VibeBuilder {
     // override pipe to detect flush method on compressed express responses and hook it up
     const oldPipe = stream.pipe
     stream.pipe = function (destination, ...args) {
-      if (destination.flush) {
-        v.flush = () => destination.flush()
-      }
+      if (destination.flush) v.flush = () => destination.flush()
+      if (destination.type) destination.type('html')
       return oldPipe.call(stream, destination, ...args)
     }
 
@@ -141,11 +140,41 @@ class VibeBuilder {
   flush () {
 
   }
+
+  // special case, script has strange escaping rules
+  style (...args) {
+    const attribs = args.find(x => typeof x === 'object') || {}
+    const stringContents = args.find(x => typeof x === 'string') || ''
+    // for inline styles, if there's data that would glitch the html parser, base64 encode the whole blob to avoid it
+    if (stringContents.includes('</')) {
+      const datauri = `data:text/javascript;base64,${Buffer.from(stringContents).toString('base64')}`
+      this.tag('style', attribs, `@import url("${datauri}");`)
+    } else {
+      this.tag('style', attribs, v => v._rawText(stringContents))
+    }
+  }
+
+  // special case, script has strange escaping rules
+  script (...args) {
+    const attribs = args.find(x => typeof x === 'object') || {}
+    const stringContents = args.find(x => typeof x === 'string')
+    if (stringContents) {
+      // if there is an inline script, with some suss maybe parser breaking markup, do data uri embedding
+      if (stringContents.includes('</')) {
+        const uriAttribs = { src: `data:text/javascript;base64,${Buffer.from(stringContents).toString('base64')}`, ...attribs }
+        this.tag('script', uriAttribs)
+      } else {
+        this.tag('script', attribs, v => v._rawText(stringContents))
+      }
+    } else {
+      this.tag('script', attribs)
+    }
+  }
 }
 
 // make convenience html tag methods available
 for (const tagName of Tags) {
-  VibeBuilder.prototype[tagName] = function (...args) {
+  VibeBuilder.prototype[tagName] ||= function (...args) {
     return this.tag(tagName, ...args)
   }
 }

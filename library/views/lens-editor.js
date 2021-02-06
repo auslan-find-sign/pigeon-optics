@@ -39,7 +39,7 @@ module.exports = (req, data, error = null) => {
           the entry's name. Values can be any JSON type, or Buffer, or Attachment instances to
           represent file data. Buffers should only be used for small pieces of data like hashes.
           Attachments should always be used for any large information for better performance.`)
-          v.textarea(data.mapCode, { name: 'mapCode', spellcheck: 'false', wrap: 'off' })
+          v.sourceCodeEditor('mapCode', 'javascript', data.mapCode)
         })
 
         v.dt('Javascript Reduce Function')
@@ -48,7 +48,7 @@ module.exports = (req, data, error = null) => {
           use this Reduce function to merge the values together in to one final result. This function
           will recieve two variables "left" and "right" containing two map output values. It should
           use the return keyword to return the resulting value for this recordID`)
-          v.textarea(data.reduceCode, { name: 'reduceCode', spellcheck: 'false', wrap: 'off' })
+          v.sourceCodeEditor('reduceCode', 'javascript', data.reduceCode)
         })
       })
 
