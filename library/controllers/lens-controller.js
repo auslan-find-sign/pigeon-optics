@@ -21,7 +21,7 @@ output(recordID, {
 const reduceCodeExample = `// example, overlays the objects overwriting properties
 return { ...left, ...right }`
 
-router.get('/lenses/create', auth.required, (req, res) => {
+router.get('/lenses/create', auth.required, async (req, res) => {
   const state = {
     create: true,
     name: '',
@@ -30,6 +30,13 @@ router.get('/lenses/create', auth.required, (req, res) => {
     mapType: 'javascript',
     mapCode: mapCodeExample,
     reduceCode: reduceCodeExample
+  }
+  if (req.query.clone) {
+    const [user, lensName] = `${req.query.clone}`.split(':')
+    const cloneConfig = await lens.readConfig(user, lensName)
+    Object.assign(state, cloneConfig)
+    state.inputs = cloneConfig.inputs.join('\n')
+    state.memo = `Cloned from /lenses/${req.query.clone}/: ${cloneConfig.memo}`
   }
   Vibe.docStream('Create a Lens', lensEditorView(req, state)).pipe(res.type('html'))
 })

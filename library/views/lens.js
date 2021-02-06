@@ -14,6 +14,14 @@ module.exports = (req, config, records) => {
       v.p(config.memo)
     }
 
+    if (req.session.auth) {
+      v.flexRow(v => {
+        v.flexSpacer(5)
+        if (req.owner) v.button('Edit', { href: uri`/lenses/${req.params.user}:${req.params.name}/edit` })
+        v.button('clone', { href: uri`/lenses/create?clone=${req.params.user}:${req.params.name}` })
+      })
+    }
+
     v.p(v => {
       v.text('Data feeding in from ')
       v.inlineList(config.inputs, x => {
@@ -31,10 +39,6 @@ module.exports = (req, config, records) => {
 
     v.heading('Reduce Function:', { level: 3 })
     v.sourceCode(config.reduceCode)
-
-    if (req.owner) {
-      v.flexRow(v => { v.flexSpacer(5); v.button('Edit', { href: uri`/lenses/${req.params.user}:${req.params.name}/edit` }) })
-    }
 
     v.heading('Records:', { level: 3 })
     v.linkList(records, name => uri`/lenses/${req.params.user}:${req.params.name}/${name}`)
