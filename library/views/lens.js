@@ -33,7 +33,7 @@ module.exports = (req, config, records) => {
     v.sourceCode(config.reduceCode)
 
     if (req.owner) {
-      v.flexRow(v => { v.flexSpacer(5); v.button('Edit', { href: uri`/lenses/edit/${req.params.user}:${req.params.name}/` }) })
+      v.flexRow(v => { v.flexSpacer(5); v.button('Edit', { href: uri`/lenses/${req.params.user}:${req.params.name}/edit` }) })
     }
 
     v.heading('Records:', { level: 3 })

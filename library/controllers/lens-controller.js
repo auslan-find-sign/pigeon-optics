@@ -8,9 +8,9 @@ const uri = require('encodeuricomponent-tag')
 
 const Vibe = require('../vibe/rich-builder')
 const layout = require('../views/layout')
-const viewportEditor = require('../views/viewport-editor')
+const lensEditorView = require('../views/lens-editor')
 const soloList = require('../views/solo-list')
-const viewportView = require('../views/viewport')
+const lensView = require('../views/lens')
 
 const mapCodeExample = `// example, simply copies the underlying dataset, but adds a property lensed: true
 const [realm, store, recordID] = recordPath.slice(1).split('/').map(x => decodeURIComponent(x))
@@ -31,7 +31,7 @@ router.get('/lenses/create', auth.required, (req, res) => {
     mapCode: mapCodeExample,
     reduceCode: reduceCodeExample
   }
-  Vibe.docStream('Create a Lens', viewportEditor(req, state)).pipe(res.type('html'))
+  Vibe.docStream('Create a Lens', lensEditorView(req, state)).pipe(res.type('html'))
 })
 
 router.post('/lenses/create', auth.required, async (req, res) => {
@@ -52,7 +52,7 @@ router.post('/lenses/create', auth.required, async (req, res) => {
       ...req.body
     }
     console.log('Stack:', err.stack)
-    Vibe.docStream('Create a Lens', viewportEditor(req, state, err.message)).pipe(res.type('html'))
+    Vibe.docStream('Create a Lens', lensEditorView(req, state, err.message)).pipe(res.type('html'))
   }
 })
 
@@ -64,7 +64,7 @@ router.get('/lenses/edit/:user\\::name/', auth.requireOwnerOrAdmin('user'), asyn
     inputs: config.inputs.join('\n'),
     name: req.params.name
   }
-  Vibe.docStream('Edit a Lens', viewportEditor(req, state)).pipe(res.type('html'))
+  Vibe.docStream('Edit a Lens', lensEditorView(req, state)).pipe(res.type('html'))
 })
 
 router.post('/lenses/edit/:user\\::name/', auth.requireOwnerOrAdmin('user'), async (req, res) => {
@@ -87,7 +87,7 @@ router.post('/lenses/edit/:user\\::name/', auth.requireOwnerOrAdmin('user'), asy
       ...req.body
     }
     console.log(err.stack)
-    Vibe.docStream('Edit a Lens', viewportEditor(req, state, err.message)).pipe(res.type('html'))
+    Vibe.docStream('Edit a Lens', lensEditorView(req, state, err.message)).pipe(res.type('html'))
   }
 })
 
@@ -118,7 +118,7 @@ router.get('/lenses/:user\\::name/', async (req, res) => {
 
   if (req.accepts('html')) {
     const recordIDs = await lens.listEntries(req.params.user, req.params.name)
-    Vibe.docStream(`${req.params.user}’s “${req.params.name}” Datasets`, viewportView(req, config, recordIDs)).pipe(res.type('html'))
+    Vibe.docStream(`${req.params.user}’s “${req.params.name}” Datasets`, lensView(req, config, recordIDs)).pipe(res.type('html'))
   } else {
     const records = await lens.listEntryHashes(req.params.user, req.params.name)
     codec.respond(req, res, {
