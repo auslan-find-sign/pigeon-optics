@@ -43,7 +43,7 @@ async function * encodePath (path, encoding) {
  * @param {string} path - path in form '/realm/user:name'
  * @param {string} encoding - 'cbor', 'json', or 'json-lines'
  */
-function streamPath (path, encoding) {
+function readableStreamOfPath (path, encoding) {
   return Readable.from(encodePath(path, encoding))
 }
 
@@ -122,7 +122,7 @@ router.get('/export/:realm(datasets|viewports)/:user\\::name', async (req, res) 
   }
 
   res.type(mimeType)
-  streamPath(path, req.query.encoding).pipe(res)
+  readableStreamOfPath(path, req.query.encoding).pipe(res)
 })
 
 /**
@@ -136,6 +136,13 @@ router.get('/export/:realm(datasets|viewports)/:user\\::name/zip', async (req, r
   }
 
   streamArchive(path, 'zip', !!req.query.attachments).pipe(res.type('application/zip'))
+})
+
+/**
+ * stream out changes to a lens or dataset's contents
+ */
+router.get('/stream/:realm(datasets|viewports)/:user\\::name', async (req, res) => {
+
 })
 
 module.exports = router

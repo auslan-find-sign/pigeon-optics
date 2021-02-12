@@ -50,19 +50,22 @@ module.exports = {
   async readEntryHash (user, dataset, recordID) {
     const index = await queue.add(() => file.read(this.path(user, dataset, 'index')))
     if (!index[recordID]) throw new Error('Dataset doesn’t contain specified record')
-    return index[recordID]
+    return index[recordID][1]
   },
 
   /** reads each record of this dataset sequentially as an async iterator
    * @param {string} username - user who owns dataset
    * @param {string} dataset - name of dataset
-   * @yields {Array} - [recordID string, recordData any, hash Buffer]
+   * @param {number} afterVersion - don't read anything below this version number
+   * @yields {Array} - [recordID string, recordData any, hash Buffer, version number]
    */
-  async * iterateEntries (user, dataset) {
+  async * iterateEntries (user, dataset, afterVersion = 0) {
     const index = await queue.add(() => file.read(this.path(user, dataset, 'index')))
-    for (const [recordID, hash] of Object.entries(index)) {
-      const recordData = await queue.add(() => file.read(this.path(user, dataset, 'objects', index[recordID].toString('hex'))))
-      yield [recordID, recordData, hash]
+    for (const [recordID, [version, hash]] of Object.entries(index)) {
+      if (version > afterVersion) {
+        const recordData = await queue.add(() => file.read(this.path(user, dataset, 'objects', index[recordID].toString('hex'))))
+        yield [recordID, recordData, hash, version]
+      }
     }
   },
 
@@ -105,12 +108,31 @@ module.exports = {
 
   /** plain object mapping recordIDs to object hashes
    * @param {string} username - user who owns dataset
-   * @param {string} dataset - name of dataset
-   * @returns {string[]} - dataset entry id's
+   * @param {string} dataset - name of dataset or lens
+   * @returns {object} - keyed with recordIDs and values are buffers containing hashes for each record's value
    * @async
    */
   async listEntryHashes (user, dataset) {
-    return await queue.add(() => file.read(this.path(user, dataset, 'index')))
+    return Object.fromEntries(Object.entries(await queue.add(() => file.read(this.path(user, dataset, 'index')))).map(([key, value]) => {
+      return [key, value[1]]
+    }))
+  },
+
+  /** get an integer version number for the current version of the dataset
+   * every merge increments the number by one
+   * @returns {number}
+   */
+  async getCurrentVersionNumber (user, dataset) {
+    const values = Object.values(await queue.add(() => file.read(this.path(user, dataset, 'index'))))
+    return values.reduce((a, b) => Math.max(a, b), 0)
+  },
+
+  /** hash the state of the whole dataset quickly
+   * @param {string} user - owner of dataset
+   * @param {string} name - name of dataset or lens
+   */
+  async getCollectionHash (user, name) {
+    return codec.objectHash(await this.listEntryHashes(user, name))
   },
 
   /** tests if a dataset or specific record exists */
@@ -247,7 +269,10 @@ module.exports = {
 
       const processedData = await attachmentStore.storeAttachments(data)
       const hash = codec.objectHash(processedData)
-      await queue.add(() => file.write(this.path(user, dataset, 'objects', hash.toString('hex')), processedData))
+      const objectPath = this.path(user, dataset, 'objects', hash.toString('hex'))
+      if (!(await file.exists(objectPath))) {
+        await queue.add(() => file.write(objectPath, processedData))
+      }
       updatedIDs.push(id)
       idMapRewrites[id] = hash
     }
@@ -258,10 +283,13 @@ module.exports = {
       const index = await file.read(path)
       // remove any elements from updatedIDs where the data didn't actually change
       updatedIDs = Object.entries(idMapRewrites).filter(([id, hash]) => !index[id] || hash.equals(index[id])).map(x => x[0])
-      await file.write(path, {
-        ...index,
-        ...idMapRewrites
-      })
+      // find the highest version number in existing data
+      const lastVersionNumber = Object.values(index).reduce((a, b) => Math.max(a[0], b[0]), 0)
+      // write the updates in to the index
+      for (const updatedID of updatedIDs) {
+        index[updatedID] = [lastVersionNumber + 1, idMapRewrites[updatedID]]
+      }
+      await file.write(path, index)
     })
 
     // do garbage collection
