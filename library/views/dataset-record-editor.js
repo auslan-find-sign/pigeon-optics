@@ -1,4 +1,5 @@
 const layout = require('./layout')
+const uri = require('encodeuricomponent-tag')
 
 /**
  * block to build a dataset manual record editor
@@ -22,7 +23,7 @@ module.exports = (req, data, error = null) => {
       v.dl(v => {
         v.dt('Record ID')
         if (data.create) {
-          v.dd(v => v.input({ name: 'recordID', value: data.recordID, minlength: 1, maxlength: 250 }))
+          v.dd(v => v.input({ name: 'recordID', value: data.recordID, minlength: 1, maxlength: 250, autocomplete: 'off' }))
         } else {
           v.dd(data.recordID)
         }
@@ -36,8 +37,8 @@ module.exports = (req, data, error = null) => {
 
       v.flexRow(v => {
         v.flexSpacer(5)
-        if (!data.create) v.button('Delete', { type: 'submit', formaction: 'delete' })
-        v.button('Save', { type: 'submit', formaction: 'save' })
+        if (!data.create) v.button('Delete', { type: 'submit', formaction: uri`/datasets/${req.params.user}:${req.params.dataset}/delete` })
+        v.button('Save', { type: 'submit' })
       })
     })
   })

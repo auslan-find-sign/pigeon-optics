@@ -10,13 +10,22 @@ const uri = require('encodeuricomponent-tag')
  */
 module.exports = (req, record) => {
   return layout(req, v => {
-    v.heading(`Record ID: ${req.params.recordID}`)
-    if (req.owner) {
-      v.flexRow(v => {
-        v.flexSpacer(5)
-        v.button('Edit', { href: uri`/datasets/${req.params.user}:${req.params.name}/${req.params.recordID}/edit` })
+    v.panel(v => {
+      v.breadcrumbs(v => {
+        v.a('Home', { href: '/' })
+        v.a('Datasets', { href: '/datasets/' })
+        v.iconLink('cassette', `${req.params.user}:${req.params.name}`, { href: uri`/datasets/${req.params.user}:${req.params.name}/` })
+        v.iconLink('newspaper', req.params.recordID, { href: uri`/datasets/${req.params.user}:${req.params.name}/${req.params.recordID}` })
       })
-    }
-    v.sourceCode(codec.json.encode(record, 2))
+
+      v.heading(`Record ID: ${req.params.recordID}`)
+      if (req.owner) {
+        v.flexRow(v => {
+          v.flexSpacer(5)
+          v.button('Edit', { href: uri`/datasets/${req.params.user}:${req.params.name}/${req.params.recordID}/edit` })
+        })
+      }
+      v.sourceCode(codec.json.encode(record, 2))
+    })
   })
 }
