@@ -6,8 +6,26 @@
 
 body {
   font-family: Helvetica Neue, Helvetica, Ariel, sans-serif;
-  margin: 2em 1em;
+  margin: 1em 1em;
   line-height: 1.5em;
+  background-color: hsl(147, 23%, 92%);
+  color: hsl(150, 3%, 12%)
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: hsl(150, 3%, 12%);
+    color: hsl(150, 10%, 80%);
+  }
+}
+
+.icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  stroke-width: 0;
+  stroke: currentColor;
+  fill: currentColor;
 }
 
 input, textarea {
@@ -57,6 +75,11 @@ button.button, a.button {
   color: hsl(var(--hue), 80%, 5%);
 }
 
+button.button > .icon, a.button > .icon {
+  margin-right: 0.5ex;
+  vertical-align: text-bottom;
+}
+
 /* Card Spread styles */
 .card-spread {
   display: flex;
@@ -89,16 +112,6 @@ h4.heading { font-size: 19pt; font-weight: 350; }
 h5.heading { font-size: 17pt; font-weight: 400; }
 h6.heading { font-size: 15pt; font-weight: 450; }
 
-/* Link styles */
-a.link {
-  /* no styles at the moment */
-}
-
-/* Monospace styles */
-pre.monospace {
-  /* no styles at the moment */
-}
-
 /* Notice panel styles */
 .notice-panel {
   background-color: white;
@@ -113,11 +126,6 @@ pre.monospace {
   font-weight: 200;
   font-style: italic;
   margin: 0 0 3mm 0;
-}
-
-/* Paragraph styles */
-p.paragraph {
-  
 }
 
 /* Playing card styles */
@@ -315,4 +323,48 @@ form.simple-form > button[type="submit"] {
   border-bottom: 1px solid #eee;
   box-shadow: 0 2mm 3mm rgba(0, 0, 0, 20%);
   padding: 2mm 2mm 2mm 2mm;
+}
+
+nav {
+  display: flex;
+  background-color: white;
+  border-radius: 1em;
+  box-shadow: 0 1px 2.5px rgba(0, 0, 0, 30%);
+  margin: 0 auto 1em auto;
+  padding: 0.5ex;
+  max-width: 60em;
+  min-width: 585px;
+  align-items: center;
+}
+
+nav a, nav a.button {
+  margin: 0 1ex;
+  text-decoration: none;
+  color: hsl(0deg, 0%, 20%);
+  background-color: transparent;
+  padding: 0.5ex 1ex;
+  border-radius: 1ex;
+  text-align: center;
+  border: 0 none;
+}
+
+nav a.button svg {
+  height: 1.2em;
+  width: 1.7em;
+}
+
+nav a:hover, nav a.button:hover {
+  background-color: hsl(203, 33%, 95%);
+}
+
+@media (prefers-color-scheme: dark) {
+  nav {
+    background-color: hsl(130, 5%, 53%);
+    box-shadow: 0 -1px 2.5px hsla(115, 42%, 84%, 0.5);
+  }
+  /* nav a { color: rgb(177, 190, 202) } */
+  nav a:hover, nav a.button:hover {
+    background-color: hsl(203, 6%, 26%);
+    color: rgb(177, 190, 202);
+  }
 }

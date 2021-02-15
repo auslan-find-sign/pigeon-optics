@@ -2,39 +2,35 @@ const uri = require('encodeuricomponent-tag')
 const pkg = require('../../package.json')
 
 module.exports = (req, block) => {
-  return async (v) => {
-    v.toolbar(() => {
-      // datasets icon
-      v.a({ href: '/', class: 'home-icon' }, () => {
-        v.img({ src: '/design/datasets-icon.png', alt: 'Site Icon', style: { height: '1.5em' } })
-        v.text(' Datasets')
-      })
-      v.flexSpacer(5)
-      // search box
-      v.form({ id: 'search', action: '/search', method: 'GET' }, () => {
-        v.input({ type: 'search', name: 'q', value: req.query.q })
-      })
-      v.flexSpacer(5)
-      // auth state links
-      v.span({ id: 'auth-links' }, () => {
-        if (req.session && req.session.auth) {
-          v.a({ href: uri`/users/${req.session.auth.user}` }, `${req.session.auth.user}`)
-          v.text(' ')
-          v.a({ href: uri`/auth/logout` }, 'Logout')
-        } else {
-          v.a({ href: uri`/auth/login` }, 'Login')
-        }
-      })
+  return async v => {
+    v.nav(v => {
+      // pigeon optics icon
+      v.a({ href: '/', class: 'home-icon' }, v => v.img({ src: '/design/icon.svg', alt: pkg.defaults.title, style: { height: '1.5em' } }))
+      v.flexSpacer(1)
+      v.iconButton('cassette', 'Datasets', { href: '/datasets/' })
+      v.iconButton('dglasses', 'Lenses', { href: '/lenses/' })
+      v.iconButton('group', 'Users', { href: '/users/' })
+
+      v.flexSpacer(10)
+      v.iconButton('search', 'Search', { href: '/search' })
+      if (req.session && req.session.auth) {
+        v.iconButton('user-circle', req.session.auth.user, { href: uri`/users/${req.session.auth.user}` })
+        v.iconButton('sign-out', 'Logout', { href: uri`/auth/logout` })
+      } else {
+        v.iconButton('user-circle', 'Login', { href: uri`/auth/login` })
+      }
     })
 
     await block(v)
 
-    v.flexRow({ class: 'footer' }, () => {
-      v.text(`Auslan Find Sign - Datasets v${pkg.version}`)
-      v.flexSpacer(5)
-      v.a({ href: pkg.homepage }, 'Open Source')
-      v.flexSpacer(5)
-      v.a({ href: 'https://find.auslan.fyi/' }, 'Find Sign')
+    v.footer(v => {
+      v.flexRow(v => {
+        v.text(`Software v ${pkg.version}`)
+        v.flexSpacer(5)
+        v.a({ href: pkg.homepage }, 'View Source')
+        v.flexSpacer(5)
+        v.a({ href: 'https://find.auslan.fyi/' }, 'Find Sign')
+      })
     })
   }
 }

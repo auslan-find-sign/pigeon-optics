@@ -78,6 +78,26 @@ class RichVibeBuilder extends VibeBuilder {
     }
   }
 
+  iconButton (iconName, ...args) {
+    this.button(getAttribs(args), v => {
+      const fn = args.find(x => typeof x === 'function')
+      const str = args.find(x => typeof x === 'string')
+      this.icon(iconName)
+      if (fn) fn.call(this, this)
+      if (str) this.text(str)
+    })
+  }
+
+  iconLink (iconName, ...args) {
+    this.a(getAttribs(args), v => {
+      const fn = args.find(x => typeof x === 'function')
+      const str = args.find(x => typeof x === 'string')
+      this.icon(iconName)
+      if (fn) fn.call(this, this)
+      if (str) this.text(str)
+    })
+  }
+
   /** shortcut for markup of a flex-row div */
   flexRow (...args) {
     const options = getAttribs(args)
@@ -176,6 +196,23 @@ class RichVibeBuilder extends VibeBuilder {
     }
   }
 
+  /** breadcrumbs structure, which just emits <div class="breadcrumbs"></div> */
+  breadcrumbs (...args) {
+    const attribs = getAttribs(args)
+    if (!attribs.class) attribs.class = []
+    if (!Array.isArray(attribs.class)) attribs.class = [attribs.class]
+    attribs.class.push('breadcrumbs')
+    this.div(...args)
+  }
+
+  panel (...args) {
+    const attribs = getAttribs(args)
+    if (!attribs.class) attribs.class = []
+    if (!Array.isArray(attribs.class)) attribs.class = [attribs.class]
+    attribs.class.push('panel')
+    this.div(...args)
+  }
+
   // emits an ACE editor component, hooked up to work inside a form, configured for javascript highlighting
   sourceCodeEditor (name, language, code, options = {}) {
     if (!this.__aceEditorPackageIncluded) {
@@ -220,6 +257,22 @@ class RichVibeBuilder extends VibeBuilder {
     ]
     this.script(init.join('\n'))
   }
+
+  footerButtons (...args) {
+    this.div({ class: [] }, ...args)
+  }
+
+  icon (symbolName) {
+    if (RichVibeBuilder.iconPath.endsWith('.svg')) {
+      this.svg({ class: ['icon', `icon-${symbolName}`], ariaHidden: 'true' }, v => {
+        this.tag('use', { 'xlink:href': `${RichVibeBuilder.iconPath}#icon-${symbolName}` })
+      })
+    } else if (RichVibeBuilder.iconPath.endsWith('/')) {
+      this.img({ class: ['icon', `icon-${symbolName}`], src: `${RichVibeBuilder.iconPath}${symbolName}.${RichVibeBuilder.iconExtension}` })
+    } else {
+      throw new Error('RichVibeBuilder.iconPath needs to point to a .svg symbol collection or a path ending in / with image files in it')
+    }
+  }
 }
 
 /** Builds a html doc with a title and some contents */
@@ -239,5 +292,8 @@ RichVibeBuilder.docStream = (title, block) => {
     })
   })
 }
+
+RichVibeBuilder.iconPath = '/design/icomoon/symbol-defs.svg'
+RichVibeBuilder.iconExtension = 'png'
 
 module.exports = RichVibeBuilder

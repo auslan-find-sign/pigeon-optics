@@ -73,8 +73,17 @@ app.get('/', (req, res) => {
   Vibe.docStream('Datasets Project', homepageView(req)).pipe(res.type('html'))
 })
 
+app.use((req, res, next) => {
+  const err = new Error('Path not Found, web address maybe incorrect')
+  err.httpCode = 404
+  err.code = 'Path Not Found'
+  throw err
+})
+
 app.use((error, req, res, next) => {
-  if (error.code === 'ENOENT') {
+  if (error.httpCode) {
+    res.status(error.httpCode)
+  } else if (error.code === 'ENOENT') {
     res.status(404) // something tried to read a file that doesn't exist
   } else if (error.name === 'SyntaxError' || error.stack.includes('/borc/src/decoder.js')) {
     res.status(400) // parse errors are likely to be clients sending malformed data

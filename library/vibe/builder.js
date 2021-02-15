@@ -7,8 +7,50 @@ const Tags = new Set(require('html-tags'))
 const { PassThrough } = require('stream')
 
 const hyphenate = (string) => `${string}`.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase()
-const escapeAttribute = (string) => string.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-const escapeText = (string) => string.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+const escapeAttribute = (string) => `${string}`.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+const escapeText = (string) => `${string}`.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+// handle 'data' attribute with object value, converting in to data-prop-name=value1 type of formatting for html data attributes / dataset
+const attributeMapDataConvert = (tagName, key, value) => {
+  if (key === 'data' && typeof value === 'object') {
+    return Object.entries(value).map(([propName, propVal]) => {
+      if (typeof propVal !== 'string') propVal = JSON.stringify(propVal)
+      return [`data-${propName}`, propVal]
+    })
+  } else {
+    return [[key, value]]
+  }
+}
+
+// handle 'style' attribute with object value, converting in to a style attribute
+const attributeMapStyleConvert = (tagName, key, value) => {
+  if (key === 'style' && typeof value === 'object') {
+    return Object.entries(value).map(([propName, propVal]) => `${hyphenate(propName)}:${propVal}`).join(';')
+  } else {
+    return [[key, value]]
+  }
+}
+
+// handle class/rel type attributes, which can be a list
+const attributeMapListConvert = (tagName, key, value) => {
+  if (Array.isArray(value) && ['rel', 'class', 'for', 'aria-labeledby', 'ping'].includes(key)) {
+    return [[key, value.join(' ')]]
+  } else {
+    return [[key, value]]
+  }
+}
+
+// handle 'style' attribute with object value, converting in to a style attribute
+const attributeMapDropReservedKeys = (tagName, key, value) => {
+  if (['innerHTML'].includes(key)) return []
+  return [[key, value]]
+}
+
+// somewhere to store private information
+const secretData = new WeakMap()
+function secret (obj) {
+  return secretData.get(obj)
+}
 
 class VibeBuilder {
   /** Runs a callback function, giving it an argument 'v' which is a VibeBuilder instance
@@ -51,6 +93,51 @@ class VibeBuilder {
     return strings.join('')
   }
 
+  /** constructs a new VibeBuilder, with options
+   * @param {VibeOptions} options
+   * @typedef {object} VibeOptions
+   * @property {function} attributeMapFunction - function (tagName, attributeName, attributeValue) { return [attributeName, attributeValue] }
+   */
+  constructor (options = {}) {
+    secretData.set(this, { options })
+  }
+
+  /** processes args to this.tag() and returns an attributes string safe to stream out in html */
+  _attributeStringFromArgs (tagName, ...args) {
+    const options = secret(this).options
+    const objs = args.filter(x => typeof x === 'object')
+    let entries = objs.flatMap(x => Object.entries(x))
+    const attribFilters = [
+      attributeMapDropReservedKeys,
+      attributeMapDataConvert,
+      attributeMapListConvert,
+      attributeMapStyleConvert
+    ]
+
+    if (options.attributeMapFunction) attribFilters.unshift(options.attributeMapFunction)
+
+    // run attribute filters to do any adjustments needed and clean them up
+    for (const mapFn of attribFilters) {
+      entries = entries.flatMap(([key, value]) => {
+        const result = mapFn(tagName, key, value)
+        if (Array.isArray(result)) return result
+        else return [[key, result]]
+      })
+    }
+
+    return entries.map(([key, value]) => {
+      if (value === false) {
+        return ''
+      } else if (value === true) {
+        return ` ${escapeAttribute(hyphenate(`${key}`))}`
+      } else {
+        value = escapeAttribute(value)
+        if (!value.match(/^[^ "'`=<>]+$/mg)) value = `"${value}"`
+        return ` ${escapeAttribute(hyphenate(`${key}`))}=${value}`
+      }
+    }).join('')
+  }
+
   /** create a html tag with specified name
    * @param {string} tagName - the name of the xml tag
    * @param {object} attributes - keys and values to use as attributes on the tag, with special handling of style and data props
@@ -59,53 +146,27 @@ class VibeBuilder {
    */
   async tag (tagName, ...args) {
     const block = args.find(x => typeof x === 'function')
-    const attribs = args.find(x => typeof x === 'object')
+    const attribs = Object.fromEntries(args.filter(x => typeof x === 'object').flatMap(x => Object.entries(x)))
     const stringContents = args.find(x => typeof x === 'string')
     const selfClosing = SelfClosingTags.has(tagName.toLowerCase())
 
     // emit opening tag
-    const attribsString = Object.entries(attribs || {}).map(([key, value]) => {
-      if (key === 'style' && typeof value === 'object') {
-        value = Object.entries(value).map(([prop, cssValue]) => `${hyphenate(prop)}:${cssValue}`).join(';')
-      }
+    const attribsString = this._attributeStringFromArgs(tagName, ...args)
 
-      if (key === 'innerHTML') {
-        return ''
-      } else if (value === true) {
-        return ` ${hyphenate(key)}`
-      } else if (!value) {
-        return ''
-      } else if (typeof value === 'object' && key === 'data') {
-        return Object.entries(value).map(([prop, propVal]) => {
-          if (typeof propVal !== 'string') propVal = JSON.stringify(propVal)
-          propVal = escapeAttribute(propVal)
-          if (!propVal.match(/^[^ "'`=<>]*$/mg)) propVal = `"${propVal}"`
-          return ` data-${escapeAttribute(hyphenate(prop))}=${propVal}`
-        }).join('')
+    this._rawText(`<${escapeAttribute(tagName)}${attribsString}>`)
+
+    if (attribs && attribs.innerHTML) this._rawText(attribs.innerHTML)
+    if (stringContents) this.text(stringContents)
+    if (block) {
+      if (block.constructor.name === 'AsyncFunction') {
+        await block(this)
       } else {
-        value = escapeAttribute(`${value}`)
-        if (!value.match(/^[^ "'`=<>]*$/mg)) value = `"${value}"`
-        return ` ${escapeAttribute(hyphenate(key))}=${value}`
+        block(this)
       }
-    }).join('')
-
-    this._rawText(`<${tagName}${attribsString}>`)
-
-    if (attribs && attribs.innerHTML) {
-      this._rawText(attribs.innerHTML)
-    } else {
-      if (block) {
-        if (block.constructor.name === 'AsyncFunction') {
-          await block(this)
-        } else {
-          block(this)
-        }
-      }
-      if (stringContents) this.text(stringContents)
     }
 
     // emit closing tag if needed
-    if (!selfClosing) this._rawText(`</${tagName}>`)
+    if (!selfClosing) this._rawText(`</${escapeAttribute(tagName)}>`)
   }
 
   /**
