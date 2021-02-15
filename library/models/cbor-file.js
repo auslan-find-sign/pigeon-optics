@@ -70,6 +70,7 @@ module.exports.write = async (dataPath, data) => {
   }
 
   await fs.move(tempPath, path1)
+  await fs.remove(path2) // everything succeeded, we can erase the backup
 }
 
 /** Remove a cbor data file
