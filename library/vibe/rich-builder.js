@@ -1,5 +1,6 @@
 const VibeBuilder = require('./builder')
 const highlight = require('h.js')
+const path = require('path')
 
 /** gets or adds attributes object to args list when proxying calls to tag builder
  * note, this sometimes changes the args array to inject an object, beware side-effects
@@ -72,6 +73,7 @@ class RichVibeBuilder extends VibeBuilder {
     const options = getAttribs(args)
     if (options.href) {
       appendClass(options, 'button')
+      options.role = 'button'
       this.tag('a', ...args)
     } else {
       this.tag('button', ...args)
@@ -199,10 +201,16 @@ class RichVibeBuilder extends VibeBuilder {
   /** breadcrumbs structure, which just emits <div class="breadcrumbs"></div> */
   breadcrumbs (...args) {
     const attribs = getAttribs(args)
+    const blocks = args.filter(x => typeof x === 'function')
+    args = args.filter(x => typeof x !== 'function')
     if (!attribs.class) attribs.class = []
     if (!Array.isArray(attribs.class)) attribs.class = [attribs.class]
     attribs.class.push('breadcrumbs')
-    this.div(...args)
+    this.div(...args, v => {
+      for (const block of blocks) {
+        block.call(v, v)
+      }
+    })
   }
 
   panel (...args) {
@@ -284,6 +292,7 @@ RichVibeBuilder.docStream = (title, block) => {
         v.title(title)
         v.meta({ charset: 'utf-8' })
         v.stylesheet('/style.css')
+        v.stylesheet('/darkmode.css', { media: '(prefers-color-scheme: dark)' })
       })
       await v.body(async () => {
         await block.call(v, v)
@@ -293,7 +302,24 @@ RichVibeBuilder.docStream = (title, block) => {
   })
 }
 
-RichVibeBuilder.iconPath = '/design/icomoon/symbol-defs.svg'
+RichVibeBuilder.iconPath = '/icomoon/symbol-defs.svg'
 RichVibeBuilder.iconExtension = 'png'
+
+RichVibeBuilder.viewsPath = './views'
+RichVibeBuilder.expressMiddleware = (req, res, next) => {
+  /** sends a vibe template to the client using streaming
+   * @param {string} viewName - filename of view
+   * @param {string} pageTitle - title for html document
+   * @param {any} ...args - args to pass to view
+   */
+  res.sendVibe = (viewName, title, ...args) => {
+    RichVibeBuilder.docStream(title, v => {
+      const viewPath = path.resolve(RichVibeBuilder.viewsPath, viewName)
+      const view = require(viewPath)
+      view.call(v, req, ...args).call(v, v)
+    }).pipe(res.type('html'))
+  }
+  next()
+}
 
 module.exports = RichVibeBuilder

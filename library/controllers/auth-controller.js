@@ -5,18 +5,13 @@ const dataset = require('../models/dataset')
 const lens = require('../models/lens')
 
 const codec = require('../models/codec')
-
-const Vibe = require('../vibe/rich-builder')
-const loginView = require('../views/login')
-const profileView = require('../views/user-profile')
-const soloList = require('../views/solo-list')
-const uri = require('encodeuricomponent-tag')
+const itToArray = require('../utility/async-iterable-to-array')
 
 const router = express.Router()
 
 // get a list of datasets owned by a specific user
 router.get('/auth/login', (req, res) => {
-  Vibe.docStream('Login', loginView(req, { return: req.query.return || req.get('Referrer') || '/' })).pipe(res.type('html'))
+  res.sendVibe('login', 'Login', { return: req.query.return || req.get('Referrer') || '/' })
 })
 
 router.post('/auth/login', async (req, res) => {
@@ -24,7 +19,7 @@ router.post('/auth/login', async (req, res) => {
     req.session.auth = await auth.login(req.body.username, req.body.password)
     res.redirect(req.body.return)
   } catch (err) {
-    Vibe.docStream('Login', loginView(req, req.body, err.message)).pipe(res.type('html'))
+    res.sendVibe('login', 'Login', req.body, err.message)
   }
 })
 
@@ -37,7 +32,7 @@ router.post('/auth/register', async (req, res) => {
       req.session.auth = await auth.login(req.body.username, req.body.password)
       res.redirect(req.body.return)
     } catch (err2) {
-      Vibe.docStream('Login', loginView(req, req.body, err.message)).pipe(res.type('html'))
+      res.sendVibe('login', 'Login', req.body, err.message)
     }
   }
 })
@@ -48,21 +43,21 @@ router.get('/auth/logout', (req, res) => {
 })
 
 router.get('/users/', async (req, res) => {
-  const users = auth.listUsers()
+  const list = await itToArray(auth.iterateUsers())
   if (req.accepts('html')) {
-    Vibe.docStream('Users', soloList(req, 'Users', users, x => uri`/users/${x}/`)).pipe(res.type('html'))
+    res.sendVibe('user-list', 'Users', { list })
   } else {
-    codec.respond(req, res, users)
+    codec.respond(req, res, list)
   }
 })
 
-router.get('/users/:user', async (req, res) => {
+router.get('/users/:user/', async (req, res) => {
   const profile = await auth.getProfile(req.params.user)
   const datasets = await dataset.listDatasets(req.params.user)
   const lenses = await lens.listDatasets(req.params.user)
 
   if (req.accepts('html')) {
-    Vibe.docStream(`${req.params.user}’s Profile`, profileView(req, profile, datasets, lenses)).pipe(res.type('html'))
+    res.sendVibe('user-profile', `${req.params.user}’s Profile`, profile, datasets, lenses)
   } else {
     codec.respond(req, res, {
       auth: profile.auth,
