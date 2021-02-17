@@ -9,36 +9,38 @@ const uri = require('encodeuricomponent-tag')
  */
 module.exports = (req, data, error = null) => {
   return layout(req, v => {
-    v.form({ class: 'simple-form', method: 'POST' }, v => {
-      if (data.create) {
-        v.heading('Create Dataset Record')
-      } else {
-        v.heading(`Editing “${data.recordID}”`)
-      }
-
-      if (error) {
-        v.p(v => { v.glitch('Error: '); v.text(error) })
-      }
-
-      v.dl(v => {
-        v.dt('Record ID')
+    v.panel(v => {
+      v.form({ method: 'POST', action: uri`/datasets/${req.params.user}:${req.params.name}/${data.recordID}` }, v => {
         if (data.create) {
-          v.dd(v => v.input({ name: 'recordID', value: data.recordID, minlength: 1, maxlength: 250, autocomplete: 'off' }))
+          v.heading('Create Dataset Record')
         } else {
-          v.dd(data.recordID)
+          v.heading(`Editing “${data.recordID}”`)
         }
 
-        v.dt('Data (JSON)')
-        v.dd(v => {
-          // v.textarea(data.recordData, { name: 'recordData', spellcheck: 'false', wrap: 'off' })
-          v.sourceCodeEditor('recordData', 'json', data.recordData)
-        })
-      })
+        if (error) {
+          v.p(v => { v.glitch('Error: '); v.text(error) })
+        }
 
-      v.flexRow(v => {
-        v.flexSpacer(5)
-        if (!data.create) v.button('Delete', { type: 'submit', formaction: uri`/datasets/${req.params.user}:${req.params.dataset}/delete` })
-        v.button('Save', { type: 'submit' })
+        v.dl(v => {
+          v.dt('Record ID')
+          if (data.create) {
+            v.dd(v => v.input({ name: 'recordID', value: data.recordID, minlength: 1, maxlength: 250, autocomplete: 'off' }))
+          } else {
+            v.dd(data.recordID)
+          }
+
+          v.dt('Data (JSON)')
+          v.dd(v => {
+            // v.textarea(data.recordData, { name: 'recordData', spellcheck: 'false', wrap: 'off' })
+            v.sourceCodeEditor('recordData', 'json', data.recordData)
+          })
+        })
+
+        v.flexRow(v => {
+          v.flexSpacer(5)
+          if (!data.create) v.button('Delete', { type: 'submit', formaction: uri`/datasets/${req.params.user}:${req.params.name}/${data.recordID}/delete` })
+          v.button('Save', { type: 'submit' })
+        })
       })
     })
   })

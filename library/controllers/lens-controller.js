@@ -6,12 +6,6 @@ const codec = require('../models/codec')
 const lens = require('../models/lens')
 const uri = require('encodeuricomponent-tag')
 
-const Vibe = require('../vibe/rich-builder')
-const layout = require('../views/layout')
-const lensEditorView = require('../views/lens-editor')
-const soloList = require('../views/solo-list')
-const lensView = require('../views/lens')
-
 // add req.owner boolean for any routes with a :user param
 router.param('user', auth.ownerParam)
 
@@ -41,7 +35,7 @@ router.get('/lenses/create', auth.required, async (req, res) => {
     state.inputs = cloneConfig.inputs.join('\n')
     state.memo = `Cloned from /lenses/${req.query.clone}/: ${cloneConfig.memo}`
   }
-  Vibe.docStream('Create a Lens', lensEditorView(req, state)).pipe(res.type('html'))
+  res.sendVibe('lens-editor', 'Create a Lens', state)
 })
 
 router.post('/lenses/create', auth.required, async (req, res) => {
@@ -62,7 +56,7 @@ router.post('/lenses/create', auth.required, async (req, res) => {
       ...req.body
     }
     console.log('Stack:', err.stack)
-    Vibe.docStream('Create a Lens', lensEditorView(req, state, err.message)).pipe(res.type('html'))
+    res.sendVibe('lens-editor', 'Create a Lens', state, err.message)
   }
 })
 
@@ -74,7 +68,7 @@ router.get('/lenses/edit/:user\\::name/', auth.requireOwnerOrAdmin('user'), asyn
     inputs: config.inputs.join('\n'),
     name: req.params.name
   }
-  Vibe.docStream('Edit a Lens', lensEditorView(req, state)).pipe(res.type('html'))
+  res.sendVibe('lens-editor', 'Edit a Lens', state)
 })
 
 router.post('/lenses/edit/:user\\::name/', auth.requireOwnerOrAdmin('user'), async (req, res) => {
@@ -97,13 +91,29 @@ router.post('/lenses/edit/:user\\::name/', auth.requireOwnerOrAdmin('user'), asy
       ...req.body
     }
     console.log(err.stack)
-    Vibe.docStream('Edit a Lens', lensEditorView(req, state, err.message)).pipe(res.type('html'))
+    res.sendVibe('lens-editor', 'Edit a Lens', state, err.message)
   }
 })
 
 router.post('/lenses/edit/:user\\::name/delete', auth.requireOwnerOrAdmin('user'), async (req, res) => {
   await lens.delete(req.params.user, req.params.name)
   res.redirect(`/lenses/${req.params.user}:`)
+})
+
+router.get('/lenses/', async (req, res) => {
+  const list = {}
+  for await (const user of auth.iterateUsers()) {
+    const lenses = await lens.listDatasets(user)
+    if (lenses && lenses.length > 0) {
+      list[user] = lenses
+    }
+  }
+
+  if (req.accepts('html')) {
+    res.sendVibe('lens-list', 'Public Lenses', { list })
+  } else {
+    codec.respond(req, res, list)
+  }
 })
 
 // get a list of datasets owned by a specific user
@@ -113,7 +123,7 @@ router.get('/lenses/:user\\:', async (req, res) => {
 
     if (req.accepts('html')) {
       const title = `${req.params.user}’s Viewports`
-      Vibe.docStream(title, soloList(req, title, lenses, x => uri`/lenses/${req.params.user}:${x}/`)).pipe(res.type('html'))
+      res.sendVibe('lens-list', title, { list: { [req.params.user]: lenses } })
     } else {
       codec.respond(req, res, lenses)
     }
@@ -128,7 +138,8 @@ router.get('/lenses/:user\\::name/', async (req, res) => {
 
   if (req.accepts('html')) {
     const recordIDs = await lens.listEntries(req.params.user, req.params.name)
-    Vibe.docStream(`${req.params.user}’s “${req.params.name}” Datasets`, lensView(req, config, recordIDs)).pipe(res.type('html'))
+    const title = `${req.params.user}’s “${req.params.name}” Datasets`
+    res.sendVibe('lens', title, config, recordIDs)
   } else {
     const records = await lens.listEntryHashes(req.params.user, req.params.name)
     codec.respond(req, res, {
@@ -145,10 +156,8 @@ router.get('/lenses/:user\\::name/:recordID', async (req, res) => {
   const record = await lens.readEntry(req.params.user, req.params.name, req.params.recordID)
 
   if (req.accepts('html')) {
-    Vibe.docStream(`${req.params.user}:${req.params.name}/${req.params.recordID}`, layout(req, v => {
-      v.heading(`Record ID: ${req.params.recordID}`)
-      v.sourceCode(codec.json.encode(record, 2))
-    })).pipe(res.type('html'))
+    const title = `${req.params.user}:${req.params.name}/${req.params.recordID}`
+    res.sendVibe('lens-record', title, record)
   } else {
     codec.respond(req, res, record)
   }
