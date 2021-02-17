@@ -8,13 +8,13 @@ module.exports = (req, block) => {
       v.a({ href: '/', class: 'home-icon' }, v => v.img({ src: '/design/icon.svg', alt: pkg.defaults.title, style: { height: '1.5em' } }))
       v.flexSpacer(1)
       v.iconButton('cassette', 'Datasets', { href: '/datasets/' })
-      v.iconButton('dglasses', 'Lenses', { href: '/lenses/' })
-      v.iconButton('group', 'Users', { href: '/users/' })
+      v.iconButton('3dglasses', 'Lenses', { href: '/lenses/' })
+      v.iconButton('users', 'Users', { href: '/users/' })
 
       v.flexSpacer(10)
-      v.iconButton('search', 'Search', { href: '/search' })
+      v.iconButton('magnifier', 'Search', { href: '/search' })
       if (req.session && req.session.auth) {
-        v.iconButton('user-circle', req.session.auth.user, { href: uri`/users/${req.session.auth.user}` })
+        v.iconButton('user-circle', req.session.auth.user, { href: uri`/users/${req.session.auth.user}/` })
         v.iconButton('sign-out', 'Logout', { href: uri`/auth/logout` })
       } else {
         v.iconButton('user-circle', 'Login', { href: uri`/auth/login` })
@@ -25,7 +25,7 @@ module.exports = (req, block) => {
 
     v.footer(v => {
       v.flexRow(v => {
-        v.text(`Software v ${pkg.version}`)
+        v.text(`Pigeon Optics v ${pkg.version}`)
         v.flexSpacer(5)
         v.a({ href: pkg.homepage }, 'View Source')
         v.flexSpacer(5)

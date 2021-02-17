@@ -194,6 +194,6 @@ module.exports.exists = async (user) => {
 /** list all users known to the system
  * @returns {AsyncIterable} - yields string account names
  */
-module.exports.listUsers = () => {
+module.exports.iterateUsers = () => {
   return file.listFolders(['users'])
 }

@@ -9,12 +9,31 @@ const uri = require('encodeuricomponent-tag')
  */
 module.exports = (req, profile, datasets, lenses) => {
   return layout(req, v => {
-    v.heading(`${profile.auth}: ${profile.user}`)
+    v.panel(v => {
+      v.breadcrumbs(v => {
+        v.a('Home', { href: '/' })
+        v.a('Users', { href: '/users/' })
+        v.iconLink('user-circle', 'Users', { href: uri`/users/${profile.user}/` })
+      })
 
-    v.heading('Datasets:', { level: 3 })
-    v.linkList(datasets, name => uri`/datasets/${profile.user}:${name}/`)
+      v.heading(`${profile.auth}: ${profile.user}`)
+      if (profile.memo) {
+        v.p(profile.memo)
+      }
 
-    v.heading('Lenses:', { level: 3 })
-    v.linkList(lenses, name => uri`/lenses/${profile.user}:${name}/`)
+      v.heading('Datasets:', { level: 3 })
+      v.ul(v => {
+        for (const dataset of datasets) {
+          v.li(v => v.iconLink('cassette', dataset, { href: uri`/datasets/${profile.user}:${dataset}/` }))
+        }
+      })
+
+      v.heading('Lenses:', { level: 3 })
+      v.ul(v => {
+        for (const lens of lenses) {
+          v.li(v => v.iconLink('3dglasses', lens, { href: uri`/lenses/${profile.user}:${lens}/` }))
+        }
+      })
+    })
   })
 }

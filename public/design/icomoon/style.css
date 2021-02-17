@@ -15,8 +15,16 @@ Single-colored icons can be modified like so:
 }
 ========================================== */
 
-.icon-search {
-  width: 0.9287109375em;
+.icon-3dglasses {
+  width: 1.40625em;
+}
+
+.icon-satellite {
+  width: 1.0390625em;
+}
+
+.icon-ticket {
+  width: 1.25em;
 }
 
 .icon-sign-out {
@@ -31,10 +39,6 @@ Single-colored icons can be modified like so:
   width: 1.142578125em;
 }
 
-.icon-group {
-  width: 1.0712890625em;
-}
-
-.icon-dglasses {
-  width: 1.40625em;
+.icon-users {
+  width: 1.125em;
 }
