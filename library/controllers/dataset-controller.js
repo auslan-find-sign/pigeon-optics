@@ -6,13 +6,6 @@ const codec = require('../models/codec')
 const dataset = require('../models/dataset')
 const uri = require('encodeuricomponent-tag')
 
-const Vibe = require('../vibe/rich-builder')
-const recordView = require('../views/dataset-record')
-const datasetIndex = require('../views/dataset-index')
-const recordEditorView = require('../views/dataset-record-editor')
-const configEditView = require('../views/dataset-config-editor')
-const soloList = require('../views/solo-list')
-
 // add req.owner boolean for any routes with a :user param
 router.param('user', auth.ownerParam)
 
@@ -22,7 +15,7 @@ router.get('/datasets/create', auth.required, (req, res) => {
     memo: '',
     create: true
   }
-  Vibe.docStream('Create a Dataset', configEditView(req, state)).pipe(res)
+  res.sendVibe('dataset-config-editor', 'Create a Dataset', state)
 })
 
 router.post('/datasets/create', auth.required, async (req, res) => {
@@ -35,7 +28,7 @@ router.post('/datasets/create', auth.required, async (req, res) => {
     const state = {
       create: true
     }
-    Vibe.docStream('Create a Dataset', configEditView(req, state, err.message)).pipe(res)
+    res.sendVibe('dataset-config-editor', 'Create a Dataset', state, err.message)
   }
 })
 
@@ -46,7 +39,7 @@ router.get('/datasets/edit/:user\\::name', auth.requireOwnerOrAdmin('user'), asy
     memo: config.memo,
     create: false
   }
-  Vibe.docStream(`Edit Dataset “${req.params.name}”`, configEditView(req, state)).pipe(res)
+  res.sendVibe('dataset-config-editor', `Edit Dataset “${req.params.name}”`, state)
 })
 
 router.post('/datasets/edit/:user\\::name', auth.requireOwnerOrAdmin('user'), async (req, res) => {
@@ -55,7 +48,23 @@ router.post('/datasets/edit/:user\\::name', auth.requireOwnerOrAdmin('user'), as
     res.redirect(uri`/datasets/${req.params.user}:${req.params.name}/`)
   } catch (err) {
     const state = { create: true, memo: req.body.memo }
-    Vibe.docStream('Create a Dataset', configEditView(req, state, err.message)).pipe(res)
+    res.sendVibe('dataset-config-editor', `Edit Dataset “${req.params.name}”`, state, err.message)
+  }
+})
+
+router.get('/datasets/', async (req, res) => {
+  const list = {}
+  for await (const user of auth.iterateUsers()) {
+    const datasets = await dataset.listDatasets(user)
+    if (datasets && datasets.length > 0) {
+      list[user] = datasets
+    }
+  }
+
+  if (req.accepts('html')) {
+    res.sendVibe('dataset-list', 'Public Datasets', { list })
+  } else {
+    codec.respond(req, res, list)
   }
 })
 
@@ -64,8 +73,7 @@ router.get('/datasets/:user\\:', async (req, res) => {
   const datasets = await dataset.listDatasets(req.params.user)
 
   if (req.accepts('html')) {
-    const title = `${req.params.user}’s Datasets`
-    Vibe.docStream(title, soloList(req, title, datasets, (x) => uri`/datasets/${req.params.user}:${x}/`)).pipe(res)
+    res.sendVibe('dataset-list', `${req.params.user}’s Datasets`, { list: { [req.params.user]: datasets } })
   } else {
     codec.respond(req, res, datasets)
   }
@@ -77,7 +85,7 @@ router.get('/datasets/:user\\::name/', async (req, res) => {
 
   if (req.accepts('html')) {
     const recordIDs = await dataset.listEntries(req.params.user, req.params.name)
-    Vibe.docStream(`${req.params.user}’s “${req.params.name}” Datasets`, datasetIndex(req, { config, recordIDs })).pipe(res)
+    res.sendVibe('dataset-index', `${req.params.user}’s “${req.params.name}” Dataset`, { config, recordIDs })
   } else {
     const records = await dataset.listEntryHashes(req.params.user, req.params.name)
     codec.respond(req, res, {
@@ -94,53 +102,54 @@ router.get('/datasets/:user\\::name/:recordID', async (req, res) => {
   const record = await dataset.readEntry(req.params.user, req.params.name, req.params.recordID)
 
   if (req.accepts('html')) {
-    Vibe.docStream(`${req.params.user}:${req.params.name}/${req.params.recordID}`, recordView(req, record)).pipe(res)
+    res.sendVibe('dataset-record', `${req.params.user}:${req.params.name}/${req.params.recordID}`, record)
   } else {
     codec.respond(req, res, record)
   }
 })
 
 // UI to edit a record from a user's dataset
-router.get('/datasets/:user\\::dataset/:recordID/edit', auth.requireOwnerOrAdmin('user'), async (req, res) => {
-  const record = await dataset.readEntry(req.params.user, req.params.dataset, req.params.recordID)
+router.get('/datasets/:user\\::name/:recordID/edit', auth.requireOwnerOrAdmin('user'), async (req, res) => {
+  const record = await dataset.readEntry(req.params.user, req.params.name, req.params.recordID)
 
-  const title = `Editing ${req.params.user}:${req.params.dataset}/${req.params.recordID}`
+  const title = `Editing ${req.params.user}:${req.params.name}/${req.params.recordID}`
   const state = {
     create: false,
     recordID: req.params.recordID,
     recordData: codec.json.encode(record, 2)
   }
-  Vibe.docStream(title, recordEditorView(req, state)).pipe(res)
+
+  res.sendVibe('dataset-record-editor', title, state)
 })
 
-router.post('/datasets/:user\\::dataset/:recordID/save', auth.requireOwnerOrAdmin('user'), async (req, res) => {
+router.post('/datasets/:user\\::name/:recordID', auth.requireOwnerOrAdmin('user'), async (req, res) => {
   try {
     const data = codec.json.decode(req.body.recordData)
-    await dataset.writeEntry(req.params.user, req.params.dataset, req.params.recordID, data)
-    res.redirect(uri`/datasets/${req.params.user}:${req.params.dataset}/${req.params.recordID}`)
+    await dataset.writeEntry(req.params.user, req.params.name, req.params.recordID, data)
+    res.redirect(uri`/datasets/${req.params.user}:${req.params.name}/${req.params.recordID}`)
   } catch (error) {
-    const title = `Editing ${req.params.user}:${req.params.dataset}/${req.params.recordID}`
+    const title = `Editing ${req.params.user}:${req.params.name}/${req.params.recordID}`
     const state = {
       create: false,
       recordID: req.params.recordID,
       recordData: req.body.recordData
     }
-    Vibe.docStream(title, recordEditorView(req, state, error.message)).pipe(res)
+    res.sendVibe('dataset-record-editor', title, state, error.message)
   }
 })
 
-router.post('/datasets/:user\\::dataset/:recordID/delete', auth.requireOwnerOrAdmin('user'), async (req, res) => {
+router.post('/datasets/:user\\::name/:recordID/delete', auth.requireOwnerOrAdmin('user'), async (req, res) => {
   try {
-    await dataset.deleteEntry(req.params.user, req.params.dataset, req.params.recordID)
-    res.redirect(uri`/datasets/${req.params.user}:${req.params.dataset}/`)
+    await dataset.deleteEntry(req.params.user, req.params.name, req.params.recordID)
+    res.redirect(uri`/datasets/${req.params.user}:${req.params.name}/`)
   } catch (error) {
-    const title = `Editing ${req.params.user}:${req.params.dataset}/${req.params.recordID}`
+    const title = `Editing ${req.params.user}:${req.params.name}/${req.params.recordID}`
     const state = {
       create: true,
       recordID: req.params.recordID,
       recordData: req.body.recordData
     }
-    Vibe.docStream(title, recordEditorView(req, state, error.message)).pipe(res)
+    res.sendVibe('dataset-record-editor', title, state, error.message)
   }
 })
 
@@ -151,7 +160,7 @@ router.get('/datasets/create-record/:user\\::name/', auth.requireOwnerOrAdmin('u
     recordID: '',
     recordData: '{}'
   }
-  Vibe.docStream(title, recordEditorView(req, state)).pipe(res)
+  res.sendVibe('dataset-record-editor', title, state)
 })
 
 // create a new record
@@ -169,7 +178,8 @@ router.post('/datasets/create-record/:user\\::name/', auth.requireOwnerOrAdmin('
       recordData: req.body.recordData
     }
     console.log(err.stack)
-    Vibe.docStream(title, recordEditorView(req, state, err.message)).pipe(res)
+
+    res.sendVibe('dataset-record-editor', title, state, err.message)
   }
 })
 
