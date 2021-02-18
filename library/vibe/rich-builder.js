@@ -234,6 +234,7 @@ class RichVibeBuilder extends VibeBuilder {
     const aceOptions = {
       lightTheme: 'ace/theme/tomorrow',
       darkTheme: 'ace/theme/tomorrow_night',
+      name,
       ace: {
         mode: `ace/mode/${language}`,
         autoScrollEditorIntoView: true,
@@ -243,27 +244,7 @@ class RichVibeBuilder extends VibeBuilder {
       }
     }
 
-    const init = [
-      '(function () {',
-      `  const options = ${JSON.stringify(aceOptions)}`,
-      "  const darkmode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)')",
-      '  options.ace.theme = (darkmode && darkmode.matches) ? options.darkTheme : options.lightTheme',
-      `  const editor = ace.edit(${JSON.stringify(`${name}-editor`)}, options.ace)`,
-      "  if (darkmode) darkmode.addEventListener('change', function (event) {",
-      '    options.ace.theme = event.matches ? options.darkTheme : options.lightTheme',
-      '    editor.setTheme(options.ace.theme)',
-      '  })',
-      "  editor.session.setMode('ace/mode/javascript')",
-      '  editor.renderer.setScrollMargin(10, 10, 0, 0)',
-      `  const hidden = document.getElementById(${JSON.stringify(`${name}-form-input`)})`,
-      '  const updateHidden = function () { hidden.value = editor.getValue() }',
-      '  if (hidden.form) {',
-      "    hidden.form.addEventListener('submit', updateHidden)",
-      '    updateHidden()',
-      '  }',
-      '})()'
-    ]
-    this.script(init.join('\n'))
+    this.script(`setupAceEditor(${JSON.stringify(aceOptions)})`)
   }
 
   footerButtons (...args) {
