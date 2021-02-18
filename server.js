@@ -16,6 +16,9 @@ app.use(Vibe.expressMiddleware)
 Vibe.viewsPath = './library/views'
 Vibe.iconPath = '/design/icomoon/symbol-defs.svg'
 
+// enable response compression
+app.use(require('compression')())
+
 // If forms are submitted, parse the data in to request.query and request.body
 app.use(express.urlencoded({ extended: true }))
 // If JSON is submitted, parse that in to request.body
