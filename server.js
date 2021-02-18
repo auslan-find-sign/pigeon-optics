@@ -7,8 +7,6 @@ const crypto = require('crypto')
 const process = require('process')
 const codec = require('./library/models/codec')
 const Vibe = require('./library/vibe/rich-builder')
-const homepageView = require('./library/views/homepage')
-const errorView = require('./library/views/error-handler')
 
 // create web server
 const app = express()
@@ -64,7 +62,7 @@ app.use(require('./library/controllers/export-controller'))
 app.use('/npm', express.static('node_modules'))
 
 app.get('/', (req, res) => {
-  Vibe.docStream('Datasets Project', homepageView(req)).pipe(res.type('html'))
+  res.sendVibe('homepage', defaults.title)
 })
 
 app.use((req, res, next) => {
@@ -86,7 +84,7 @@ app.use((error, req, res, next) => {
   }
 
   if (req.accepts('html')) {
-    Vibe.docStream('Request Error', errorView(req, error)).pipe(res.type('html'))
+    res.sendVibe('error-handler', 'Request Error', error)
   } else {
     codec.respond(req, res, { error: error.message })
   }
