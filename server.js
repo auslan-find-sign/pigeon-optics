@@ -3,6 +3,7 @@
 const defaults = require('./package.json').defaults
 const express = require('express')
 const cookieSession = require('cookie-session')
+const methodOverride = require('method-override')
 const crypto = require('crypto')
 const process = require('process')
 const codec = require('./library/models/codec')
@@ -36,8 +37,8 @@ app.use((req, res, next) => {
   }
 })
 
-// enable response compression
-app.use(require('compression')())
+// allow forms to override method using Rails ?_method= format
+app.use(methodOverride((req, res) => (req.query && req.query._method) || (req.body && req.body._method) || req.method))
 
 // allow non-credentialed cors requests to anything by default
 app.use((req, res, next) => {
