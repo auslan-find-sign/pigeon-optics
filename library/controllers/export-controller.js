@@ -25,17 +25,23 @@ const encodingMimeTypes = {
  */
 async function * encodePath (path, encoding) {
   if (encoding === 'json') yield '{\n'
+  let first = true
   for await (const [recordPath, recordData] of readPath(path)) {
     const { recordID } = codec.path.decode(recordPath)
     if (encoding === 'cbor') {
       yield codec.cbor.encode([recordID, recordData])
     } else if (encoding === 'json') {
-      yield `  ${codec.json.encode(recordID)}:${codec.json.encode(recordData)}\n`
+      if (first) {
+        yield `  ${codec.json.encode(recordID)}:${codec.json.encode(recordData)}`
+      } else {
+        yield `,\n  ${codec.json.encode(recordID)}:${codec.json.encode(recordData)}`
+      }
     } else if (encoding === 'json-lines') {
       yield `${codec.json.encode([recordID, recordData])}\n`
     }
+    first = false
   }
-  if (encoding === 'json') yield '}\n'
+  if (encoding === 'json') yield '\n}\n'
 }
 
 /**
@@ -109,7 +115,7 @@ function streamArchive (path, archiveType, includeAttachments) {
 //  - json-lines: returns a text file, where each line is a json array in the same format as cbor, followed by newlines \n
 //  - json: returns a json object where each key is an entryID and each value is entry data
 // json-lines maybe easier to process with large datasets, as you can just read a line in at a time
-router.get('/export/:realm(datasets|viewports)/:user\\::name', async (req, res) => {
+router.get('/export/:realm(datasets|lenses)/:user\\::name', async (req, res) => {
   const path = uri`/${req.params.realm}/${req.params.user}:${req.params.name}`
   const mimeType = encodingMimeTypes[req.query.encoding]
 
@@ -128,7 +134,7 @@ router.get('/export/:realm(datasets|viewports)/:user\\::name', async (req, res) 
 /**
  * export a dataset/viewport output as a zip file
  */
-router.get('/export/:realm(datasets|viewports)/:user\\::name/zip', async (req, res) => {
+router.get('/export/:realm(datasets|lenses)/:user\\::name/zip', async (req, res) => {
   const path = uri`/${req.params.realm}/${req.params.user}:${req.params.name}`
 
   if (!await readPath.exists(path)) {
@@ -141,7 +147,7 @@ router.get('/export/:realm(datasets|viewports)/:user\\::name/zip', async (req, r
 /**
  * stream out changes to a lens or dataset's contents
  */
-router.get('/stream/:realm(datasets|viewports)/:user\\::name', async (req, res) => {
+router.get('/export/:realm(datasets|lenses)/:user\\::name/event-stream', async (req, res) => {
 
 })
 
