@@ -17,7 +17,7 @@ module.exports = (req, block) => {
         v.iconButton('user-circle', req.session.auth.user, { href: uri`/users/${req.session.auth.user}/` })
         v.iconButton('sign-out', 'Logout', { href: uri`/auth/logout` })
       } else {
-        v.iconButton('user-circle', 'Login', { href: uri`/auth/login` })
+        v.iconButton('user-circle', 'Login', { href: uri`/auth` })
       }
     })
 

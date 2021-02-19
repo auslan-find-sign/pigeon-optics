@@ -9,32 +9,26 @@ const itToArray = require('../utility/async-iterable-to-array')
 
 const router = express.Router()
 
-// get a list of datasets owned by a specific user
-router.get('/auth/login', (req, res) => {
-  res.sendVibe('login', 'Login', { return: req.query.return || req.get('Referrer') || '/' })
-})
-
-router.post('/auth/login', async (req, res) => {
-  try {
-    req.session.auth = await auth.login(req.body.username, req.body.password)
-    res.redirect(req.body.return)
-  } catch (err) {
-    res.sendVibe('login', 'Login', req.body, err.message)
-  }
-})
-
-router.post('/auth/register', async (req, res) => {
-  try {
-    req.session.auth = await auth.register(req.body.username, req.body.password)
-    res.redirect(req.body.return)
-  } catch (err) {
+router.all('/auth', async (req, res) => {
+  let error = false
+  if (req.body && req.body.username && req.body.password) {
     try {
-      req.session.auth = await auth.login(req.body.username, req.body.password)
-      res.redirect(req.body.return)
-    } catch (err2) {
-      res.sendVibe('login', 'Login', req.body, err.message)
+      if (req.body.register) {
+        req.session.auth = await auth.register(req.body.username, req.body.password)
+      } else {
+        req.session.auth = await auth.login(req.body.username, req.body.password)
+      }
+      return res.redirect(req.body.return)
+    } catch (err) {
+      error = err.message
     }
   }
+
+  const form = {
+    ...req.body || {},
+    return: req.query.return || req.get('Referrer') || '/'
+  }
+  res.sendVibe('login', 'Login', form, error)
 })
 
 router.get('/auth/logout', (req, res) => {
