@@ -1,6 +1,7 @@
 const VibeBuilder = require('./builder')
 const highlight = require('h.js')
 const path = require('path')
+const uri = require('encodeuricomponent-tag')
 
 /** gets or adds attributes object to args list when proxying calls to tag builder
  * note, this sometimes changes the args array to inject an object, beware side-effects
@@ -76,8 +77,46 @@ class RichVibeBuilder extends VibeBuilder {
       options.role = 'button'
       this.tag('a', ...args)
     } else {
+      if (options.formmethod && !['get', 'post'].includes(options.method.toLowerCase())) {
+        if (!options.name) {
+          // rewrite this button to provide the method
+          options.name = '_method'
+          options.value = options.method.toUpperCase()
+        } else {
+          // rewrite the formaction
+          const action = options.formaction || (this.forms || []).slice(-1)[0].action || ''
+          if (action.includes('?')) {
+            options.formaction = action + uri`&_method=${options.formmethod.toUpperCase()}`
+          } else {
+            options.formaction = action + uri`?_method=${options.formmethod.toUpperCase()}`
+          }
+        }
+        options.formmethod = 'POST'
+      }
+
       this.tag('button', ...args)
     }
+  }
+
+  // overload form with method overwriting functionality
+  form (...args) {
+    const options = getAttribs(args)
+    this.forms = this.forms || []
+    this.forms.push(options) // store parent forms for button rewriting functionality
+
+    if (options.method && !['get', 'post'].includes(options.method.toLowerCase())) {
+      if (!options.action) {
+        options.action = uri`?_method=${options.method.toUpperCase()}`
+      } else if (options.action.includes('?')) {
+        options.action += uri`&_method=${options.method.toUpperCase()}`
+      } else {
+        options.action += uri`?_method=${options.method.toUpperCase()}`
+      }
+      options.method = 'POST'
+    }
+    this.tag('form', ...args)
+
+    this.forms.pop()
   }
 
   iconButton (iconName, ...args) {
@@ -240,6 +279,7 @@ class RichVibeBuilder extends VibeBuilder {
         autoScrollEditorIntoView: true,
         maxLines: 30,
         minLines: 2,
+        tabSize: 2,
         ...(options.ace || {})
       }
     }
