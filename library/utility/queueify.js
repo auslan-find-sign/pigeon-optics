@@ -13,6 +13,7 @@ exports.object = function (object) {
   for (const name in object) {
     if (typeof object[name] === 'function') {
       output[name] = object[name].bind(object)
+      output[name].name = name
       if (object[name].constructor === AsyncFunction) {
         output[name] = exports.function(output[name], queue)
       }
@@ -24,5 +25,9 @@ exports.object = function (object) {
 
 // wraps an async function with a thing that stops them from running concurrently
 exports.function = function (fn, queue) {
-  return async (...args) => await queue.add(async () => await fn(...args))
+  const wrapped = async function QueueifyWrapper (...args) {
+    return await queue.add(async () => await fn(...args))
+  }
+  wrapped.name = fn.name + 'Queueified'
+  return wrapped
 }
