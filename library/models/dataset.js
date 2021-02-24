@@ -5,40 +5,76 @@ const file = require('./cbor-file')
 const attachmentStore = require('./attachment-storage')
 const codec = require('./codec')
 const auth = require('./auth')
-const { default: PQueue } = require('p-queue')
+const queueify = require('../utility/queueify')
+const itToArray = require('../utility/async-iterable-to-array')
 
-// queue to handle writes
-const queue = new PQueue({ concurrency: 1 })
+function validateRecord (id, data) {
+  console.assert(typeof id === 'string', 'recordID must be a string')
+  console.assert(id !== '', 'recordID must not be empty')
+  console.assert(id.length > 10000, 'recordID cannot be longer than 10 thousand characters')
+  console.assert(data !== undefined, 'record data cannot be set to undefined, use delete operation instead')
+}
 
-module.exports = {
+module.exports = queueify.object({
   // resolve dataset paths
-  path (user, ...path) {
-    return [...auth.userFolder(user), 'datasets', ...path]
+  path (user, ...path) { return [...auth.userFolder(user), 'datasets', ...path] },
+
+  // version path stuff
+  versionPath (user, name, version) { return this.path(user, name, 'versions', `${version}`) },
+
+  // read a version state info, a frozen representation of everything about the dataset's contents at that moment in time
+  async readVersion (user, name, version = null) {
+    if (version === null) version = (await this.readConfig(user, name)).version
+    const path = this.versionPath(user, name, version)
+    if (await file.exists(path)) {
+      return await file.read(path)
+    } else {
+      return undefined
+    }
+  },
+
+  // write a new version of the dataset
+  async writeVersion (user, name, snapshot) {
+    const config = (await this.readConfig(user, name))
+    config.version += 1
+
+    snapshot.created = Date.now()
+    snapshot.version = config.version
+    for (const id in snapshot.records) {
+      if (!('version' in snapshot.records[id])) snapshot.records[id].version = snapshot.version
+    }
+
+    const path = this.versionPath(user, name, config.version)
+    await file.write(path, snapshot)
+    await this.writeConfig(user, name, config)
+    return snapshot
   },
 
   /** read an entry from a dataset
-   * @param {string} username - user who owns dataset
-   * @param {string} dataset - name of dataset
+   * @param {string} user - user who owns dataset
+   * @param {string} name - name of dataset
    * @param {string} recordID - the dataset record's name
+   * @param {number} [version] - optional version to read from
    * @returns {object} - parsed dataset record data
    * @async
    */
-  async readEntry (user, dataset, recordID) {
-    const hash = await this.readEntryHash(user, dataset, recordID)
-    return await this.readEntryByHash(user, dataset, hash)
+  async readEntry (user, name, recordID, version = null) {
+    const info = await this.readEntryMeta(user, name, recordID, version)
+    if (!info) return undefined
+    return await this.readEntryByHash(user, name, info.hash)
   },
 
-  /** read an entry's hash from this dataset
-   * @param {string} username - user who owns dataset
-   * @param {string} dataset - name of dataset
+  /** read an entry's version and hash from this dataset
+   * @param {string} user - user who owns dataset
+   * @param {string} name - name of dataset
    * @param {string} recordID - the dataset record's name
-   * @returns {Buffer} - hash of recordID's object contents
+   * @param {number} [version] - optional version to read from
+   * @returns {Object} { version: int, hash: Buffer[32] }
    * @async
    */
-  async readEntryHash (user, dataset, recordID) {
-    const index = await queue.add(() => file.read(this.path(user, dataset, 'index')))
-    if (!index[recordID]) throw new Error('Dataset doesn’t contain specified record')
-    return index[recordID][1]
+  async readEntryMeta (user, name, recordID, version = null) {
+    const snapshot = this.readVersion(user, name, version)
+    return snapshot.records[recordID]
   },
 
   /** read an entry from a dataset
@@ -50,21 +86,21 @@ module.exports = {
    */
   async readEntryByHash (user, name, hash) {
     if (Buffer.isBuffer(hash)) hash = hash.toString('hex')
-    return await queue.add(() => file.read(this.path(user, name, 'objects', hash.toLowerCase())))
+    return await file.read(this.path(user, name, 'objects', hash.toLowerCase()))
   },
 
   /** reads each record of this dataset sequentially as an async iterator
    * @param {string} user - user who owns dataset
    * @param {string} name - name of dataset
-   * @param {number} afterVersion - don't read anything below this version number
-   * @yields {Array} - [recordID string, recordData any, hash Buffer, version number]
+   * @param {function} filter - optional filter function, gets { id, version, hash } object as arg, boolean return decides if iterator loads and outputs this result
+   * @yields {Array} - { id: "recordID", data: {any}, hash: Buffer[32], version: {number} }
    */
-  async * iterateEntries (user, name, afterVersion = 0) {
-    const index = await queue.add(() => file.read(this.path(user, name, 'index')))
-    for (const [recordID, [version, hash]] of Object.entries(index)) {
-      if (version > afterVersion) {
-        const recordData = await this.readEntryByHash(user, name, hash)
-        yield [recordID, recordData, hash, version]
+  async * iterateEntries (user, name, filter = null) {
+    const snapshot = await this.readVersion(user, name)
+    for (const [id, { version, hash }] of Object.entries(snapshot.records)) {
+      if (!filter || filter({ id, version, hash })) {
+        const data = await this.readEntryByHash(user, name, hash)
+        yield { id, data, hash, version }
       }
     }
   },
@@ -77,7 +113,13 @@ module.exports = {
    * @async
    */
   async writeEntry (user, name, recordID, data) {
-    return await this.merge(user, name, [[recordID, data]])
+    validateRecord(recordID, data)
+
+    const snapshot = await this.readVersion(user, name)
+    const hash = await this.writeObject(user, name, data)
+    snapshot.records[recordID] = { hash, version: snapshot.version + 1 }
+    await this.writeVersion(user, name, snapshot)
+    return snapshot.records[recordID]
   },
 
   /** delete an entry from a dataset
@@ -87,35 +129,32 @@ module.exports = {
    * @async
    */
   async deleteEntry (user, name, recordID) {
-    await queue.add(async () => {
-      const path = await this.path(user, name, 'index')
-      const index = await file.read(path)
-      delete index[recordID]
-      await file.write(path, index)
-    })
-    await this.garbageCollect(user, name)
+    const snapshot = await this.readVersion(user, name)
+    if (snapshot.records[recordID]) {
+      delete snapshot.records[recordID]
+      await this.writeVersion(user, name, snapshot)
+    }
   },
 
   /** list all the recordIDs in a dataset
-   * @param {string} username - user who owns dataset
-   * @param {string} dataset - name of dataset
+   * @param {string} user - user who owns dataset
+   * @param {string} name - name of dataset
    * @returns {string[]} - dataset entry id's
    * @async
    */
-  async listEntries (user, dataset) {
-    return Object.keys(await this.listEntryHashes(user, dataset))
+  async listEntries (user, name) {
+    return Object.keys(await this.listEntryMeta(user, name))
   },
 
   /** plain object mapping recordIDs to object hashes
    * @param {string} user - user who owns dataset
    * @param {string} name - name of dataset or lens
-   * @returns {object} - keyed with recordIDs and values are buffers containing hashes for each record's value
+   * @returns {object} - keyed with recordIDs and values are { version: num, hash: Buffer[32] }
    * @async
    */
-  async listEntryHashes (user, name) {
-    return Object.fromEntries(Object.entries(await queue.add(() => file.read(this.path(user, name, 'index')))).map(([key, value]) => {
-      return [key, value[1]]
-    }))
+  async listEntryMeta (user, name) {
+    const snapshot = await this.readVersion(user, name)
+    return snapshot.records
   },
 
   /** get an integer version number for the current version of the dataset
@@ -123,8 +162,8 @@ module.exports = {
    * @returns {number}
    */
   async getCurrentVersionNumber (user, name) {
-    const values = Object.values(await queue.add(() => file.read(this.path(user, name, 'index'))))
-    return values.reduce((a, b) => Math.max(a, b), 0)
+    const config = await this.readConfig(user, name)
+    return config.version
   },
 
   /** hash the state of the whole dataset quickly
@@ -132,7 +171,7 @@ module.exports = {
    * @param {string} name - name of dataset or lens
    */
   async getCollectionHash (user, name) {
-    return codec.objectHash(await this.listEntryHashes(user, name))
+    return codec.objectHash(await this.readVersion(user, name))
   },
 
   /** tests if a dataset or specific record exists */
@@ -161,11 +200,7 @@ module.exports = {
    * @async
    */
   async listDatasets (user) {
-    const output = []
-    for await (const datasetName of this.iterateDatasets(user)) {
-      output.push(datasetName)
-    }
-    return output
+    return await itToArray(this.iterateDatasets(user))
   },
 
   /** validates config object for dataset/lens is valid
@@ -173,6 +208,7 @@ module.exports = {
    */
   async validateConfig (config) {
     console.assert(typeof config.memo === 'string', 'memo must be a string')
+    console.assert(typeof config.version === 'number', 'version must be a number')
   },
 
   /** create a dataset with a specific name
@@ -198,12 +234,14 @@ module.exports = {
       throw new Error('This name already exists')
     }
 
+    config.version = 0
+    config.garbageCollect = true
+    config.create = Date.now()
+
     await this.validateConfig(config)
 
-    await queue.add(() => Promise.all([
-      file.write(this.path(user, name, 'config'), { created: Date.now(), ...config }),
-      file.write(this.path(user, name, 'index'), {})
-    ]))
+    await file.write(this.path(user, name, 'config'), config)
+    await file.write(this.versionPath(user, name, 0), { version: 0, records: {}, created: Date.now() })
   },
 
   /** read config of existing dataset
@@ -214,7 +252,7 @@ module.exports = {
    */
   async readConfig (user, name) {
     return {
-      ...await queue.add(() => file.read(this.path(user, name, 'config'))),
+      ...await file.read(this.path(user, name, 'config')),
       user,
       name
     }
@@ -229,7 +267,7 @@ module.exports = {
    */
   async writeConfig (user, dataset, configData) {
     await this.validateConfig(configData)
-    await queue.add(() => file.write(this.path(user, dataset, 'config'), configData))
+    await file.write(this.path(user, dataset, 'config'), configData)
   },
 
   /** delete a dataset to from user's data folder
@@ -238,52 +276,63 @@ module.exports = {
    * @async
    */
   async delete (user, dataset) {
-    await queue.add(() => file.delete(this.path(user, dataset)))
+    await file.delete(this.path(user, dataset))
   },
 
   /** overwrite all the entries in a dataset, removing any straglers
    * @param {string} username - user who owns dataset
-   * @param {string} dataset - name of dataset
+   * @param {string} name - name of dataset
    * @param {Iterable} entries - (optically async) iterable that outputs an array with two elements, first a string entry name, second an object value
    * @async
    */
-  async overwrite (user, dataset, entries) {
-    await queue.add(() => file.write(this.path(user, dataset, 'index'), {}))
-    return await this.merge(user, dataset, entries)
+  async overwrite (user, name, entries) {
+    const config = await this.readConfig(user, name)
+    const version = config.version + 1
+
+    const records = {}
+    for await (const [id, data] of entries) {
+      validateRecord(id, data)
+      const hash = await this.writeObject(user, name, data)
+      records[id] = { hash, version, changed: Date.now() }
+    }
+
+    await this.writeVersion(user, name, { records })
+
+    if (config.garbageCollect) await this.garbageCollect(user, name)
+
+    return records
   },
 
   /** overwrite all the listed entries in a dataset, leaving any unmentioned entries in tact
    * @param {string} user - user who owns dataset
    * @param {string} name - name of dataset/lens
    * @param {Iterable} entries - (optically async) iterable that outputs an array with two elements, first a string entry name, second an object value
-   * @returns {string[]} - recordIDs were updated
+   * @returns {object} - version records data
    * @async
    */
   async merge (user, name, entries) {
-    const updatedIDs = []
-    await queue.add(async () => {
-      const indexPath = this.path(user, name, 'index')
-      const index = await file.read(indexPath)
-      const lastVersion = Object.values(index).reduce((a, b) => Math.max(a[0], b[0]), 0)
+    const config = await this.readConfig(user, name)
+    const snapshot = await this.readVersion(user, name)
+    const version = config.version + 1
 
-      for await (const [id, data] of entries) {
-        if (!(typeof id === 'string')) throw new Error('Record ID must be a string')
-        if (id.length < 1) throw new Error('Record ID must be at least one character long')
-        if (id.length > 250) throw new Error('Record ID must be less than 250 characters long')
+    for await (const [id, data] of entries) {
+      if (data !== undefined) {
+        validateRecord(id, data)
 
         const hash = await this.writeObject(user, name, data)
-        updatedIDs.push(id)
-
-        index[id] = [lastVersion + 1, hash]
+        if (!snapshot.records[id] || !hash.equals(snapshot.records[id])) {
+          snapshot.records[id] = { hash, version, changed: Date.now() }
+        }
+      } else {
+        delete snapshot.records[id]
       }
+    }
 
-      await file.write(indexPath, index)
-    })
+    await this.writeVersion(user, name, snapshot)
 
-    // do garbage collection
-    await this.garbageCollect(user, name)
+    if (config.garbageCollect) await this.garbageCollect(user, name)
 
-    return updatedIDs
+    return snapshot.records
   },
 
   /** list's objects in a dataset/lens output
@@ -320,11 +369,25 @@ module.exports = {
    * @async
    */
   async garbageCollect (user, name) {
-    const references = Object.values(await this.listEntryHashes(user, name))
+    // remove dereferenced objects
+    const snapshot = await this.readVersion(user, name)
+    const hashes = Object.values(snapshot.records).map(x => x.hash)
     for await (const objectHash of this.listObjects(user, name)) {
-      if (!references.some(x => x.equals(objectHash))) {
+      if (!hashes.some(x => objectHash.equals(x))) {
         await this.deleteObject(user, name, objectHash)
       }
     }
+
+    // remove any versions older than 1 month
+    const cutoff = Date.now() - (1000 * 60 * 60 * 24 * 30)
+    let version = snapshot.version - 1
+    while (version > -1) {
+      const oldSnap = await this.readVersion(user, name, version)
+      if (!oldSnap) return
+      if (oldSnap.created < cutoff) {
+        await file.delete(this.versionPath(user, name, version))
+        version = oldSnap.version - 1
+      }
+    }
   }
-}
+})
