@@ -72,27 +72,3 @@ codec.cloneable.encode = function (object) {
 
   return object
 }
-
-codec.path = {
-  // generated with path-to-regexp
-  regexp: /^(?:\/(lenses|datasets))(?:\/([^/#?]+?)):([^/#?]+?)(?:\/([^/#?]+?))?[/#?]?$/,
-
-  /** decodes a data path in to:
-   * @param {string} dataPath - like /source/user:name/recordID or /source/user:name/
-   * @returns {DataPathComponents}
-   * @typedef {Object} DataPathComponents
-   * @property {'datasets'|'lenses'} source
-   * @property {string} user
-   * @property {string} name
-   * @property {string} [recordID]
-   */
-  decode (string) {
-    const match = string.match(this.regexp)
-    if (match) {
-      const [source, user, name, recordID] = match.slice(1)
-      return { source, user, name, recordID }
-    } else {
-      return false
-    }
-  }
-}

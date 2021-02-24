@@ -143,8 +143,8 @@ Object.assign(module.exports, {
 
         // run user script with data
         const lines = [
-          'const recordPath = $0.copySync();',
-          'const recordData = codec.cloneable.decode($1.copySync());',
+          'const path = $0.copySync();',
+          'const data = codec.cloneable.decode($1.copySync());',
           'Math.random = function () { throw new Error("Math.random() is non-deterministic and disallowed") };',
           'function output(key, recordData) {',
           '  if (typeof key !== "string") throw new Error("first argument key must be a string");',
@@ -159,7 +159,11 @@ Object.assign(module.exports, {
           config.mapCode,
           '}'
         ]
-        await context.evalClosure(lines.join('\n'), [recordPath, codec.cloneable.encode(recordData), logger, emit], {
+        const pathInfo = {
+          string: recordPath,
+          params: codec.path.decode(recordPath)
+        }
+        await context.evalClosure(lines.join('\n'), [pathInfo, codec.cloneable.encode(recordData), log, emit], {
           timeout: defaults.lensTimeout,
           arguments: { reference: true },
           filename: `${defaults.url}/lenses/${config.user}:${config.name}/functions/map.js`,
