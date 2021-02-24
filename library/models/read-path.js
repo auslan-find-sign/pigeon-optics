@@ -19,45 +19,52 @@ const sources = { datasets, lenses }
  * @yields {ReadPathOutput}
  */
 async function * readPath (path) {
+  for await (const output of readPath.meta(path)) {
+    output.data = await output.read()
+    delete output.read
+    yield output
+  }
+}
+
+readPath.meta = async function * readPathMeta (path) {
   if (Array.isArray(path)) {
     for (const entry of path) {
-      for await (const result of readPath(entry)) {
+      for await (const result of readPath.meta(entry)) {
         yield result
       }
     }
   } else if (typeof path === 'string') {
     const params = codec.path.decode(path)
-    /** @type datasets */
     const source = sources[params.source]
 
     if (source !== undefined) {
       if (params.recordID !== undefined) {
         // just yield the specific entry
-        const record = await source.readEntryMeta(params.user, params.name, params.recordID)
+        const meta = await source.readEntryMeta(params.user, params.name, params.recordID)
         yield {
           path: codec.path.encode(params.source, params.user, params.name, params.recordID),
-          data: await source.readEntryByHash(params.user, params.name, record.hash),
-          ...record
+          read: async function readEntry () { return await source.readEntryByHash(params.user, params.name, meta.hash) },
+          ...meta
         }
       } else {
         // do the whole dataset
-        for await (const { id, meta, data } of source.iterateEntries(params.user, params.name)) {
+        for (const [recordID, meta] of Object.entries(await source.listEntryMeta(params.user, params.name))) {
           yield {
-            path: codec.path.encode(params.source, params.user, params.name, id),
-            data: data,
+            path: codec.path.encode(params.source, params.user, params.name, recordID),
+            read: async function readEntry () { return await source.readEntryByHash(params.user, params.name, meta.hash) },
             ...meta
           }
         }
       }
     } else {
-      throw new Error('root directory of path is not known to readPath()')
+      throw new Error(`Unknown dataset type "/${params.source}/"`)
     }
   } else {
     throw new Error('path type must be Array or String')
   }
 }
 
-readPath.exists = async function (path) {
+readPath.exists = async function readPathExists (path) {
   const params = codec.path.decode(path)
   if (!params) return false
   const source = sources[params.source]
