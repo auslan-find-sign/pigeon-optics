@@ -79,7 +79,10 @@ router.all('/datasets/:user\\::name/configuration', auth.ownerRequired, async (r
 
   if (req.method === 'PUT') {
     try {
-      await dataset.writeConfig(req.params.user, req.params.name, { memo: req.body.memo })
+      await dataset.writeConfig(req.params.user, req.params.name, {
+        ...config,
+        memo: req.body.memo
+      })
       if (req.accepts('html')) res.redirect(uri`/datasets/${req.params.user}:${req.params.name}/`)
       else res.sendStatus(204)
     } catch (err) {
