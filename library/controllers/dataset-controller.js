@@ -162,15 +162,29 @@ router.post('/datasets/:user\\::name/records/', auth.ownerRequired, async (req, 
 
 // get a record from a user's dataset
 router.all('/datasets/:user\\::name/records/:recordID', async (req, res) => {
+  let error = null
+
   if (req.method === 'PUT') {
     if (!req.owner) throw new Error('You do not have write access to this dataset')
-    if (req.is('urlencoded')) {
-      req.body = codec.json.decode(req.body.recordData)
-    }
-    // write record
-    const { version } = await dataset.writeEntry(req.params.user, req.params.name, req.params.recordID)
+    try {
+      if (req.is('urlencoded')) {
+        req.body = codec.json.decode(req.body.recordData)
+      }
+      // write record
+      const { version } = await dataset.writeEntry(req.params.user, req.params.name, req.params.recordID, req.body)
 
-    if (!req.accepts('html')) req.set('X-Version', version).sendStatus(204)
+      if (!req.accepts('html')) return req.set('X-Version', version).sendStatus(204)
+    } catch (err) {
+      error = err.message
+    }
+  } else if (req.method === 'DELETE') {
+    if (!req.owner) throw new Error('You do not have write access to this dataset')
+    const { version } = await dataset.deleteEntry(req.params.user, req.params.name, req.params.recordID)
+    if (req.accepts('html')) {
+      return req.redirect(uri`/datasets/${req.params.user}:${req.params.name}/`)
+    } else {
+      return res.set('X-Version', version).sendStatus(204)
+    }
   }
 
   const record = await dataset.readEntry(req.params.user, req.params.name, req.params.recordID)
@@ -180,64 +194,14 @@ router.all('/datasets/:user\\::name/records/:recordID', async (req, res) => {
     if (req.query.edit && req.owner) {
       res.sendVibe('dataset-record-editor', title, {
         recordID: req.params.recordID,
-        recordData: codec.json.encode(record, 2)
-      })
+        recordData: codec.json.encode(record, '\t')
+      }, error)
     } else {
       res.sendVibe('dataset-record', title, record)
     }
   } else {
     codec.respond(req, res, record)
   }
-})
-
-// UI to edit a record from a user's dataset
-router.get('/datasets/:user\\::name/records/:recordID/edit', auth.ownerRequired, async (req, res) => {
-  const record = await dataset.readEntry(req.params.user, req.params.name, req.params.recordID)
-
-  const title = `Editing ${req.params.user}:${req.params.name}/${req.params.recordID}`
-  const state = {
-    create: false,
-    recordID: req.params.recordID,
-    recordData: codec.json.encode(record, 2)
-  }
-
-  res.sendVibe('dataset-record-editor', title, state)
-})
-
-router.post('/datasets/:user\\::name/records/:recordID', auth.ownerRequired, async (req, res) => {
-  try {
-    const data = codec.json.decode(req.body.recordData)
-    await dataset.writeEntry(req.params.user, req.params.name, req.params.recordID, data)
-    res.redirect(uri`/datasets/${req.params.user}:${req.params.name}/${req.params.recordID}`)
-  } catch (error) {
-    const title = `Editing ${req.params.user}:${req.params.name}/${req.params.recordID}`
-    const state = {
-      create: false,
-      recordID: req.params.recordID,
-      recordData: req.body.recordData
-    }
-    res.sendVibe('dataset-record-editor', title, state, error.message)
-  }
-})
-
-router.post('/datasets/:user\\::name/records/:recordID/delete', auth.ownerRequired, async (req, res) => {
-  try {
-    await dataset.deleteEntry(req.params.user, req.params.name, req.params.recordID)
-    res.redirect(uri`/datasets/${req.params.user}:${req.params.name}/`)
-  } catch (error) {
-    const title = `Editing ${req.params.user}:${req.params.name}/${req.params.recordID}`
-    const state = {
-      create: true,
-      recordID: req.params.recordID,
-      recordData: req.body.recordData
-    }
-    res.sendVibe('dataset-record-editor', title, state, error.message)
-  }
-})
-
-router.delete('/datasets/:user\\::name/records/:recordID', auth.ownerRequired, async (req, res) => {
-  await dataset.deleteEntry(req.params.user, req.params.name, req.params.recordID)
-  codec.respond(req, res, { deleted: true })
 })
 
 module.exports = router

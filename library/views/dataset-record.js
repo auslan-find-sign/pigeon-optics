@@ -16,14 +16,14 @@ module.exports = (req, record) => {
         v.a('Datasets', { href: '/datasets/' })
         v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}` })
         v.iconLink('cassette', req.params.name, { href: uri`/datasets/${req.params.user}:${req.params.name}/` })
-        v.iconLink('newspaper', req.params.recordID, { href: uri`/datasets/${req.params.user}:${req.params.name}/${req.params.recordID}` })
+        v.iconLink('newspaper', req.params.recordID, { href: uri`/datasets/${req.params.user}:${req.params.name}/records/${req.params.recordID}` })
       })
 
       v.heading(`Record ID: ${req.params.recordID}`)
       if (req.owner) {
         v.flexRow(v => {
           v.flexSpacer(5)
-          v.button('Edit', { href: uri`/datasets/${req.params.user}:${req.params.name}/${req.params.recordID}/edit` })
+          v.button('Edit', { href: uri`/datasets/${req.params.user}:${req.params.name}/records/${req.params.recordID}?edit=1` })
         })
       }
       v.sourceCode(codec.json.encode(record, 2))
