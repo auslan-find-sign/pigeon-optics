@@ -77,14 +77,15 @@ class RichVibeBuilder extends VibeBuilder {
       options.role = 'button'
       this.tag('a', ...args)
     } else {
-      if (options.formmethod && !['get', 'post'].includes(options.method.toLowerCase())) {
+      if (options.formmethod && !['GET', 'POST'].includes(options.formmethod.toUpperCase())) {
         if (!options.name) {
           // rewrite this button to provide the method
           options.name = '_method'
-          options.value = options.method.toUpperCase()
+          options.value = options.formmethod.toUpperCase()
         } else {
           // rewrite the formaction
-          const action = options.formaction || (this.forms || []).slice(-1)[0].action || ''
+          const containerForm = (this.forms || []).slice(-1)[0]
+          const action = options.formaction || containerForm.action || ''
           if (action.includes('?')) {
             options.formaction = action + uri`&_method=${options.formmethod.toUpperCase()}`
           } else {
@@ -104,7 +105,7 @@ class RichVibeBuilder extends VibeBuilder {
     this.forms = this.forms || []
     this.forms.push(options) // store parent forms for button rewriting functionality
 
-    if (options.method && !['get', 'post'].includes(options.method.toLowerCase())) {
+    if (options.method && !['GET', 'POST'].includes(options.method.toUpperCase())) {
       if (!options.action) {
         options.action = uri`?_method=${options.method.toUpperCase()}`
       } else if (options.action.includes('?')) {
@@ -280,6 +281,7 @@ class RichVibeBuilder extends VibeBuilder {
         maxLines: 30,
         minLines: 2,
         tabSize: 2,
+        esversion: 9,
         ...(options.ace || {})
       }
     }
