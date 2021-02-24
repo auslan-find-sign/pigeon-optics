@@ -20,10 +20,10 @@ module.exports = (req, { config, recordIDs }) => {
       v.heading(`Dataset: ${req.params.name}`)
       if (config.memo) v.p(config.memo)
       v.heading('Records:', { level: 3 })
-      v.linkList(recordIDs, id => uri`/datasets/${req.params.user}:${req.params.name}/${id}`)
+      v.linkList(recordIDs, id => uri`/datasets/${req.params.user}:${req.params.name}/records/${id}`)
 
       if (req.owner) {
-        v.button('Add Record', { href: uri`/datasets/create-record/${req.params.user}:${req.params.name}` })
+        v.button('Add Record', { href: uri`/datasets/${req.params.user}:${req.params.name}/create-record` })
       }
     })
   })

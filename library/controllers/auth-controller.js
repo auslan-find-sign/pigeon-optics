@@ -11,7 +11,7 @@ const router = express.Router()
 
 router.all('/auth', async (req, res) => {
   let error = false
-  if (req.body && req.body.username && req.body.password) {
+  if (req.method === 'POST' && req.body && req.body.username && req.body.password) {
     try {
       if (req.body.register) {
         req.session.auth = await auth.register(req.body.username, req.body.password)

@@ -18,9 +18,9 @@ module.exports.cbor = {
       size: inputBuffer.length,
       tags: {
         27: ([type, ...args]) => {
-          if (type === 'dataset/Attachment') {
+          if (type === 'pigeon-optics/Attachment') {
             return new Attachment(...args)
-          } else if (type === 'dataset/AttachmentReference') {
+          } else if (type === 'pigeon-optics/AttachmentReference') {
             return new AttachmentReference(...args)
           }
         }
@@ -73,9 +73,9 @@ module.exports.json = {
     const replacer = (key, value) => {
       if (value instanceof AttachmentReference) {
         if (value.data) {
-          return { class: value.constructor.name, hash: value.hash.toString('hex'), mimeType: value.mimeType, data: value.data.toString('base64') }
+          return { class: value.constructor.name, hash: value.hash.toString('hex').toLowerCase(), mimeType: value.mimeType, data: value.data.toString('base64') }
         } else {
-          return { class: value.constructor.name, hash: value.hash.toString('hex'), mimeType: value.mimeType }
+          return { class: value.constructor.name, hash: value.hash.toString('hex').toLowerCase(), mimeType: value.mimeType }
         }
       } else if (Buffer.isBuffer(value)) {
         return { bufferBase64: value.toString('base64') }
@@ -143,21 +143,24 @@ module.exports.cloneable = {
 }
 
 const ptr = require('path-to-regexp')
-const path = '/:source(lenses|datasets)/:user\\::name/:recordID?'
-const pathMatch = ptr.match(path)
-const pathCompile = ptr.compile(path)
+const datasetPath = '/:source(lenses|datasets)/:user\\::name'
+const datasetMatch = ptr.match(datasetPath)
+const datasetCompile = ptr.compile(datasetPath)
+const recordPath = `${datasetPath}/records/:recordID`
+const recordMatch = ptr.match(recordPath)
+const recordCompile = ptr.compile(recordPath)
 
 module.exports.path = {
   decode (string) {
-    const out = pathMatch(string)
+    const out = datasetMatch(string) || recordMatch(string)
     return out ? out.params : out
   },
   encode (...args) {
     if (args.length === 1) {
-      return pathCompile(args[0])
+      return args.recordID ? recordCompile(args[0]) : datasetCompile(args[0])
     } else {
       const [source, user, name, recordID] = args
-      return pathCompile({ source, user, name, recordID })
+      return recordID ? recordCompile({ source, user, name, recordID }) : datasetCompile({ source, user, name })
     }
   }
 }

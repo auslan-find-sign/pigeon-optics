@@ -3,7 +3,7 @@ const nacl = require('tweetnacl')
 const uri = require('encodeuricomponent-tag')
 const codec = require('./codec')
 
-module.exports.basicAuthMiddleware = async (req, res, next) => {
+exports.basicAuthMiddleware = async (req, res, next) => {
   // handle http basic auth
   if (req.get('Authorization')) {
     const authHeader = req.get('Authorization')
@@ -22,7 +22,7 @@ module.exports.basicAuthMiddleware = async (req, res, next) => {
 }
 
 /** app.param handler to populate req.owner with a boolean for if this resource should be editable */
-module.exports.ownerParam = (req, res, next, value, id) => {
+exports.ownerParam = (req, res, next, value, id) => {
   req.owner = req.session.auth && (req.session.auth.user === req.params[id] || req.session.auth.auth === 'admin')
   next()
 }
@@ -30,10 +30,10 @@ module.exports.ownerParam = (req, res, next, value, id) => {
 /**
  * Express middleware to require auth and redirect users to login
  */
-module.exports.required = (req, res, next) => {
+exports.required = (req, res, next) => {
   if (!req.session || !req.session.auth || !req.session.auth.user) {
     if (req.accepts('html')) {
-      return res.redirect(uri`/auth/login?return=${req.originalUrl}`)
+      return res.redirect(uri`/auth?return=${req.originalUrl}`)
     } else {
       return res.status(401).set('WWW-Authenticate', 'Basic realm="Datasets", charset="UTF-8"]').sendJSON({
         err: 'This request requires you be logged in with basic auth or a cookie'
@@ -44,11 +44,25 @@ module.exports.required = (req, res, next) => {
   }
 }
 
+exports.ownerRequired = (req, res, next) => {
+  if (req.owner) {
+    return next()
+  } else {
+    const msg = { err: 'You need to login as someone with permission to edit this' }
+    if (req.accepts('html')) {
+      return res.redirect(uri`/auth?err=${msg.err}&return=${req.originalUrl}`)
+    } else {
+      return codec.respond(req, res.status(403), msg)
+    }
+  }
+}
+
 /**
  * Express Middleware that requires the owner specified in a resource url is authenticated, or an admin role
  * @param {string|function} ownerParam - named parameter string containing owner, or function that returns owner for this resource when called with req
  */
-module.exports.requireOwnerOrAdmin = (ownerParam) => {
+exports.requireOwnerOrAdmin = (ownerParam) => {
+  console.warn('Deprecated use of requireOwnerOrAdmin')
   return (req, res, next) => {
     if (req.session.auth && req.session.auth.auth === 'admin') {
       return next()
@@ -60,7 +74,7 @@ module.exports.requireOwnerOrAdmin = (ownerParam) => {
     } else {
       const msg = { err: 'You need to login as this thing’s owner or an admin to access this' }
       if (req.accepts('html')) {
-        return res.redirect(uri`/auth/login?err=${msg.err}&return=${req.originalUrl}`)
+        return res.redirect(uri`/auth?err=${msg.err}&return=${req.originalUrl}`)
       } else {
         return codec.respond(req, res.status(403), msg)
       }
@@ -72,20 +86,20 @@ module.exports.requireOwnerOrAdmin = (ownerParam) => {
  * @param {string} username
  * @returns {string}
 */
-module.exports.userFolder = (username) => ['users', username]
+exports.userFolder = (username) => ['users', username]
 
 /** Helper function, path inside cbor-file database, where user's account is stored
  * @param {string} username
  * @returns {string}
 */
-module.exports.userAccountPath = (username) => [...module.exports.userFolder(username), 'account']
+exports.userAccountPath = (username) => [...module.exports.userFolder(username), 'account']
 
 /** check a login attempt for a user account
  * @param {string} username
  * @param {string} password
  * @returns {object} - { user: "string username", auth: "string authorization level" }
  */
-module.exports.login = async (user, pass) => {
+exports.login = async (user, pass) => {
   let account
 
   try {
@@ -112,7 +126,7 @@ module.exports.login = async (user, pass) => {
  * @param {string} password
  * @returns {object} - { user: "string username", auth: "string authorization level" }
  */
-module.exports.register = async (user, pass, auth = 'user') => {
+exports.register = async (user, pass, auth = 'user') => {
   const path = module.exports.userAccountPath(user)
 
   if (await file.exists(path)) {
@@ -152,7 +166,7 @@ module.exports.register = async (user, pass, auth = 'user') => {
  * @param {string} username
  * @param {string} newPassword
  */
-module.exports.changePassword = async (user, newPass) => {
+exports.changePassword = async (user, newPass) => {
   const path = module.exports.userAccountPath(user)
   const account = await file.read(path)
   account.passSalt = Buffer.from(nacl.randomBytes(64))
@@ -164,7 +178,7 @@ module.exports.changePassword = async (user, newPass) => {
  * @param {string} username
  * @param {string} authorization - default "user"
  */
-module.exports.changeAuth = async (user, auth) => {
+exports.changeAuth = async (user, auth) => {
   const path = module.exports.userAccountPath(user)
   const account = await file.read(path)
   account.auth = auth
@@ -172,7 +186,7 @@ module.exports.changeAuth = async (user, auth) => {
 }
 
 /** get a user's profile */
-module.exports.getProfile = async (user) => {
+exports.getProfile = async (user) => {
   const account = await file.read(module.exports.userAccountPath(user))
   return account
 }
@@ -180,20 +194,20 @@ module.exports.getProfile = async (user) => {
 /** delete a user
  * @param {string} username
  */
-module.exports.delete = async (user) => {
+exports.delete = async (user) => {
   await file.delete(module.exports.userFolder(user))
 }
 
 /** check if user account exists
  * @param {string} username
  */
-module.exports.exists = async (user) => {
+exports.exists = async (user) => {
   return await file.exists(module.exports.userAccountPath(user))
 }
 
 /** list all users known to the system
  * @returns {AsyncIterable} - yields string account names
  */
-module.exports.iterateUsers = () => {
+exports.iterateUsers = () => {
   return file.listFolders(['users'])
 }

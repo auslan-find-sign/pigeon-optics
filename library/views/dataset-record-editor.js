@@ -10,7 +10,7 @@ const uri = require('encodeuricomponent-tag')
 module.exports = (req, data, error = null) => {
   return layout(req, v => {
     v.panel(v => {
-      v.form({ method: 'POST', action: uri`/datasets/${req.params.user}:${req.params.name}/${data.recordID}` }, v => {
+      v.form({ method: 'PUT' }, v => {
         if (data.create) {
           v.heading('Create Dataset Record')
         } else {
@@ -31,14 +31,13 @@ module.exports = (req, data, error = null) => {
 
           v.dt('Data (JSON)')
           v.dd(v => {
-            // v.textarea(data.recordData, { name: 'recordData', spellcheck: 'false', wrap: 'off' })
             v.sourceCodeEditor('recordData', 'json', data.recordData)
           })
         })
 
         v.flexRow(v => {
           v.flexSpacer(5)
-          if (!data.create) v.button('Delete', { type: 'submit', formaction: uri`/datasets/${req.params.user}:${req.params.name}/${data.recordID}/delete` })
+          if (!data.create) v.button('Delete', { type: 'submit', formmethod: 'DELETE', formaction: uri`/datasets/${req.params.user}:${req.params.name}/records/${data.recordID}` })
           v.button('Save', { type: 'submit' })
         })
       })
