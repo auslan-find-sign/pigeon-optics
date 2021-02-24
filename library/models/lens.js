@@ -14,6 +14,7 @@ const file = require('./cbor-file')
 const codec = require('./codec')
 const ivm = require('isolated-vm')
 const defaults = require('../../package.json').defaults
+const queueify = require('../utility/queueify')
 
 const readPath = require('./read-path')
 const auth = require('./auth')
@@ -25,8 +26,8 @@ const Isolate = new ivm.Isolate({ memoryLimit: 64 })
 const codecIvmCode = fs.readFileSync(require.resolve('./codec-lite.ivm.js')).toString()
 const codecScript = Isolate.compileScriptSync(codecIvmCode)
 
-Object.assign(module.exports, {
-  ...dataset, // import dataset functions
+Object.assign(exports, queueify.object({
+  ...Object.getPrototypeOf(dataset), // import dataset functions
 
   // resolve path inside this - override with viewports path in user folder
   path (user, ...path) {
