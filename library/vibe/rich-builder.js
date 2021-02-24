@@ -225,7 +225,7 @@ class RichVibeBuilder extends VibeBuilder {
   sourceCodeEditor (name, language, code, options = {}) {
     if (!this.__aceEditorPackageIncluded) {
       this.__aceEditorPackageIncluded = true
-      this.script({ src: '/npm/ace-builds/src-min-noconflict/ace.js', type: 'text/javascript', charset: 'utf-8' })
+      this.script({ src: '/npm/ace-builds/src-min-noconflict/ace.js', type: 'text/javascript', charset: 'utf-8', defer: true })
     }
 
     this.pre(code, { class: 'code-editor javascript', id: `${name}-editor` })
@@ -244,7 +244,7 @@ class RichVibeBuilder extends VibeBuilder {
       }
     }
 
-    this.script(`setupAceEditor(${JSON.stringify(aceOptions)})`)
+    this.script(`window.addEventListener('load', () => setupAceEditor(${JSON.stringify(aceOptions)}))`)
   }
 
   footerButtons (...args) {
