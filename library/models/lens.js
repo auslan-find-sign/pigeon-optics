@@ -79,7 +79,7 @@ Object.assign(exports, queueify.object({
       }
     }
 
-    for await (const { input, outputs } of mapFn(cacheMaps(readPath(config.inputs)))) {
+    for await (const { input, outputs, logs } of mapFn(cacheMaps(readPath(config.inputs)))) {
       const inputHash = codec.objectHash({ input, mapCode: config.mapCode })
       const inputHashString = inputHash.toString('hex')
 
@@ -133,9 +133,14 @@ Object.assign(exports, queueify.object({
         const [recordPath, recordData] = input
         const context = await Isolate.createContext()
         const outputs = []
+        const logs = []
 
         // Adjust the jail to have a console.log/warn/error/info api, and to remove some non-deterministic features
-        if (!logger) logger = (type, ...args) => console.info(`Lens ${config.user}:${config.name}/map console.${type}:`, ...args)
+        const log = (type, ...args) => {
+          console.info(`Lens ${config.user}:${config.name}/map console.${type}:`, ...args)
+          if (logger) logger(type, ...args)
+          logs.push({ type, timestamp: Date.now(), args })
+        }
         const emit = (key, recordData) => {
           outputs.push([key, codec.cloneable.decode(recordData)])
         }
@@ -175,7 +180,7 @@ Object.assign(exports, queueify.object({
         // ask v8 to free this context's memory
         context.release()
 
-        yield { input, outputs }
+        yield { input, outputs, logs }
       }
     }
   },
@@ -210,4 +215,4 @@ Object.assign(exports, queueify.object({
       return codec.cloneable.decode(result.result)
     }
   }
-})
+}))
