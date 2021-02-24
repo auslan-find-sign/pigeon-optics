@@ -61,20 +61,22 @@ router.all('/lenses/create', auth.required, async (req, res) => {
   res.sendVibe('lens-editor', 'Create a Lens', state, state.error)
 })
 
-router.get('/lenses/:user\\::name/edit', auth.ownerRequired, async (req, res) => {
+router.get('/lenses/:user\\::name/configuration', auth.ownerRequired, async (req, res) => {
   const config = await lens.readConfig(req.params.user, req.params.name)
   const state = {
-    create: false,
     ...config,
-    inputs: config.inputs.join('\n'),
+    create: false,
     name: req.params.name
   }
   res.sendVibe('lens-editor', 'Edit a Lens', state)
 })
 
-router.post('/lenses/:user\\::name/edit', auth.ownerRequired, async (req, res) => {
+router.put('/lenses/:user\\::name/configuration', auth.ownerRequired, async (req, res) => {
+  const config = await lens.readConfig(req.params.user, req.params.name)
+
   try {
     await lens.writeConfig(req.params.user, req.params.name, {
+      ...config,
       memo: req.body.memo,
       inputs: req.body.inputs.split('\n').map(x => x.trim()).filter(x => !!x),
       mapType: req.body.mapType,
@@ -84,12 +86,12 @@ router.post('/lenses/:user\\::name/edit', auth.ownerRequired, async (req, res) =
     // rebuild since settings may have changed
     await lens.build(req.session.auth.user, req.body.name)
 
-    res.redirect(uri`/lenses/${req.params.user}:${req.params.name}/`)
+    return res.redirect(uri`/lenses/${req.params.user}:${req.params.name}/`)
   } catch (err) {
     const state = {
-      create: false,
+      ...req.body,
       name: req.params.name,
-      ...req.body
+      create: false
     }
     console.log(err.stack)
     res.sendVibe('lens-editor', 'Edit a Lens', state, err.message)
