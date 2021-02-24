@@ -210,8 +210,8 @@ module.exports = queueify.object({
    * @returns {boolean}
    */
   async validateConfig (config) {
-    console.assert(typeof config.memo === 'string', 'memo must be a string')
-    console.assert(typeof config.version === 'number', 'version must be a number')
+    assert(typeof config.memo === 'string', 'memo must be a string')
+    assert(typeof config.version === 'number', 'version must be a number')
   },
 
   /** create a dataset with a specific name
@@ -239,7 +239,7 @@ module.exports = queueify.object({
 
     config.version = 0
     config.garbageCollect = true
-    config.create = Date.now()
+    config.created = Date.now()
 
     await this.validateConfig(config)
 
