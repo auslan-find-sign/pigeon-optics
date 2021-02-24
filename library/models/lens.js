@@ -64,7 +64,7 @@ Object.assign(exports, queueify.object({
     }
     async function * cacheMaps (inputs) {
       for await (const entry of inputs) {
-        const inputHash = codec.objectHash(entry)
+        const inputHash = codec.objectHash({ input: entry, mapCode: config.mapCode })
         const inputHashString = inputHash.toString('hex')
         if (mapOutputIndex[inputHashString]) {
           for (const [recordID, recordHash] of mapOutputIndex[inputHashString]) {
@@ -80,7 +80,7 @@ Object.assign(exports, queueify.object({
     }
 
     for await (const { input, outputs } of mapFn(cacheMaps(readPath(config.inputs)))) {
-      const inputHash = codec.objectHash(input)
+      const inputHash = codec.objectHash({ input, mapCode: config.mapCode })
       const inputHashString = inputHash.toString('hex')
 
       const indexEntry = mapOutputIndex[inputHashString] = []
