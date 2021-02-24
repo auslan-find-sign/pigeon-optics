@@ -2,6 +2,7 @@
  * CBOR codec, implementing custom tagged type for attachments
  */
 const cbor = require('borc')
+const json5 = require('json5')
 const objectHash = require('object-hash')
 const { Attachment, AttachmentReference } = require('./attachment')
 const Vibe = require('../vibe/rich-builder')
@@ -60,7 +61,11 @@ module.exports.json = {
       return value
     }
 
-    return JSON.parse(jsonString, reviver)
+    try {
+      return JSON.parse(jsonString, reviver)
+    } catch (err) {
+      return json5.parse(jsonString, reviver)
+    }
   },
 
   /**
