@@ -141,21 +141,23 @@ module.exports = queueify.object({
   /** list all the recordIDs in a dataset
    * @param {string} user - user who owns dataset
    * @param {string} name - name of dataset
+   * @param {number} [version] - dataset version number - defaults to latest
    * @returns {string[]} - dataset entry id's
    * @async
    */
-  async listEntries (user, name) {
-    return Object.keys(await this.listEntryMeta(user, name))
+  async listEntries (user, name, version = null) {
+    return Object.keys(await this.listEntryMeta(user, name, version))
   },
 
   /** plain object mapping recordIDs to object hashes
    * @param {string} user - user who owns dataset
    * @param {string} name - name of dataset or lens
+   * @param {number} [version] - dataset version number - defaults to latest
    * @returns {object} - keyed with recordIDs and values are { version: num, hash: Buffer[32] }
    * @async
    */
-  async listEntryMeta (user, name) {
-    const snapshot = await this.readVersion(user, name)
+  async listEntryMeta (user, name, version = null) {
+    const snapshot = await this.readVersion(user, name, version)
     return snapshot.records
   },
 
