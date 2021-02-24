@@ -60,7 +60,7 @@ router.post('/lenses/create', auth.required, async (req, res) => {
   }
 })
 
-router.get('/lenses/:user\\::name/edit', auth.requireOwnerOrAdmin('user'), async (req, res) => {
+router.get('/lenses/:user\\::name/edit', auth.ownerRequired, async (req, res) => {
   const config = await lens.readConfig(req.params.user, req.params.name)
   const state = {
     create: false,
@@ -71,7 +71,7 @@ router.get('/lenses/:user\\::name/edit', auth.requireOwnerOrAdmin('user'), async
   res.sendVibe('lens-editor', 'Edit a Lens', state)
 })
 
-router.post('/lenses/:user\\::name/edit', auth.requireOwnerOrAdmin('user'), async (req, res) => {
+router.post('/lenses/:user\\::name/edit', auth.ownerRequired, async (req, res) => {
   try {
     await lens.writeConfig(req.params.user, req.params.name, {
       memo: req.body.memo,
@@ -95,7 +95,7 @@ router.post('/lenses/:user\\::name/edit', auth.requireOwnerOrAdmin('user'), asyn
   }
 })
 
-router.delete('/lenses/:user\\::name/', auth.requireOwnerOrAdmin('user'), async (req, res) => {
+router.delete('/lenses/:user\\::name/', auth.ownerRequired, async (req, res) => {
   await lens.delete(req.params.user, req.params.name)
   res.redirect(`/lenses/${req.params.user}:`)
 })

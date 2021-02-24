@@ -44,6 +44,9 @@ exports.required = (req, res, next) => {
   }
 }
 
+/**
+ * Express Middleware that requires the owner specified in a resource url is authenticated, or an admin role
+ */
 exports.ownerRequired = (req, res, next) => {
   if (req.owner) {
     return next()
@@ -53,31 +56,6 @@ exports.ownerRequired = (req, res, next) => {
       return res.redirect(uri`/auth?err=${msg.err}&return=${req.originalUrl}`)
     } else {
       return codec.respond(req, res.status(403), msg)
-    }
-  }
-}
-
-/**
- * Express Middleware that requires the owner specified in a resource url is authenticated, or an admin role
- * @param {string|function} ownerParam - named parameter string containing owner, or function that returns owner for this resource when called with req
- */
-exports.requireOwnerOrAdmin = (ownerParam) => {
-  console.warn('Deprecated use of requireOwnerOrAdmin')
-  return (req, res, next) => {
-    if (req.session.auth && req.session.auth.auth === 'admin') {
-      return next()
-    }
-
-    const owner = typeof ownerParam === 'string' ? req.params[ownerParam] : ownerParam(req)
-    if (req.session && req.session.auth && req.session.auth.user === owner) {
-      return next()
-    } else {
-      const msg = { err: 'You need to login as this thing’s owner or an admin to access this' }
-      if (req.accepts('html')) {
-        return res.redirect(uri`/auth?err=${msg.err}&return=${req.originalUrl}`)
-      } else {
-        return codec.respond(req, res.status(403), msg)
-      }
     }
   }
 }
