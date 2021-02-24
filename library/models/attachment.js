@@ -42,7 +42,7 @@ class AttachmentReference {
 
   // internal, handles cbor encoding
   encodeCBOR (gen) {
-    return gen.pushAny(new cbor.Tagged(27, ['dataset/AttachmentReference', this.hash, this.mimeType]))
+    return gen.pushAny(new cbor.Tagged(27, ['pigeon-optics/AttachmentReference', this.hash, this.mimeType]))
   }
 }
 
@@ -60,7 +60,7 @@ class Attachment extends AttachmentReference {
 
   // internal, handles cbor encoding
   encodeCBOR (gen) {
-    return gen.pushAny(new cbor.Tagged(27, ['dataset/Attachment', this.data, this.mimeType]))
+    return gen.pushAny(new cbor.Tagged(27, ['pigeon-optics/Attachment', this.data, this.mimeType]))
   }
 
   /**
