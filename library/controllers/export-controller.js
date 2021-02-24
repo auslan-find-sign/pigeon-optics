@@ -20,24 +20,24 @@ const encodingMimeTypes = {
 
 /**
  * iterator which yields chunks of text or buffer in whichever encoding is requested
- * @param {string} path - path in form '/realm/user:name'
+ * @param {string} dataPath - path in form '/realm/user:name'
  * @param {string} encoding - 'cbor', 'json', or 'json-lines'
  */
-async function * encodePath (path, encoding) {
+async function * encodePath (dataPath, encoding) {
   if (encoding === 'json') yield '{\n'
   let first = true
-  for await (const [recordPath, recordData] of readPath(path)) {
-    const { recordID } = codec.path.decode(recordPath)
+  for await (const { path, data } of readPath(dataPath)) {
+    const { recordID } = codec.path.decode(path)
     if (encoding === 'cbor') {
-      yield codec.cbor.encode([recordID, recordData])
+      yield codec.cbor.encode([recordID, data])
     } else if (encoding === 'json') {
       if (first) {
-        yield `  ${codec.json.encode(recordID)}:${codec.json.encode(recordData)}`
+        yield `  ${codec.json.encode(recordID)}:${codec.json.encode(data)}`
       } else {
-        yield `,\n  ${codec.json.encode(recordID)}:${codec.json.encode(recordData)}`
+        yield `,\n  ${codec.json.encode(recordID)}:${codec.json.encode(data)}`
       }
     } else if (encoding === 'json-lines') {
-      yield `${codec.json.encode([recordID, recordData])}\n`
+      yield `${codec.json.encode([recordID, data])}\n`
     }
     first = false
   }
@@ -53,10 +53,10 @@ function readableStreamOfPath (path, encoding) {
   return Readable.from(encodePath(path, encoding))
 }
 
-function streamArchive (path, archiveType, includeAttachments) {
+function streamArchive (dataPath, archiveType, includeAttachments) {
   if (archiveType !== 'zip') throw new Error('Archiving only supports zip currently')
   const zip = new ZipStream({
-    comment: `Archive of ${path}, built by Datasets v${pkg.version}`
+    comment: `Archive of ${dataPath}, built by Datasets v${pkg.version}`
   })
 
   // promisify the entry append thing
@@ -73,23 +73,23 @@ function streamArchive (path, archiveType, includeAttachments) {
     await entry(null, { name: '/json/' })
     if (includeAttachments) await entry(null, { name: '/attachments/' })
 
-    for await (const [recordPath, recordData] of readPath(path)) {
-      const { recordID } = codec.path.decode(recordPath)
+    for await (const { path, data } of readPath(dataPath)) {
+      const { recordID } = codec.path.decode(path)
       // zip-stream support for entry contents being strings or buffers seems broken
       // but stream inputs works, so just make streams
       // output cbor version
       const cborStream = Readable.from((async function * () {
-        yield codec.cbor.encode(recordData)
+        yield codec.cbor.encode(data)
       })())
       await entry(cborStream, { name: uri`/cbor/${recordID}.cbor` })
       // output json version
       const jsonStream = Readable.from((async function * () {
-        yield Buffer.from(codec.json.encode(recordData, 2))
+        yield Buffer.from(codec.json.encode(data, 2))
       })())
       await entry(jsonStream, { name: uri`/json/${recordID}.json` })
       // write any attachments
       if (includeAttachments) {
-        const refs = attach.listReferences(recordData)
+        const refs = attach.listReferences(data)
         for (const ref of refs) {
           const hexHash = ref.hash.toString('hex')
           if (!writtenAttachments.has(hexHash)) {

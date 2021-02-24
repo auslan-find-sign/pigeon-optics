@@ -6,8 +6,17 @@ const lenses = require('./lens')
 const codec = require('./codec')
 const sources = { datasets, lenses }
 
+/** ReadPathOutput is what readPath yields
+ * @typedef {Object} ReadPathOutput
+ * @property {string} path - data path
+ * @property {*} data - the record's value
+ * @property {Buffer[32]} hash - the record's hash
+ * @property {number} version - version number the record is sourced from
+ */
+
 /** reads a data path, which could be one specific record, or a whole dataset/viewport
  * @param {string|Array} path - can be a path, or array of paths to read sequentially
+ * @yields {ReadPathOutput}
  */
 async function * readPath (path) {
   if (Array.isArray(path)) {
@@ -24,17 +33,20 @@ async function * readPath (path) {
     if (source !== undefined) {
       if (params.recordID !== undefined) {
         // just yield the specific entry
-        const recordHash = await source.readEntryHash(params.user, params.name, params.recordID)
-        yield [
-          codec.path.encode(params.source, params.user, params.name, params.recordID),
-          await source.readEntryByHash(params.user, params.name, recordHash),
-          recordHash
-        ]
+        const record = await source.readEntryMeta(params.user, params.name, params.recordID)
+        yield {
+          path: codec.path.encode(params.source, params.user, params.name, params.recordID),
+          data: await source.readEntryByHash(params.user, params.name, record.hash),
+          ...record
+        }
       } else {
         // do the whole dataset
-        for await (const [recordID, recordData, recordHash] of source.iterateEntries(params.user, params.name)) {
-          const recordPath = codec.path.encode(params.source, params.user, params.name, recordID)
-          yield [recordPath, recordData, recordHash]
+        for await (const { id, meta, data } of source.iterateEntries(params.user, params.name)) {
+          yield {
+            path: codec.path.encode(params.source, params.user, params.name, id),
+            data: data,
+            ...meta
+          }
         }
       }
     } else {
@@ -49,7 +61,7 @@ readPath.exists = async function (path) {
   const params = codec.path.decode(path)
   if (!params) return false
   const source = sources[params.source]
-  return source.exists(params.user, params.name, params.recordID)
+  return await source.exists(params.user, params.name, params.recordID)
 }
 
 module.exports = readPath
