@@ -8,11 +8,11 @@ const layout = require('./layout')
  */
 module.exports = (req, data, error = null) => {
   return layout(req, v => {
-    v.form({ class: 'simple-form', method: 'POST' }, v => {
+    v.form({ class: 'simple-form', method: 'PUT' }, v => {
       if (data.create) v.heading('Create a Viewport')
       else v.heading(`Editing Viewport “${req.params.name}”`)
 
-      if (error) v.p(v => { v.glitch('Error: '); v.text(error) })
+      if (error) v.p(v => { v.glitch('Error: '); v.pre(error) })
 
       v.hiddenFormData({ owner: data.owner || req.session.auth.user })
       v.hiddenFormData({ mapType: data.mapType })
@@ -30,7 +30,7 @@ module.exports = (req, data, error = null) => {
         v.dd(v => v.textarea(data.memo, { name: 'memo', spellcheck: 'true', wrap: 'off' }))
 
         v.dt('Inputs (one data path per line)')
-        v.dd(v => v.textarea(data.inputs, { name: 'inputs', spellcheck: 'false', wrap: 'off' }))
+        v.dd(v => v.textarea([data.inputs].flat().join('\n'), { name: 'inputs', spellcheck: 'false', wrap: 'off' }))
 
         v.dt('Javascript Map Function')
         v.dd(v => {
@@ -57,7 +57,7 @@ module.exports = (req, data, error = null) => {
         if (data.create) {
           v.button('Create', { type: 'submit' })
         } else {
-          v.button('Delete', { type: 'submit', formaction: 'delete' })
+          v.button('Delete', { type: 'submit', formaction: 'DELETE' })
           v.button('Save', { type: 'submit' })
         }
       })

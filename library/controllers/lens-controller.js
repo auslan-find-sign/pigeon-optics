@@ -18,46 +18,47 @@ output(recordID, {
 const reduceCodeExample = `// example, overlays the objects overwriting properties
 return { ...left, ...right }`
 
-router.get('/lenses/create', auth.required, async (req, res) => {
+router.all('/lenses/create', auth.required, async (req, res) => {
   const state = {
     create: true,
     name: '',
     memo: '',
-    inputs: '/datasets/owner-user:dataset-name',
+    inputs: ['/datasets/owner-user:dataset-name'],
     mapType: 'javascript',
     mapCode: mapCodeExample,
     reduceCode: reduceCodeExample
   }
+
   if (req.query.clone) {
     const [user, lensName] = `${req.query.clone}`.split(':')
-    const cloneConfig = await lens.readConfig(user, lensName)
-    Object.assign(state, cloneConfig)
-    state.inputs = cloneConfig.inputs.join('\n')
-    state.memo = `Cloned from /lenses/${req.query.clone}/: ${cloneConfig.memo}`
+    Object.assign(state, await lens.readConfig(user, lensName))
+    state.memo = `Cloned from /lenses/${req.query.clone}/: ${state.memo}`
   }
-  res.sendVibe('lens-editor', 'Create a Lens', state)
-})
 
-router.post('/lenses/create', auth.required, async (req, res) => {
-  try {
-    await lens.create(req.session.auth.user, req.body.name, {
-      memo: req.body.memo,
-      inputs: req.body.inputs.split('\n').map(x => x.trim()).filter(x => !!x),
-      mapType: req.body.mapType,
-      mapCode: req.body.mapCode,
-      reduceCode: req.body.reduceCode
-    })
-    // rebuild since settings may have changed
-    await lens.build(req.session.auth.user, req.body.name)
-    res.redirect(uri`/lenses/${req.session.auth.user}:${req.body.name}/`)
-  } catch (err) {
-    const state = {
-      create: true,
-      ...req.body
-    }
-    console.log('Stack:', err.stack)
-    res.sendVibe('lens-editor', 'Create a Lens', state, err.message)
+  if (typeof req.body === 'object') {
+    Object.assign(state, req.body)
   }
+
+  if (typeof state.inputs === 'string') state.inputs = state.inputs.split('\n')
+
+  if (req.method === 'PUT') {
+    try {
+      await lens.create(req.session.auth.user, req.body.name, {
+        memo: req.body.memo,
+        inputs: req.body.inputs.split('\n').map(x => x.trim()).filter(x => !!x),
+        mapType: req.body.mapType,
+        mapCode: req.body.mapCode,
+        reduceCode: req.body.reduceCode
+      })
+      // rebuild since settings may have changed
+      await lens.build(req.session.auth.user, req.body.name)
+      return res.redirect(uri`/lenses/${req.session.auth.user}:${req.body.name}/`)
+    } catch (err) {
+      state.error = err.stack || err.message
+    }
+  }
+
+  res.sendVibe('lens-editor', 'Create a Lens', state, state.error)
 })
 
 router.get('/lenses/:user\\::name/edit', auth.ownerRequired, async (req, res) => {
