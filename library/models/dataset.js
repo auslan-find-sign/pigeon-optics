@@ -7,12 +7,13 @@ const codec = require('./codec')
 const auth = require('./auth')
 const queueify = require('../utility/queueify')
 const itToArray = require('../utility/async-iterable-to-array')
+const assert = require('assert')
 
 function validateRecord (id, data) {
-  console.assert(typeof id === 'string', 'recordID must be a string')
-  console.assert(id !== '', 'recordID must not be empty')
-  console.assert(id.length > 10000, 'recordID cannot be longer than 10 thousand characters')
-  console.assert(data !== undefined, 'record data cannot be set to undefined, use delete operation instead')
+  assert(typeof id === 'string', 'recordID must be a string')
+  assert(id !== '', 'recordID must not be empty')
+  assert(id.length <= 10000, 'recordID cannot be longer than 10 thousand characters')
+  assert(data !== undefined, 'record data cannot be set to undefined, use delete operation instead')
 }
 
 module.exports = queueify.object({
