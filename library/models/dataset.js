@@ -74,7 +74,7 @@ module.exports = queueify.object({
    * @async
    */
   async readEntryMeta (user, name, recordID, version = null) {
-    const snapshot = this.readVersion(user, name, version)
+    const snapshot = await this.readVersion(user, name, version)
     return snapshot.records[recordID]
   },
 
@@ -120,7 +120,7 @@ module.exports = queueify.object({
     const hash = await this.writeObject(user, name, data)
     snapshot.records[recordID] = { hash, version: snapshot.version + 1 }
     await this.writeVersion(user, name, snapshot)
-    return snapshot.records[recordID]
+    return snapshot
   },
 
   /** delete an entry from a dataset
@@ -133,8 +133,9 @@ module.exports = queueify.object({
     const snapshot = await this.readVersion(user, name)
     if (snapshot.records[recordID]) {
       delete snapshot.records[recordID]
-      await this.writeVersion(user, name, snapshot)
+      return await this.writeVersion(user, name, snapshot)
     }
+    return snapshot
   },
 
   /** list all the recordIDs in a dataset
@@ -177,10 +178,11 @@ module.exports = queueify.object({
 
   /** tests if a dataset or specific record exists */
   async exists (user, name, recordID = undefined) {
-    if (recordID === undefined) {
-      return file.exists(this.path(user, name, 'index'))
+    if (typeof recordID !== 'string') {
+      return await file.exists(this.path(user, name, 'config'))
     } else {
-      return (await this.listEntries(user, name)).includes(recordID)
+      if (!await file.exists(this.path(user, name, 'config'))) return false
+      return !!(await this.readEntryMeta(user, name, recordID))
     }
   },
 
