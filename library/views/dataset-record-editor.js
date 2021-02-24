@@ -31,7 +31,7 @@ module.exports = (req, data, error = null) => {
 
           v.dt('Data (JSON)')
           v.dd(v => {
-            v.sourceCodeEditor('recordData', 'json', data.recordData)
+            v.sourceCodeEditor('recordData', 'json5', data.recordData)
           })
         })
 
