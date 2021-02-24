@@ -9,6 +9,7 @@
  * Lenses always include a 'reduce' function which combines multiple outputs that have the same recordID key, implemented in
  * javascript. The map function maybe a javascript function, a webhook or a remote service.
  */
+const assert = require('assert')
 const fs = require('fs-extra')
 const file = require('./cbor-file')
 const codec = require('./codec')
@@ -36,13 +37,13 @@ Object.assign(exports, queueify.object({
 
   async validateConfig (config) {
     dataset.validateConfig(config)
-    console.assert(['webhook', 'javascript', 'remote'].includes(config.mapType), 'map type must be javascript, webhook, or remote')
-    console.assert(typeof config.mapCode === 'string', 'map code must be a string')
-    console.assert(typeof config.reduceCode === 'string', 'reduce code must be a string')
-    console.assert(Array.isArray(config.inputs), 'inputs must be an array')
-    console.assert(config.inputs.every(x => typeof x === 'string'), 'inputs entries must be strings')
+    assert(['webhook', 'javascript', 'remote'].includes(config.mapType), 'map type must be javascript, webhook, or remote')
+    assert(typeof config.mapCode === 'string', 'map code must be a string')
+    assert(typeof config.reduceCode === 'string', 'reduce code must be a string')
+    assert(Array.isArray(config.inputs), 'inputs must be an array')
+    assert(config.inputs.every(x => typeof x === 'string'), 'inputs entries must be strings')
     for (const input of config.inputs) {
-      console.assert(await readPath.exists(input), `${input} doesn’t exist`)
+      assert(await readPath.exists(input), `${input} doesn’t exist`)
     }
   },
 
