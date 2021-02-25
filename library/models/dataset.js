@@ -389,10 +389,8 @@ module.exports = queueify.object({
     while (version > -1) {
       const oldSnap = await this.readVersion(user, name, version)
       if (!oldSnap) return
-      if (oldSnap.created < cutoff) {
-        await file.delete(this.versionPath(user, name, version))
-        version = oldSnap.version - 1
-      }
+      if (oldSnap.created < cutoff) await file.delete(this.versionPath(user, name, version))
+      version = oldSnap.version - 1
     }
   }
 })
