@@ -6,13 +6,11 @@ const codec = require('../models/codec')
 module.exports = (req, { mapOutputs }) => {
   return layout(req, v => {
     v.panel(v => {
-      v.panelTabs(v => {
-        v.a('Lens', { href: uri`/lenses/${req.params.user}:${req.params.name}/` })
-        if (req.owner) {
-          v.a('Edit', { href: uri`/lenses/${req.params.user}:${req.params.name}/configuration` })
-        }
-        v.a('Logs', { href: uri`/lenses/${req.params.user}:${req.params.name}/logs` })
-      })
+      v.panelTabs(
+        { label: 'Lens', href: uri`/lenses/${req.params.user}:${req.params.name}/` },
+        req.owner && { label: 'Edit', href: uri`/lenses/${req.params.user}:${req.params.name}/configuration` },
+        { label: 'Logs', href: uri`/lenses/${req.params.user}:${req.params.name}/logs`, current: true }
+      )
 
       v.breadcrumbs(v => {
         v.a('Home', { href: '/' })

@@ -9,28 +9,26 @@ const uri = require('encodeuricomponent-tag')
  */
 module.exports = (req, data, error = null) => {
   return layout(req, v => {
-    v.panel(v => {
-      v.panelTabs(v => {
-        v.a('Lens', { href: uri`/lenses/${req.params.user}:${req.params.name}/` })
-        if (req.owner) {
-          v.a('Edit', { href: uri`/lenses/${req.params.user}:${req.params.name}/configuration` })
-        }
-        v.a('Logs', { href: uri`/lenses/${req.params.user}:${req.params.name}/logs` })
-      })
+    v.form({ class: 'simple-form', method: 'PUT' }, v => {
+      v.panelTabs(
+        { label: 'Lens', href: uri`/lenses/${req.params.user}:${req.params.name}/` },
+        req.owner && { label: 'Edit', href: uri`/lenses/${req.params.user}:${req.params.name}/configuration`, current: true },
+        { label: 'Logs', href: uri`/lenses/${req.params.user}:${req.params.name}/logs` }
+      )
 
-      v.breadcrumbs(v => {
-        v.a('Home', { href: '/' })
-        v.a('Lenses', { href: '/lenses/' })
-        if (data.create) {
-          v.a('Create Lens', { href: '/lenses/create' })
-        } else {
-          v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}/` })
-          v.iconLink('3dglasses', req.params.name, { href: uri`/lenses/${req.params.user}:${req.params.name}/` })
-          v.a('Edit Lens', { href: uri`/lenses/${req.params.user}:${req.params.name}/configuration` })
-        }
-      })
+      v.panel(v => {
+        v.breadcrumbs(v => {
+          v.a('Home', { href: '/' })
+          v.a('Lenses', { href: '/lenses/' })
+          if (data.create) {
+            v.a('Create Lens', { href: '/lenses/create' })
+          } else {
+            v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}/` })
+            v.iconLink('3dglasses', req.params.name, { href: uri`/lenses/${req.params.user}:${req.params.name}/` })
+            v.a('Edit Lens', { href: uri`/lenses/${req.params.user}:${req.params.name}/configuration` })
+          }
+        })
 
-      v.form({ class: 'simple-form', method: 'PUT' }, v => {
         if (data.create) v.heading('Create a Lens')
         else v.heading(`Editing Lens “${req.params.name}”`)
 

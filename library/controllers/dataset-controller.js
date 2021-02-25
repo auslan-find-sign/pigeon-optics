@@ -63,12 +63,12 @@ router.get('/datasets/:user\\::name/', async (req, res) => {
     const recordIDs = await dataset.listEntries(req.params.user, req.params.name)
     res.sendVibe('dataset-index', `${req.params.user}’s “${req.params.name}” Dataset`, { config, recordIDs })
   } else {
-    const records = await dataset.listEntryHashes(req.params.user, req.params.name)
+    const records = await dataset.listEntryMeta(req.params.user, req.params.name)
     codec.respond(req, res, {
       owner: req.params.user,
       name: req.params.name,
       config,
-      records: Object.fromEntries(Object.entries(records).map(([key, value]) => [uri`/datasets/${req.params.user}:${req.params.name}/records/${key}`, value]))
+      records
     })
   }
 })

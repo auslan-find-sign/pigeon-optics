@@ -10,6 +10,13 @@ const uri = require('encodeuricomponent-tag')
  */
 module.exports = (req, record) => {
   return layout(req, v => {
+    if (req.owner) {
+      v.panelTabs(
+        { label: 'View', href: uri`/datasets/${req.params.user}:${req.params.name}/records/${req.params.recordID}`, current: true },
+        { label: 'Edit', href: uri`/datasets/${req.params.user}:${req.params.name}/records/${req.params.recordID}?edit=1` }
+      )
+    }
+
     v.panel(v => {
       v.breadcrumbs(v => {
         v.a('Home', { href: '/' })
@@ -20,12 +27,7 @@ module.exports = (req, record) => {
       })
 
       v.heading(`Record ID: ${req.params.recordID}`)
-      if (req.owner) {
-        v.flexRow(v => {
-          v.flexSpacer(5)
-          v.button('Edit', { href: uri`/datasets/${req.params.user}:${req.params.name}/records/${req.params.recordID}?edit=1` })
-        })
-      }
+
       v.sourceCode(codec.json.encode(record, 2))
     })
   })

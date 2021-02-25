@@ -1,21 +1,21 @@
 :root {
   --bg: hsl(150, 3%, 12%);
   --fg: hsl(150, 10%, 80%);
+  --bg-panel: hsl(130, 5%, 53%);
+  --fg-panel: hsl(0deg, 0%, 20%)
 }
 
-nav {
+nav.global-nav {
   background-color: hsl(130, 5%, 53%);
   box-shadow: 0 -1px 2.5px hsla(115, 42%, 84%, 0.5);
 }
-nav a:hover, nav a.button:hover {
+nav.global-nav a:hover, nav.global-nav a.button:hover {
   background-color: hsl(203, 6%, 26%);
   color: rgb(177, 190, 202);
 }
 
 div.panel {
-  background-color: hsl(130, 5%, 53%);
   box-shadow: 0 -1px 2.5px hsla(115, 42%, 84%, 0.5);
-  color: hsl(0deg, 0%, 20%);
 }
 
 footer a {

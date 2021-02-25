@@ -5,8 +5,9 @@
   --fg: hsl(150, 3%, 12%);
   --fg-link: hsl(150, 5%, 6%);
   --fg-link-underline: hsl(150, 3%, 12%, 50%);
-  --bg: hsl(147, 23%, 92%);
-  --bg-panel: 
+  --fg-panel: var(--fg);
+  --bg: rgb(230, 239, 234);
+  --bg-panel: white;
 }
 
 * {
@@ -25,7 +26,7 @@ a {
   color: var(--fg-link);
   text-decoration: underline;
   text-decoration-style: dotted;
-  text-decoration-color: var(--fg-link-underline); 
+  text-decoration-color: var(--fg-link-underline);
 }
 
 a svg.icon {
@@ -124,7 +125,7 @@ h5.heading { font-size: 17pt; font-weight: 400; }
 h6.heading { font-size: 15pt; font-weight: 450; }
 
 /* navigation heading */
-nav {
+nav.global-nav {
   display: flex;
   background-color: white;
   border-radius: 1em;
@@ -136,7 +137,7 @@ nav {
   align-items: center;
 }
 
-nav a, nav a.button {
+nav.global-nav a, nav.global-nav a.button {
   margin: 0 1ex;
   text-decoration: none;
   color: hsl(0deg, 0%, 20%);
@@ -147,18 +148,19 @@ nav a, nav a.button {
   border: 0 none;
 }
 
-nav a.button svg {
+nav.global-nav a.button svg {
   height: 1.2em;
   width: 1.7em;
 }
 
-nav a:hover, nav a.button:hover {
+nav.global-nav a:hover, nav.global-nav a.button:hover {
   background-color: hsl(203, 33%, 95%);
 }
 
 /* panels */
 div.panel {
-  background-color: white;
+  background-color: var(--bg-panel);
+  color: var(--fg-panel);
   border-radius: 1ex;
   box-shadow: 0 1px 2.5px rgba(0, 0, 0, 30%);
   padding: 1em;
@@ -168,27 +170,69 @@ div.panel > h1 {
   color: inherit;
   font-weight: 200;
   font-style: italic;
-  margin: 0 0 3mm 0;
+  margin-bottom: 3mm;
+}
+
+nav.panel-tabs {
+  display: flex;
+  padding: 0.5ex 2ex 0 2ex;
+  margin: 0;
+  justify-content: center;
+  box-shadow: inset 0px -1px 3px rgba(0, 0, 0, 10%);
+}
+
+nav.panel-tabs > a {
+  display: block;
+  border-radius: 0.5ex 0.5ex 0 0;
+  background-color: var(--bg-panel);
+  box-shadow: 0.5px -1px 1px rgba(0, 0, 0, 30%),
+        inset 0 -1px 2px rgba(0, 0, 0, 30%);
+  opacity: 0.5;
+  padding: 0 1.5ex;
+  margin: 0 1.5ex;
+}
+
+nav.panel-tabs > a[aria-current], nav.panel-tabs > a:hover {
+  background-color: var(--bg-panel);
+  box-shadow: 0.5px -1px 1px rgba(0, 0, 0, 30%);
+  opacity: 1.0;
 }
 
 /* breadcrumb trails */
-div.breadcrumbs { display: block; }
-div.breadcrumbs > * {
+nav.breadcrumbs {
+  display: block;
+}
+nav.breadcrumbs > * {
   display: inline-block;
 }
-div.breadcrumbs > *:not(:last-child) {
+nav.breadcrumbs > *:not(:last-child) {
   margin-right: 1.8ex;
 }
-div.breadcrumbs > a svg {
+nav.breadcrumbs > a svg {
   margin-right: 0.5ex;
   vertical-align: -10%;
 }
-div.breadcrumbs > *:not(:last-child)::after {
+nav.breadcrumbs > *:not(:last-child)::after {
   position: absolute;
   content: "‣";
   opacity: 0.5;
   padding: 0 0.5ex;
   text-decoration: none;
+}
+
+div.panel-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: -2ex;
+}
+
+div.panel-actions > * {
+  display: block;
+  border-radius: 1em;
+  background-color: var(--bg-panel);
+  box-shadow: 0 0 0.5ex rgba(0, 0, 0, 60%);
+  border: 0 none;
+  margin: 0 1ex 0 1ex;
 }
 
 form > dl > dt {
@@ -228,7 +272,7 @@ form > button[type="submit"] {
   --operator: #abb2bf;
   --punctual: #ccc;
   --fn-name:  #3193c6;
-  
+
   line-height: 1.3;
   border-radius: 2mm;
   overflow-x: scroll;
@@ -328,5 +372,3 @@ form > button[type="submit"] {
   box-shadow: 0 2mm 3mm rgba(0, 0, 0, 20%);
   padding: 2mm 2mm 2mm 2mm;
 }
-
-

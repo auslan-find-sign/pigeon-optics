@@ -9,8 +9,23 @@ const uri = require('encodeuricomponent-tag')
  */
 module.exports = (req, data, error = null) => {
   return layout(req, v => {
-    v.panel(v => {
-      v.form({ method: 'PUT' }, v => {
+    v.form({ method: 'PUT' }, v => {
+      if (req.owner) {
+        v.panelTabs(
+          { label: 'View', href: uri`/datasets/${req.params.user}:${req.params.name}/records/${req.params.recordID}` },
+          { label: 'Edit', href: uri`/datasets/${req.params.user}:${req.params.name}/records/${req.params.recordID}?edit=1`, current: true }
+        )
+      }
+
+      v.panel(v => {
+        v.breadcrumbs(v => {
+          v.a('Home', { href: '/' })
+          v.a('Datasets', { href: '/datasets/' })
+          v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}` })
+          v.iconLink('cassette', req.params.name, { href: uri`/datasets/${req.params.user}:${req.params.name}/` })
+          v.iconLink('newspaper', req.params.recordID, { href: uri`/datasets/${req.params.user}:${req.params.name}/records/${req.params.recordID}` })
+        })
+
         if (data.create) {
           v.heading('Create Dataset Record')
         } else {
@@ -34,13 +49,12 @@ module.exports = (req, data, error = null) => {
             v.sourceCodeEditor('recordData', 'json5', data.recordData)
           })
         })
-
-        v.flexRow(v => {
-          v.flexSpacer(5)
-          if (!data.create) v.button('Delete', { type: 'submit', formmethod: 'DELETE', formaction: uri`/datasets/${req.params.user}:${req.params.name}/records/${data.recordID}` })
-          v.button('Save', { type: 'submit' })
-        })
       })
+
+      v.panelActions(
+        !data.create && { label: 'Delete', attributes: { type: 'submit', formmethod: 'DELETE', formaction: uri`/datasets/${req.params.user}:${req.params.name}/records/${data.recordID}` } },
+        { label: 'Save', attributes: { type: 'submit' } }
+      )
     })
   })
 }

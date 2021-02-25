@@ -3,7 +3,7 @@ const pkg = require('../../package.json')
 
 module.exports = (req, block) => {
   return async v => {
-    v.nav(v => {
+    v.nav({ class: 'global-nav' }, v => {
       // pigeon optics icon
       v.a({ href: '/', class: 'home-icon' }, v => v.img({ src: '/design/icon.svg', alt: pkg.defaults.title, style: { height: '1.5em' } }))
       v.flexSpacer(1)

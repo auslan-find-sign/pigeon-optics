@@ -8,9 +8,9 @@ const layout = require('./layout')
  */
 module.exports = (req, data, error = null) => {
   return layout(req, v => {
-    v.panel(v => {
-      v.form({ method: 'POST' }, v => {
-        v.heading('Login to Datasets')
+    v.form({ method: 'POST' }, v => {
+      v.panel(v => {
+        v.heading('Login to Pigeon Optics')
 
         v.hiddenFormData(Object.fromEntries(Object.entries(data).filter(([key]) => key !== 'username' && key !== 'password')))
 
@@ -29,13 +29,12 @@ module.exports = (req, data, error = null) => {
           v.dt('Password')
           v.dd(v => v.input({ name: 'password', value: data.password || '', type: 'password', minlength: 8, maxlength: 500 }))
         })
-
-        v.flexRow(v => {
-          v.flexSpacer(5)
-          v.button('Register', { type: 'submit', name: 'register', value: 'true' })
-          v.button('Login', { type: 'submit', name: 'login', value: 'true' })
-        })
       })
+
+      v.panelActions(
+        { label: 'Register', attributes: { type: 'submit', name: 'register', value: 'true' } },
+        { label: 'Login', attributes: { type: 'submit', name: 'login', value: 'true' } }
+      )
     })
   })
 }

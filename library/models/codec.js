@@ -54,8 +54,8 @@ module.exports.json = {
           return new Attachment(Buffer.from(value.data, 'base64'), value.mimeType)
         } else if (value.class === 'AttachmentReference') {
           return new AttachmentReference(value.hash, value.mimeType)
-        } else if (typeof value.bufferBase64 === 'string') {
-          return Buffer.from(value.bufferBase64, 'base64')
+        } else if (value.type === 'Buffer' && Array.isArray(value.data)) {
+          return Buffer.from(value)
         }
       }
       return value
@@ -82,8 +82,6 @@ module.exports.json = {
         } else {
           return { class: value.constructor.name, hash: value.hash.toString('hex').toLowerCase(), mimeType: value.mimeType }
         }
-      } else if (Buffer.isBuffer(value)) {
-        return { bufferBase64: value.toString('base64') }
       } else {
         return value
       }
@@ -220,10 +218,13 @@ module.exports.respond = async (req, res, object) => {
       res.write(null)
     } else {
       Vibe.docStream('API Object Response Stream', layout(req, async v => {
-        v.heading('API Object Response Stream:')
-        for await (const entry of object) {
-          v.sourceCode(module.exports.json.encode(entry, 2))
-        }
+        await v.panel(async v => {
+          v.heading('API Object Response Stream:')
+
+          for await (const entry of object) {
+            v.sourceCode(module.exports.json.encode(entry, 2))
+          }
+        })
       })).pipe(res)
     }
   } else {
@@ -233,8 +234,10 @@ module.exports.respond = async (req, res, object) => {
       res.type(bestMatch).send(module.exports.json.encode(object))
     } else {
       Vibe.docStream('API Object Response', layout(req, v => {
-        v.heading('API Object Response:')
-        v.sourceCode(module.exports.json.encode(object, 2))
+        v.panel(v => {
+          v.heading('API Object Response:')
+          v.sourceCode(module.exports.json.encode(object, 2))
+        })
       })).pipe(res)
     }
   }

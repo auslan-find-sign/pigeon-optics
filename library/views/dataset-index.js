@@ -21,10 +21,12 @@ module.exports = (req, { config, recordIDs }) => {
       if (config.memo) v.p(config.memo)
       v.heading('Records:', { level: 3 })
       v.linkList(recordIDs, id => uri`/datasets/${req.params.user}:${req.params.name}/records/${id}`)
-
-      if (req.owner) {
-        v.button('Add Record', { href: uri`/datasets/${req.params.user}:${req.params.name}/create-record` })
-      }
     })
+
+    if (req.owner) {
+      v.panelActions(
+        { label: 'Add Record', attributes: { href: uri`/datasets/${req.params.user}:${req.params.name}/create-record` } }
+      )
+    }
   })
 }

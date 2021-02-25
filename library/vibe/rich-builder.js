@@ -246,7 +246,8 @@ class RichVibeBuilder extends VibeBuilder {
     if (!attribs.class) attribs.class = []
     if (!Array.isArray(attribs.class)) attribs.class = [attribs.class]
     attribs.class.push('breadcrumbs')
-    this.div(...args, v => {
+    attribs.ariaLabel = 'Breadcrumbs'
+    return this.nav(...args, v => {
       for (const block of blocks) {
         block.call(v, v)
       }
@@ -258,19 +259,31 @@ class RichVibeBuilder extends VibeBuilder {
     if (!attribs.class) attribs.class = []
     if (!Array.isArray(attribs.class)) attribs.class = [attribs.class]
     attribs.class.push('panel')
-    this.div(...args)
+    return this.div(...args)
   }
 
-  panelTabs (...args) {
-    const attribs = getAttribs(args)
-    appendClass(attribs, 'panel-tabs')
-    this.div(...args)
+  // given a list of objects, generates a panel tab bar heading
+  panelTabs (...list) {
+    this.nav({ class: 'panel-tabs', role: 'tablist' }, v => {
+      for (const entry of list) {
+        if (!entry) continue
+
+        const attribs = entry.current ? { ariaCurrent: 'page', role: 'tab' } : { role: 'tab' }
+        if (entry.icon) v.iconLink(entry.icon, entry.label, { href: entry.href, ...attribs })
+        else v.a(entry.label, { href: entry.href, ...attribs })
+      }
+    })
   }
 
   panelActions (...args) {
-    const attribs = getAttribs(args)
-    appendClass(attribs, 'panel-actions')
-    this.div(...args)
+    this.div({ class: 'panel-actions' }, v => {
+      for (const entry of args) {
+        if (!entry) continue
+
+        if (entry.icon) v.iconButton(entry.icon, entry.label, entry.attributes || {})
+        else v.button(entry.label, entry.attributes || {})
+      }
+    })
   }
 
   // emits an ACE editor component, hooked up to work inside a form, configured for javascript highlighting

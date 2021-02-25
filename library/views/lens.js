@@ -9,15 +9,13 @@ const uri = require('encodeuricomponent-tag')
  */
 module.exports = (req, config, records) => {
   return layout(req, v => {
-    v.panel(v => {
-      v.panelTabs(v => {
-        v.a('Lens', { href: uri`/lenses/${req.params.user}:${req.params.name}/` })
-        if (req.owner) {
-          v.a('Edit', { href: uri`/lenses/${req.params.user}:${req.params.name}/configuration` })
-        }
-        v.a('Logs', { href: uri`/lenses/${req.params.user}:${req.params.name}/logs` })
-      })
+    v.panelTabs(
+      { label: 'Lens', href: uri`/lenses/${req.params.user}:${req.params.name}/`, current: true },
+      req.owner && { label: 'Edit', href: uri`/lenses/${req.params.user}:${req.params.name}/configuration` },
+      { label: 'Logs', href: uri`/lenses/${req.params.user}:${req.params.name}/logs` }
+    )
 
+    v.panel(v => {
       v.breadcrumbs(v => {
         v.a('Home', { href: '/' })
         v.a('Lenses', { href: '/lenses/' })
@@ -28,14 +26,6 @@ module.exports = (req, config, records) => {
       v.heading(`Lens ${req.params.user}:${req.params.name}`)
       if (config.memo) {
         v.p(config.memo)
-      }
-
-      if (req.session.auth) {
-        v.flexRow(v => {
-          v.flexSpacer(5)
-          if (req.owner) v.button('Edit', { href: uri`/lenses/${req.params.user}:${req.params.name}/configuration` })
-          v.button('Clone', { href: uri`/lenses/create?clone=${req.params.user}:${req.params.name}` })
-        })
       }
 
       v.p(v => {
@@ -59,5 +49,9 @@ module.exports = (req, config, records) => {
       v.heading('Records:', { level: 3 })
       v.linkList(records, name => uri`/lenses/${req.params.user}:${req.params.name}/records/${name}`)
     })
+
+    if (req.session.auth) {
+      v.panelActions({ label: 'Clone', attributes: { href: uri`/lenses/create?clone=${req.params.user}:${req.params.name}` } })
+    }
   })
 }
