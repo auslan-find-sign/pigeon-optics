@@ -10,6 +10,21 @@ const uri = require('encodeuricomponent-tag')
 module.exports = (req, config, records) => {
   return layout(req, v => {
     v.panel(v => {
+      v.panelTabs(v => {
+        v.a('Lens', { href: uri`/lenses/${req.params.user}:${req.params.name}/` })
+        if (req.owner) {
+          v.a('Edit', { href: uri`/lenses/${req.params.user}:${req.params.name}/configuration` })
+        }
+        v.a('Logs', { href: uri`/lenses/${req.params.user}:${req.params.name}/logs` })
+      })
+
+      v.breadcrumbs(v => {
+        v.a('Home', { href: '/' })
+        v.a('Lenses', { href: '/lenses/' })
+        v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}/` })
+        v.iconLink('3dglasses', req.params.name, { href: uri`/lenses/${req.params.user}:${req.params.name}/` })
+      })
+
       v.heading(`Lens ${req.params.user}:${req.params.name}`)
       if (config.memo) {
         v.p(config.memo)

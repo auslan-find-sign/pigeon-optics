@@ -19,7 +19,7 @@ const queueify = require('../utility/queueify')
 
 const readPath = require('./read-path')
 const auth = require('./auth')
-const dataset = require('./dataset')
+const dataset = Object.getPrototypeOf(require('./dataset'))
 
 // Setup a VM for executing javascript lenses
 const Isolate = new ivm.Isolate({ memoryLimit: 64 })
@@ -28,7 +28,7 @@ const codecIvmCode = fs.readFileSync(require.resolve('./codec-lite.ivm.js')).toS
 const codecScript = Isolate.compileScriptSync(codecIvmCode)
 
 Object.assign(exports, queueify.object({
-  ...Object.getPrototypeOf(dataset), // import dataset functions
+  ...dataset, // import dataset functions
 
   // resolve path inside this - override with viewports path in user folder
   path (user, ...path) {
@@ -36,7 +36,7 @@ Object.assign(exports, queueify.object({
   },
 
   async validateConfig (config) {
-    dataset.validateConfig(config)
+    await dataset.validateConfig(config)
     assert(['webhook', 'javascript', 'remote'].includes(config.mapType), 'map type must be javascript, webhook, or remote')
     assert(typeof config.mapCode === 'string', 'map code must be a string')
     assert(typeof config.reduceCode === 'string', 'reduce code must be a string')
@@ -47,66 +47,112 @@ Object.assign(exports, queueify.object({
     }
   },
 
-  // (re)build a specified viewport
-  async build (user, lens) {
+  // iterates through logs and errors in lens's last build
+  async * iterateLogs (user, lens) {
+    for await (const filename of file.list(this.path(user, lens, 'map-cache'))) {
+      const mapResult = await file.read(this.path(user, lens, 'map-cache', filename))
+      const { input, error, logs } = mapResult
+      yield { input, error, logs }
+    }
+  },
+
+  // (re)build map outputs
+  async buildMapOutputs (user, lens) {
     const config = await this.readConfig(user, lens)
-    const resultsMap = {}
+    const userMapFunc = await this.loadMapFunction(config)
+    const outputs = new Set()
 
-    // run the map over the whole dataset, transforming to map output objects on disk
-    const mapFn = await this.loadMapFunction(config)
-
-    // wrap it with a caching system so same hashed inputs skip running
-    const path = this.path
-    const usedInputHashKeys = [] // keep track of which cache entries are still in use in the output
-    let mapOutputIndex = {}
-    if (await file.exists(path(user, lens, 'map-outputs', 'index'))) {
-      mapOutputIndex = await file.read(path(user, lens, 'map-outputs', 'index'))
-    }
-    async function * cacheMaps (inputs) {
-      for await (const entry of inputs) {
-        const inputHash = codec.objectHash({ input: entry, mapCode: config.mapCode })
-        const inputHashString = inputHash.toString('hex')
-        if (mapOutputIndex[inputHashString]) {
-          for (const [recordID, recordHash] of mapOutputIndex[inputHashString]) {
-            if (!resultsMap[recordID]) resultsMap[recordID] = []
-            resultsMap[recordID].push(recordHash)
-          }
-          usedInputHashKeys.push(inputHashString)
-        } else {
-          // if cache hit failed, yield the entry to the map function to process
-          yield entry
+    for await (const meta of readPath.meta(config.inputs)) {
+      const mixHash = codec.objectHash({ input: meta.hash, code: config.mapCode })
+      const cachePath = this.path(user, lens, 'map-cache', mixHash.toString('hex').toLowerCase())
+      outputs.add(mixHash.toString('hex').toLowerCase())
+      if (!await file.exists(cachePath)) {
+        const input = {
+          path: meta.path,
+          data: await meta.read()
         }
-      }
-    }
-
-    for await (const { input, outputs, logs } of mapFn(cacheMaps(readPath(config.inputs)))) {
-      const inputHash = codec.objectHash({ input, mapCode: config.mapCode })
-      const inputHashString = inputHash.toString('hex')
-
-      const indexEntry = mapOutputIndex[inputHashString] = []
-      for (const [recordID, recordData] of outputs) {
-        const recordHash = codec.objectHash(recordData)
-        await file.write(this.path(user, lens, 'map-output', recordHash.toString('hex')), recordData)
-        indexEntry.push([recordID, recordHash])
-        if (!resultsMap[recordID]) resultsMap[recordID] = []
-        resultsMap[recordID].push(recordHash)
-      }
-    }
-
-    // reduce the results using the merge function in to entries in this viewport dataset
-    const reduceFn = await this.loadReduceFunction(config)
-    async function * entryIter () {
-      const read = async (hash) => file.read(module.exports.path(user, lens, 'map-output', hash.toString('hex')))
-      for (const [recordID, recordHashList] of Object.entries(resultsMap)) {
-        let recordData = await read(recordHashList.shift())
-        while (recordHashList.length) {
-          recordData = await reduceFn(recordData, await read(recordHashList.shift()))
+        let output
+        const logs = []
+        const logger = (type, ...args) => logs.push({ timestamp: Date.now(), type, args })
+        try {
+          output = await userMapFunc(input, logger)
+          output.error = false
+          output.logs = logs
+        } catch (err) {
+          output = { input, outputs: [], error: err.stack, logs }
         }
-        yield [recordID, recordData]
+        await file.write(cachePath, output)
       }
     }
 
-    await this.overwrite(user, lens, entryIter())
+    // garbage collect
+    for await (const filename of file.list(this.path(user, lens, 'map-cache'))) {
+      if (!outputs.has(filename)) {
+        file.delete(this.path(user, lens, 'map-cache', filename))
+      }
+    }
+  },
+
+  // (re)builds new version of lens dataset output by reducing map output cache
+  async buildReducedVersion (user, lens) {
+    const config = await this.readConfig(user, lens)
+    // index the map-cache by recordIDs
+    const idMap = {}
+    const errorMap = {}
+    for await (const filename of file.list(this.path(user, lens, 'map-cache'))) {
+      const mapResult = await file.read(this.path(user, lens, 'map-cache', filename))
+      const { input, outputs, error } = mapResult
+      if (!error) {
+        outputs.forEach(([recordID, data], index) => {
+          if (!idMap[recordID]) idMap[recordID] = []
+          idMap[recordID].push({ filename, index })
+        })
+      } else {
+        errorMap[input] = error
+      }
+    }
+
+    const userReduceFunction = await this.loadReduceFunction(config)
+
+    // build each output
+    const snapshot = await this.readVersion(user, lens)
+    const records = {}
+    let changed = false
+    const objectsInUse = new Set()
+    for (const [recordID, locations] of Object.entries(idMap)) {
+      let output
+      for (const { filename, index } of locations) {
+        const mapResult = await file.read(this.path(user, lens, 'map-cache', filename))
+        const nextOutput = mapResult.outputs[index][1]
+        if (output === undefined) output = nextOutput
+        else output = await userReduceFunction(output, nextOutput)
+      }
+
+      const hash = await this.writeObject(user, lens, output)
+      objectsInUse.add(hash.toString('hex').toLowerCase())
+      if (!snapshot.records[recordID] || !hash.equals(snapshot.records[recordID].hash)) {
+        records[recordID] = { hash }
+        changed = true
+      } else {
+        records[recordID] = snapshot.records[recordID]
+      }
+    }
+
+    // if something changed, save out a new version
+    if (changed) {
+      await this.writeVersion(user, lens, {
+        ...snapshot,
+        records
+      })
+
+      if (config.garbageCollect) await this.garbageCollect(user, lens)
+    }
+  },
+
+  // (re)build a specified lens
+  async build (user, lens) {
+    await this.buildMapOutputs(user, lens)
+    await this.buildReducedVersion(user, lens)
   },
 
   /**
@@ -118,7 +164,7 @@ Object.assign(exports, queueify.object({
    * if set, logger must be a function which accepts logger('log'|'info'|'error'|'warn', ...args) and is
    * otherwise similar to console.log/warn/error etc
    * @typedef {function} LensMapFunction
-   * @param {async function*} iterator - async iterator that yields [recordPath, recordData] to process
+   * @param {object} object with path, and data properties
    * @param {null|function} logger - optional logger function accepts same input as console.log but first arg is info|warn|log|error string
    */
 
@@ -128,60 +174,56 @@ Object.assign(exports, queueify.object({
    * @async
    */
   async loadMapFunction (config) {
-    return async function * (iterator, logger = null) {
-      for await (const input of iterator) {
-        const [recordPath, recordData] = input
-        const context = await Isolate.createContext()
-        const outputs = []
-        const logs = []
+    return async function userMapFunction (input, logger = null) {
+      const { path, data } = input
+      const context = await Isolate.createContext()
+      const outputs = []
 
-        // Adjust the jail to have a console.log/warn/error/info api, and to remove some non-deterministic features
-        const log = (type, ...args) => {
-          console.info(`Lens ${config.user}:${config.name}/map console.${type}:`, ...args)
-          if (logger) logger(type, ...args)
-          logs.push({ type, timestamp: Date.now(), args })
-        }
-        const emit = (key, recordData) => {
-          outputs.push([key, codec.cloneable.decode(recordData)])
-        }
-
-        // load embedded codec library
-        await codecScript.run(context)
-
-        // run user script with data
-        const lines = [
-          'const path = $0.copySync();',
-          'const data = codec.cloneable.decode($1.copySync());',
-          'Math.random = function () { throw new Error("Math.random() is non-deterministic and disallowed") };',
-          'function output(key, recordData) {',
-          '  if (typeof key !== "string") throw new Error("first argument key must be a string");',
-          '  if (recordData === null || recordData === undefined) throw new Error("second argument recordData must not be null or undefined");',
-          '  $3.applySync(undefined, [key, codec.cloneable.encode(recordData)], { arguments: { copy: true } })',
-          '};',
-          'const console = Object.freeze(Object.fromEntries(["log", "warn", "error", "info"].map(kind => {',
-          '  return [kind, (...args) => $2.applyIgnored(undefined, [kind, ...args], { arguments: { copy: true } })]',
-          '})));',
-          '{',
-          'const $0 = undefined, $1 = undefined, $2 = undefined, $3 = undefined',
-          config.mapCode,
-          '}'
-        ]
-        const pathInfo = {
-          string: recordPath,
-          params: codec.path.decode(recordPath)
-        }
-        await context.evalClosure(lines.join('\n'), [pathInfo, codec.cloneable.encode(recordData), log, emit], {
-          timeout: defaults.lensTimeout,
-          arguments: { reference: true },
-          filename: `${defaults.url}/lenses/${config.user}:${config.name}/functions/map.js`,
-          lineOffset: (-lines.length)
-        })
-
-        // ask v8 to free this context's memory
-        context.release()
-
-        yield { input, outputs, logs }
+      // Adjust the jail to have a console.log/warn/error/info api, and to remove some non-deterministic features
+      const log = (type, ...args) => {
+        console.info(`Lens ${config.user}:${config.name}/map console.${type}:`, ...args)
+        if (logger) logger(type, ...args)
       }
+      const emit = (key, recordData) => {
+        outputs.push([key, codec.cloneable.decode(recordData)])
+      }
+
+      // load embedded codec library
+      await codecScript.run(context)
+
+      // run user script with data
+      const lines = [
+        'const path = $0.copySync();',
+        'const data = codec.cloneable.decode($1.copySync());',
+        'Math.random = function () { throw new Error("Math.random() is non-deterministic and disallowed") };',
+        'function output(key, recordData) {',
+        '  if (typeof key !== "string") throw new Error("first argument key must be a string");',
+        '  if (recordData === null || recordData === undefined) throw new Error("second argument recordData must not be null or undefined");',
+        '  $3.applySync(undefined, [key, codec.cloneable.encode(recordData)], { arguments: { copy: true } })',
+        '};',
+        'const console = Object.freeze(Object.fromEntries(["log", "warn", "error", "info"].map(kind => {',
+        '  return [kind, (...args) => $2.applyIgnored(undefined, [kind, ...args], { arguments: { copy: true } })]',
+        '})));',
+        '{',
+        'const $0 = undefined, $1 = undefined, $2 = undefined, $3 = undefined',
+        config.mapCode,
+        '}'
+      ]
+      const pathInfo = {
+        string: path,
+        ...codec.path.decode(path)
+      }
+      await context.evalClosure(lines.join('\n'), [pathInfo, codec.cloneable.encode(data), log, emit], {
+        timeout: defaults.lensTimeout,
+        arguments: { reference: true },
+        filename: `${defaults.url}/lenses/${config.user}:${config.name}/functions/map.js`,
+        lineOffset: (-lines.length)
+      })
+
+      // ask v8 to free this context's memory
+      context.release()
+
+      return { input: path, outputs }
     }
   },
 
@@ -191,7 +233,7 @@ Object.assign(exports, queueify.object({
    * @returns {async function} - function accepts two entries and returns one
    */
   async loadReduceFunction (config) {
-    return async function (left, right) {
+    return async function userReduceFunction (left, right) {
       const context = await Isolate.createContext()
       // load embedded codec library
       await codecScript.run(context)

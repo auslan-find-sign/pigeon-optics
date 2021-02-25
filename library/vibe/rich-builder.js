@@ -261,6 +261,18 @@ class RichVibeBuilder extends VibeBuilder {
     this.div(...args)
   }
 
+  panelTabs (...args) {
+    const attribs = getAttribs(args)
+    appendClass(attribs, 'panel-tabs')
+    this.div(...args)
+  }
+
+  panelActions (...args) {
+    const attribs = getAttribs(args)
+    appendClass(attribs, 'panel-actions')
+    this.div(...args)
+  }
+
   // emits an ACE editor component, hooked up to work inside a form, configured for javascript highlighting
   sourceCodeEditor (name, language, code, options = {}) {
     if (!this.__aceEditorPackageIncluded) {
@@ -281,7 +293,7 @@ class RichVibeBuilder extends VibeBuilder {
         maxLines: 30,
         minLines: 2,
         tabSize: 2,
-        esversion: 9,
+        esVersion: 9,
         ...(options.ace || {})
       }
     }

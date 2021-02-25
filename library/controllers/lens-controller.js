@@ -5,6 +5,7 @@ const auth = require('../models/auth')
 const codec = require('../models/codec')
 const lens = require('../models/lens')
 const uri = require('encodeuricomponent-tag')
+const itToArray = require('../utility/async-iterable-to-array')
 
 // add req.owner boolean for any routes with a :user param
 router.param('user', auth.ownerParam)
@@ -84,7 +85,9 @@ router.put('/lenses/:user\\::name/configuration', auth.ownerRequired, async (req
       reduceCode: req.body.reduceCode
     })
     // rebuild since settings may have changed
+    console.log('starting build')
     await lens.build(req.session.auth.user, req.body.name)
+    console.log('build finished, sending redirect')
 
     return res.redirect(uri`/lenses/${req.params.user}:${req.params.name}/`)
   } catch (err) {
@@ -95,6 +98,16 @@ router.put('/lenses/:user\\::name/configuration', auth.ownerRequired, async (req
     }
     console.log(err.stack)
     res.sendVibe('lens-editor', 'Edit a Lens', state, err.message)
+  }
+})
+
+router.get('/lenses/:user\\::name/logs', async (req, res) => {
+  const logsIter = lens.iterateLogs(req.params.user, req.params.name)
+
+  if (req.accepts('html')) {
+    res.sendVibe('lens-log-viewer', 'Lens Logs', { mapOutputs: await itToArray(logsIter) })
+  } else {
+    codec.respond(req, res, logsIter)
   }
 })
 

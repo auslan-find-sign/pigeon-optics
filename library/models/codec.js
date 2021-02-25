@@ -213,7 +213,7 @@ module.exports.respond = async (req, res, object) => {
       let first = true
       for await (const entry of object) {
         if (!first) res.write(',\n')
-        res.write(module.exports.json.encode(entry))
+        res.write('\t' + module.exports.json.encode(entry))
         first = false
       }
       res.write('\n]\n')
