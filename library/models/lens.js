@@ -79,7 +79,8 @@ Object.assign(exports, queueify.object({
           output.error = false
           output.logs = logs
         } catch (err) {
-          output = { input, outputs: [], error: err.stack, logs }
+          const [snippedStack] = err.stack.split('at (<isolated-vm boundary>)')
+          output = { input: input.path, outputs: [], error: snippedStack, logs }
         }
         await file.write(cachePath, output)
       }
