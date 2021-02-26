@@ -72,9 +72,10 @@ class RichVibeBuilder extends VibeBuilder {
   // override button to support a href attribute, which emits an <a> link instead with the same styling
   button (...args) {
     const options = getAttribs(args)
+    appendClass(options, 'button')
+    options.role = 'button'
+
     if (options.href) {
-      appendClass(options, 'button')
-      options.role = 'button'
       this.tag('a', ...args)
     } else {
       if (options.formmethod && !['GET', 'POST'].includes(options.formmethod.toUpperCase())) {
