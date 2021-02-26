@@ -217,7 +217,7 @@ Object.assign(exports, queueify.object({
         timeout: defaults.lensTimeout,
         arguments: { reference: true },
         filename: `${defaults.url}/lenses/${config.user}:${config.name}/functions/map.js`,
-        lineOffset: (-lines.length)
+        lineOffset: (-lines.length) + 2
       })
 
       // ask v8 to free this context's memory
