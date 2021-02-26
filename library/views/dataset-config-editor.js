@@ -9,8 +9,22 @@ const uri = require('encodeuricomponent-tag')
  */
 module.exports = (req, data, error = null) => {
   return layout(req, v => {
-    v.panel(v => {
-      v.form({ class: 'simple-form', method: 'PUT', action: data.create ? '' : uri`/datasets/${req.params.user}:${req.params.name}` }, v => {
+    v.form({ class: 'simple-form', method: 'PUT', action: data.create ? '' : uri`/datasets/${req.params.user}:${req.params.name}` }, v => {
+      if (req.owner && !data.create) {
+        v.panelTabs(
+          { label: 'View', href: uri`/datasets/${req.params.user}:${req.params.name}/` },
+          { label: 'Edit', href: uri`/datasets/${req.params.user}:${req.params.name}/configuration`, current: true }
+        )
+      }
+
+      v.panel(v => {
+        v.breadcrumbs(v => {
+          v.a('Home', { href: '/' })
+          v.a('Datasets', { href: '/datasets/' })
+          v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}` })
+          v.iconLink('cassette', req.params.name, { href: uri`/datasets/${req.params.user}:${req.params.name}/` })
+        })
+
         if (data.create) {
           v.heading('Create Dataset')
         } else {
@@ -23,26 +37,18 @@ module.exports = (req, data, error = null) => {
 
         v.dl(v => {
           v.dt('Dataset Name')
-          if (data.create) {
-            v.dd(v => v.input({ name: 'name', value: data.name, minlength: 1, maxlength: 60, pattern: "[^!*'();:@&=+$,/?%#[\\]]+" }))
-          } else {
-            v.dd(data.name)
-          }
+          v.dd(v => v.input({ name: 'name', value: data.name, minlength: 1, maxlength: 60, pattern: "[^!*'();:@&=+$,/?%#[\\]]+", disabled: !data.create }))
 
           v.dt('Memo (short description)')
           v.dd(v => v.textarea(data.memo, { name: 'memo', spellcheck: 'true', wrap: 'off' }))
         })
-
-        v.flexRow(v => {
-          v.flexSpacer(5)
-          if (data.create) {
-            v.button('Create', { type: 'submit' })
-          } else {
-            v.button('Delete', { type: 'submit', formmethod: 'DELETE' })
-            v.button('Save', { type: 'submit', formmethod: 'PUT' })
-          }
-        })
       })
+
+      v.panelActions(
+        data.create && { label: 'Create', attributes: { type: 'submit' } },
+        !data.create && { label: 'Save', attributes: { type: 'submit', formmethod: 'PUT' } },
+        !data.create && { label: 'Delete', attributes: { type: 'submit', formmethod: 'DELETE' } }
+      )
     })
   })
 }

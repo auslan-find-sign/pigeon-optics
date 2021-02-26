@@ -8,6 +8,10 @@
   --fg-panel: var(--fg);
   --bg: rgb(230, 239, 234);
   --bg-panel: white;
+  --button-bg: hsl(150, 26%, 78%);
+  --button-fg: var(--fg-panel);
+  --button-hover-bg: lavender;
+  --button-hover-fg: black;
 }
 
 * {
@@ -49,21 +53,6 @@ input, textarea {
   width: 100%;
 }
 
-form button {
-  background-color: #bbbbf2;
-  border: 2px solid currentColor;
-  border-radius: .25em;
-  cursor: pointer;
-  font-size: inherit;
-  line-height: 1.4em;
-  padding: 0.25em 1em;
-  max-width: 20ch;
-}
-
-form button:hover {
-  background-color: lavender;
-}
-
 footer {
   margin-top: 3em;
   padding-top: 1.5em;
@@ -72,10 +61,10 @@ footer {
 
 /* Button styles */
 button.button, a.button {
-  --hue: 190deg;
-  background-color: hsl(var(--hue), 60%, 93%);
+  background-color: var(--button-bg);
+  color: var(--button-fg);
   border-radius: 1.5mm;
-  border: 0.75mm solid hsl(var(--hue), 80%, 50%);
+  border: 0.75mm solid var(--button-fg);
   font-size: inherit;
   font-family: inherit;
   -webkit-user-select: none;
@@ -84,7 +73,11 @@ button.button, a.button {
   padding: 0.5mm 2mm;
   margin: 2px;
   text-decoration: none;
-  color: hsl(var(--hue), 80%, 5%);
+}
+
+button.button:hover, a.button:hover {
+  --button-bg: var(--button-hover-bg);
+  --button-fg: var(--button-hover-fg);
 }
 
 button.button > .icon, a.button > .icon {
@@ -229,10 +222,10 @@ div.panel-actions {
 div.panel-actions > * {
   display: block;
   border-radius: 1em;
-  background-color: var(--bg-panel);
   box-shadow: 0 0 0.5ex rgba(0, 0, 0, 60%);
   border: 0 none;
   margin: 0 1ex 0 1ex;
+  padding: 0.5ex 2ex;
 }
 
 form > dl > dt {

@@ -10,7 +10,7 @@ const uri = require('encodeuricomponent-tag')
 module.exports = (req, data, error = null) => {
   return layout(req, v => {
     v.form({ method: 'PUT' }, v => {
-      if (req.owner) {
+      if (req.owner && !data.create) {
         v.panelTabs(
           { label: 'View', href: uri`/datasets/${req.params.user}:${req.params.name}/records/${req.params.recordID}` },
           { label: 'Edit', href: uri`/datasets/${req.params.user}:${req.params.name}/records/${req.params.recordID}?edit=1`, current: true }
@@ -23,7 +23,11 @@ module.exports = (req, data, error = null) => {
           v.a('Datasets', { href: '/datasets/' })
           v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}` })
           v.iconLink('cassette', req.params.name, { href: uri`/datasets/${req.params.user}:${req.params.name}/` })
-          v.iconLink('newspaper', req.params.recordID, { href: uri`/datasets/${req.params.user}:${req.params.name}/records/${req.params.recordID}` })
+          if (data.create) {
+            v.iconLink('newspaper', 'Add Record', { href: uri`/datasets/${req.params.user}:${req.params.name}/create-record` })
+          } else {
+            v.iconLink('newspaper', req.params.recordID, { href: uri`/datasets/${req.params.user}:${req.params.name}/records/${req.params.recordID}` })
+          }
         })
 
         if (data.create) {
@@ -52,8 +56,8 @@ module.exports = (req, data, error = null) => {
       })
 
       v.panelActions(
-        !data.create && { label: 'Delete', attributes: { type: 'submit', formmethod: 'DELETE', formaction: uri`/datasets/${req.params.user}:${req.params.name}/records/${data.recordID}` } },
-        { label: 'Save', attributes: { type: 'submit' } }
+        { label: 'Save', attributes: { type: 'submit' } },
+        !data.create && { label: 'Delete', attributes: { type: 'submit', formmethod: 'DELETE', formaction: uri`/datasets/${req.params.user}:${req.params.name}/records/${data.recordID}` } }
       )
     })
   })

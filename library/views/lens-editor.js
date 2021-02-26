@@ -83,6 +83,15 @@ module.exports = (req, data, error = null) => {
           }
         })
       })
+
+      if (data.create) {
+        v.panelActions({ label: 'Create', attributes: { type: 'submit' } })
+      } else {
+        v.panelActions(
+          { label: 'Save', attributes: { type: 'submit' } },
+          { label: 'Delete', attributes: { type: 'submit', formaction: 'DELETE' } }
+        )
+      }
     })
   })
 }

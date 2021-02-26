@@ -9,6 +9,13 @@ const uri = require('encodeuricomponent-tag')
  */
 module.exports = (req, { config, recordIDs }) => {
   return layout(req, v => {
+    if (req.owner) {
+      v.panelTabs(
+        { label: 'View', href: uri`/datasets/${req.params.user}:${req.params.name}/`, current: true },
+        { label: 'Edit', href: uri`/datasets/${req.params.user}:${req.params.name}/configuration` }
+      )
+    }
+
     v.panel(v => {
       v.breadcrumbs(v => {
         v.a('Home', { href: '/' })
