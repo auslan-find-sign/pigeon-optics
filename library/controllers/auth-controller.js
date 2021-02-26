@@ -25,8 +25,8 @@ router.all('/auth', async (req, res) => {
   }
 
   const form = {
-    ...req.body || {},
-    return: req.query.return || req.get('Referrer') || '/'
+    return: req.query.return || req.get('Referrer') || '/',
+    ...req.body || {}
   }
   res.sendVibe('login', 'Login', form, error)
 })

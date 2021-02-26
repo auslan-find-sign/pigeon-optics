@@ -12,7 +12,9 @@ module.exports = (req, data, error = null) => {
       v.panel(v => {
         v.heading('Login to Pigeon Optics')
 
-        v.hiddenFormData(Object.fromEntries(Object.entries(data).filter(([key]) => key !== 'username' && key !== 'password')))
+        if (data.return) {
+          v.hiddenFormData({ return: data.return })
+        }
 
         v.p(v => {
           v.text('Login or register an account here')
@@ -32,8 +34,8 @@ module.exports = (req, data, error = null) => {
       })
 
       v.panelActions(
-        { label: 'Register', attributes: { type: 'submit', name: 'register', value: 'true' } },
-        { label: 'Login', attributes: { type: 'submit', name: 'login', value: 'true' } }
+        { label: 'Login', attributes: { type: 'submit', name: 'login', value: 'true' } },
+        { label: 'Register', attributes: { type: 'submit', name: 'register', value: 'true' } }
       )
     })
   })
