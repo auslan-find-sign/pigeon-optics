@@ -17,13 +17,9 @@ const getAttribs = (args) => {
  * @param {*} attributes - attributes object
  * @param {*} className - className string to append
  */
-const appendClass = (attributes, className) => {
-  if (Array.isArray(className)) className = className.join(' ')
-  if (attributes.class) {
-    attributes.class += ` ${className}`
-  } else {
-    attributes.class = `${className}`
-  }
+const appendClass = (attributes, ...classNames) => {
+  if (!Array.isArray(attributes.class)) attributes.class = [attributes.class].flat().filter(x => typeof x === 'string')
+  attributes.class.push(...classNames)
 }
 
 class RichVibeBuilder extends VibeBuilder {
@@ -72,27 +68,17 @@ class RichVibeBuilder extends VibeBuilder {
   // override button to support a href attribute, which emits an <a> link instead with the same styling
   button (...args) {
     const options = getAttribs(args)
-    appendClass(options, 'button')
-    options.role = 'button'
 
     if (options.href) {
+      options.role = 'button'
       this.tag('a', ...args)
     } else {
       if (options.formmethod && !['GET', 'POST'].includes(options.formmethod.toUpperCase())) {
-        if (!options.name) {
-          // rewrite this button to provide the method
-          options.name = '_method'
-          options.value = options.formmethod.toUpperCase()
-        } else {
-          // rewrite the formaction
-          const containerForm = (this.forms || []).slice(-1)[0]
-          const action = options.formaction || containerForm.action || ''
-          if (action.includes('?')) {
-            options.formaction = action + uri`&_method=${options.formmethod.toUpperCase()}`
-          } else {
-            options.formaction = action + uri`?_method=${options.formmethod.toUpperCase()}`
-          }
-        }
+        const containerForm = (this.forms || []).slice(-1)[0]
+        const [action, ...qs] = (options.formaction || containerForm.action || '').split('?')
+        const searchParams = new URLSearchParams(qs.join('?'))
+        searchParams.set('_method', options.formmethod.toUpperCase())
+        options.formaction = `${action}?${searchParams}`
         options.formmethod = 'POST'
       }
 
@@ -107,18 +93,21 @@ class RichVibeBuilder extends VibeBuilder {
     this.forms.push(options) // store parent forms for button rewriting functionality
 
     if (options.method && !['GET', 'POST'].includes(options.method.toUpperCase())) {
-      if (!options.action) {
-        options.action = uri`?_method=${options.method.toUpperCase()}`
-      } else if (options.action.includes('?')) {
-        options.action += uri`&_method=${options.method.toUpperCase()}`
-      } else {
-        options.action += uri`?_method=${options.method.toUpperCase()}`
-      }
+      const [action, ...qs] = (options.action || '').split('?')
+      const searchParams = new URLSearchParams(qs.join('?'))
+      searchParams.set('_method', options.method.toUpperCase())
+      options.action = `${action}?${searchParams}`
       options.method = 'POST'
     }
-    this.tag('form', ...args)
 
-    this.forms.pop()
+    const result = this.tag('form', ...args)
+
+    if (result instanceof Promise) {
+      result.then(x => this.forms.pop())
+    } else {
+      this.forms.pop()
+    }
+    return result
   }
 
   iconButton (iconName, ...args) {
@@ -138,30 +127,6 @@ class RichVibeBuilder extends VibeBuilder {
       this.icon(iconName)
       if (fn) fn.call(this, this)
       if (str) this.text(str)
-    })
-  }
-
-  /** shortcut for markup of a flex-row div */
-  flexRow (...args) {
-    const options = getAttribs(args)
-    appendClass(options, 'flex-row')
-    this.div(...args)
-  }
-
-  /** shortcut for markup of a flex-row div */
-  toolbar (...args) {
-    const options = getAttribs(args)
-    appendClass(options, 'toolbar')
-    this.div(...args)
-  }
-
-  /** shortcut for markup of a flex-row/toolbar spacer
-   * @param {number} pressure - number indicating how much space this spacer should take up
-   */
-  flexSpacer (pressure) {
-    this.span({
-      class: 'spring',
-      style: { flexGrow: pressure }
     })
   }
 
@@ -258,9 +223,13 @@ class RichVibeBuilder extends VibeBuilder {
 
   panel (...args) {
     const attribs = getAttribs(args)
-    if (!attribs.class) attribs.class = []
-    if (!Array.isArray(attribs.class)) attribs.class = [attribs.class]
-    attribs.class.push('panel')
+    appendClass(attribs, 'panel')
+    return this.div(...args)
+  }
+
+  sidebar (...args) {
+    const attribs = getAttribs(args)
+    appendClass(attribs, 'sidebar')
     return this.div(...args)
   }
 
@@ -277,27 +246,8 @@ class RichVibeBuilder extends VibeBuilder {
     })
   }
 
-  panelActions (...args) {
-    this.div({ class: 'panel-actions' }, v => {
-      for (const entry of args) {
-        if (!entry) continue
-
-        if (entry.icon) v.iconButton(entry.icon, entry.label, entry.attributes || {})
-        else v.button(entry.label, entry.attributes || {})
-      }
-    })
-  }
-
   // emits an ACE editor component, hooked up to work inside a form, configured for javascript highlighting
   sourceCodeEditor (name, language, code, options = {}) {
-    if (!this.__aceEditorPackageIncluded) {
-      this.__aceEditorPackageIncluded = true
-      this.script({ src: '/npm/ace-builds/src-min-noconflict/ace.js', type: 'text/javascript', charset: 'utf-8', defer: true })
-    }
-
-    this.pre(code, { class: 'code-editor javascript', id: `${name}-editor` })
-    this.input({ type: 'hidden', name, id: `${name}-form-input` })
-
     const aceOptions = {
       lightTheme: 'ace/theme/tomorrow',
       darkTheme: 'ace/theme/tomorrow_night',
@@ -313,11 +263,16 @@ class RichVibeBuilder extends VibeBuilder {
       }
     }
 
-    this.script(`window.addEventListener('load', () => setupAceEditor(${JSON.stringify(aceOptions)}))`)
-  }
+    this.div({ class: ['code-editor', 'javascript', ...options.class || []] }, v => {
+      if (!this.__aceEditorPackageIncluded) {
+        this.__aceEditorPackageIncluded = true
+        v.script({ src: '/npm/ace-builds/src-min-noconflict/ace.js', type: 'text/javascript', charset: 'utf-8', defer: true })
+      }
 
-  footerButtons (...args) {
-    this.div({ class: [] }, ...args)
+      v.script(`window.addEventListener('load', () => setupAceEditor(${JSON.stringify(aceOptions)}))`)
+      v.input({ type: 'hidden', name, id: `${name}-form-input` })
+      v.pre(code, { id: `${name}-editor` })
+    })
   }
 
   icon (symbolName) {
