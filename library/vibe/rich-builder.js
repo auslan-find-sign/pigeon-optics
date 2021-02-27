@@ -249,6 +249,7 @@ class RichVibeBuilder extends VibeBuilder {
     attribs.class.push('breadcrumbs')
     attribs.ariaLabel = 'Breadcrumbs'
     return this.nav(...args, v => {
+      v.a('Home', { href: '/' })
       for (const block of blocks) {
         block.call(v, v)
       }

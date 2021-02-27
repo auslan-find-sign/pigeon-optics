@@ -8,10 +8,15 @@
   --fg-panel: var(--fg);
   --bg: rgb(230, 239, 234);
   --bg-panel: white;
-  --button-bg: hsl(150, 26%, 78%);
+  --bg-panel-deemphasised: rgb(243, 243, 243);
+  --button-bg: hsl(167, 21%, 87%);
   --button-fg: var(--fg-panel);
-  --button-hover-bg: lavender;
+  --button-hover-bg: hsl(203, 33%, 95%);
   --button-hover-fg: black;
+  --edge-controls-bg: var(--fg);
+  --edge-controls-fg: var(--bg);
+  --selection-accent-bg: rgb(168, 235, 213);
+  --selection-accent-fg: rgb(37, 35, 35);
 }
 
 * {
@@ -53,14 +58,16 @@ input, textarea {
   width: 100%;
 }
 
-footer {
+body > footer {
   margin-top: 3em;
   padding-top: 1.5em;
   border-top: 1px solid lightgrey;
+  display: flex;
+  justify-content: space-between;
 }
 
 /* Button styles */
-button.button, a.button {
+button, a[role=button] {
   background-color: var(--button-bg);
   color: var(--button-fg);
   border-radius: 1.5mm;
@@ -75,50 +82,32 @@ button.button, a.button {
   text-decoration: none;
 }
 
-button.button:hover, a.button:hover {
+button:hover, a[role=button]:hover {
   --button-bg: var(--button-hover-bg);
   --button-fg: var(--button-hover-fg);
 }
 
-button.button > .icon, a.button > .icon {
+button > .icon, a[role=button] > .icon {
   margin-right: 0.5ex;
   vertical-align: text-bottom;
 }
 
-/* Card Spread styles */
-.card-spread {
-  display: flex;
-  flex-wrap: wrap;
-}
-
-.card-spread > .playing-card {
-  margin: 2mm;
-}
-
-/* Flex Row styles */
-div.flex-row, div.toolbar {
-  display: flex;
-  justify-content: flex-start;
-  flex-wrap: nowrap;
-}
-
 /* Heading styles */
-h1.heading, h2.heading, h3.heading, h4.heading, h5.heading, h6.heading {
+h1, h2, h3, h4, h5, h6 {
   font-style: italic;
   font-size: 25pt;
   font-weight: 200;
-  max-width: calc(100% - 5rem);
   line-height: 1.1;
 }
 
-h2.heading { font-size: 23pt; font-weight: 250; }
-h3.heading { font-size: 21pt; font-weight: 300; }
-h4.heading { font-size: 19pt; font-weight: 350; }
-h5.heading { font-size: 17pt; font-weight: 400; }
-h6.heading { font-size: 15pt; font-weight: 450; }
+h2 { font-size: 23pt; font-weight: 250; }
+h3 { font-size: 21pt; font-weight: 300; }
+h4 { font-size: 19pt; font-weight: 350; }
+h5 { font-size: 17pt; font-weight: 400; }
+h6 { font-size: 15pt; font-weight: 450; }
 
 /* navigation heading */
-nav.global-nav {
+body > header {
   display: flex;
   background-color: white;
   border-radius: 1em;
@@ -130,10 +119,10 @@ nav.global-nav {
   align-items: center;
 }
 
-nav.global-nav a, nav.global-nav a.button {
+body > header > a, body > header > a[role=button] {
   margin: 0 1ex;
   text-decoration: none;
-  color: hsl(0deg, 0%, 20%);
+  color: currentColor;
   background-color: transparent;
   padding: 0.5ex 1ex;
   border-radius: 1ex;
@@ -141,14 +130,69 @@ nav.global-nav a, nav.global-nav a.button {
   border: 0 none;
 }
 
-nav.global-nav a.button svg {
+body > header a[role=button] svg {
   height: 1.2em;
   width: 1.7em;
 }
 
-nav.global-nav a:hover, nav.global-nav a.button:hover {
-  background-color: hsl(203, 33%, 95%);
+body > header a:hover, body > header a.button:hover {
+  background-color: var(--button-hover-bg);
+  color: var(--button-hover-fg);
 }
+
+main {
+  display: flex;
+  align-items: flex-start;
+}
+
+main > *:not(div.sidebar) {
+  flex-grow: 100;
+}
+
+div.sidebar {
+  background-color: var(--bg-panel);
+  color: var(--fg-panel);
+  border-radius: 1ex;
+  box-shadow: 0 1px 2.5px rgba(0, 0, 0, 30%);
+  overflow: hidden;
+  width: 13em;
+  margin-right: 1em;
+}
+
+@media screen and (max-width: 992px) {
+  div.sidebar { display: none }
+}
+
+div.sidebar > h1 {
+  background-color: var(--fg-panel);
+  color: var(--bg-panel);
+  display: flex;
+  margin: 0;
+  height: 2.4em;
+  font-size: 100%;
+  font-weight: normal;
+  align-items: center;
+  padding-left: 1em;
+  font-weight: 200;
+}
+
+div.sidebar > ul {
+  margin: 0; padding: 0;
+  list-style: none;
+}
+div.sidebar > ul > li > a {
+  display: block;
+  padding: 0.5ex 0.5ex 0.5ex 1em;
+  color: inherit;
+}
+div.sidebar > ul > li:not(:last-child) { border-bottom: 1px solid rgba(0, 0, 0, 0.034); }
+div.sidebar > ul > li.selected {
+  background-color: var(--selection-accent-bg);
+  color: var(--selection-accent-fg);
+}
+
+div.sidebar:not(:hover) > ul > li.selected > a { text-decoration-style: solid; text-decoration-color: currentColor; }
+
 
 /* panels */
 div.panel {
@@ -156,47 +200,78 @@ div.panel {
   color: var(--fg-panel);
   border-radius: 1ex;
   box-shadow: 0 1px 2.5px rgba(0, 0, 0, 30%);
-  padding: 1em;
+  padding: 1rem;
+  overflow: hidden;
 }
 
 div.panel > h1 {
   color: inherit;
   font-weight: 200;
   font-style: italic;
-  margin-bottom: 3mm;
+  margin-bottom: 1rem;
 }
 
-nav.panel-tabs {
+div.panel > header {
+  background-color: var(--fg-panel);
+  color: var(--bg-panel);
+  --fg-link: currentColor;
   display: flex;
-  padding: 0.5ex 2ex 0 2ex;
+  justify-content: space-between;
+  height: 2.5em;
+  margin: -2ex -2ex 2ex -2ex;
+  padding-left: 2ex;
+  align-items: center;
+}
+
+div.panel > .expand {
+  margin: -1rem;
+  padding: 0;
+  border-radius: 0;
+}
+
+div.panel > *:not(header) + .expand {
+  margin-top: 1rem;
+}
+
+div.panel > .expand + footer {
+  margin-top: 1rem;
+}
+
+div.panel > .expand.source-code { padding: 0; }
+div.panel > .expand.source-code > code:first-child::before { padding-top: 0.5rem; }
+div.panel > .expand.source-code > code:last-child::before { padding-bottom: 0.5rem; }
+
+nav.panel-tabs {
+  display: block;
+  padding: 0;
   margin: 0;
-  justify-content: center;
-  box-shadow: inset 0px -1px 3px rgba(0, 0, 0, 10%);
+  align-self: flex-end;
 }
 
 nav.panel-tabs > a {
-  display: block;
-  border-radius: 0.5ex 0.5ex 0 0;
-  background-color: var(--bg-panel);
+  display: inline-block;
+  border-radius: 1ex 1ex 0 0;
   box-shadow: 0.5px -1px 1px rgba(0, 0, 0, 30%),
         inset 0 -1px 2px rgba(0, 0, 0, 30%);
-  opacity: 0.5;
-  padding: 0 1.5ex;
-  margin: 0 1.5ex;
+  background-color: var(--bg-panel-deemphasised);
+  color: var(--fg-panel);
+  padding: 0.25ex 1.5ex 0.25ex 1.5ex;
+  margin: 0 1.5ex 0 0;
 }
 
-nav.panel-tabs > a[aria-current], nav.panel-tabs > a:hover {
+nav.panel-tabs > a[aria-current] {
+  box-shadow: none;
   background-color: var(--bg-panel);
-  box-shadow: 0.5px -1px 1px rgba(0, 0, 0, 30%);
-  opacity: 1.0;
 }
 
 /* breadcrumb trails */
 nav.breadcrumbs {
   display: block;
+  font-weight: 200;
 }
 nav.breadcrumbs > * {
   display: inline-block;
+  color: inherit;
 }
 nav.breadcrumbs > *:not(:last-child) {
   margin-right: 1.8ex;
@@ -207,19 +282,22 @@ nav.breadcrumbs > a svg {
 }
 nav.breadcrumbs > *:not(:last-child)::after {
   position: absolute;
-  content: "‣";
-  opacity: 0.5;
+  content: "»";
   padding: 0 0.5ex;
   text-decoration: none;
 }
 
-div.panel-actions {
+div.panel > footer {
   display: flex;
   justify-content: center;
-  margin-top: -2ex;
+  align-items: center;
+  background-color: var(--edge-controls-bg);
+  color: var(--edge-controls-fg);
+  margin: 0 -1em -1em -1em;
+  height: 2.5em;
 }
 
-div.panel-actions > * {
+div.panel > footer > * {
   display: block;
   border-radius: 1em;
   box-shadow: 0 0 0.5ex rgba(0, 0, 0, 60%);
@@ -228,21 +306,29 @@ div.panel-actions > * {
   padding: 0.5ex 2ex;
 }
 
-form > dl > dt {
-  word-wrap: none;
+div.panel > dl {
+  margin-left: -1em;
+  margin-right: -1em;
+  display: grid;
+  grid-template-columns: [labels] 10em [values] auto;
 }
 
-form > dl > dd {
+div.panel > dl > dt {
+  padding: 0 0 0 1em;
+  font-style: italic;
+  font-weight: 200;
+  grid-column: labels;
+  background-color: var(--bg-panel-deemphasised);
+  padding-top: 0.5ex;
+}
+div.panel > dl > dd {
+  grid-column: values;
+  padding: 0.5ex 1em 0.5ex 0.5ex;
   margin: 0;
 }
-
-form > dl > dd > textarea {
-  resize: none;
-}
-
-form > button[type="submit"] {
+div.panel > dl > dd > input {
   display: block;
-  margin-left: 1ex;
+  margin: 0;
 }
 
 /* Source Code widget */
@@ -266,10 +352,10 @@ form > button[type="submit"] {
   --punctual: #4E4E4C;
   --fn-name:  #4371AE;
 
+  font: 12px/normal 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
   line-height: 1.3;
   border-radius: 2mm;
   overflow-x: scroll;
-  font-family: monospace;
   counter-reset: line-number;
   background-color: var(--background);
   color: var(--default);
@@ -305,6 +391,7 @@ form > button[type="submit"] {
   background-color: var(--background-selected);
 }
 
+/* gutter */
 .source-code > code::before {
   content: counter(line-number);
   counter-increment: line-number;

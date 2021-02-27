@@ -183,7 +183,11 @@ router.get('/lenses/:user\\::name/records/:recordID', async (req, res) => {
 
   if (req.accepts('html')) {
     const title = `${req.params.user}:${req.params.name}/${req.params.recordID}`
-    res.sendVibe('lens-record', title, record)
+    const state = {
+      record,
+      sidebar: { recordIDs: await lens.listEntries(req.params.user, req.params.name) }
+    }
+    res.sendVibe('lens-record', title, state)
   } else {
     codec.respond(req, res, record)
   }

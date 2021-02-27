@@ -2,14 +2,16 @@
   --bg: hsl(150, 3%, 12%);
   --fg: hsl(150, 10%, 80%);
   --bg-panel: hsl(130, 5%, 53%);
-  --fg-panel: hsl(0deg, 0%, 20%)
+  --fg-panel: hsl(0deg, 0%, 20%);
+  --selection-accent-bg: rgb(12, 56, 41);
+  --selection-accent-fg: rgb(220, 236, 230);
 }
 
-nav.global-nav {
+body > header {
   background-color: hsl(130, 5%, 53%);
   box-shadow: 0 -1px 2.5px hsla(115, 42%, 84%, 0.5);
 }
-nav.global-nav a:hover, nav.global-nav a.button:hover {
+body > header a:hover, body > header a.button:hover {
   background-color: hsl(203, 6%, 26%);
   color: rgb(177, 190, 202);
 }
@@ -18,7 +20,7 @@ div.panel {
   box-shadow: 0 -1px 2.5px hsla(115, 42%, 84%, 0.5);
 }
 
-footer a {
+body > footer a {
   color: inherit;
   text-decoration-color: currentColor !important;
 }

@@ -204,14 +204,19 @@ router.all('/datasets/:user\\::name/records/:recordID', async (req, res) => {
   const record = await dataset.readEntry(req.params.user, req.params.name, req.params.recordID)
 
   if (req.accepts('html')) {
+    const sidebar = {
+      recordIDs: await dataset.listEntries(req.params.user, req.params.name)
+    }
+
     const title = `${req.params.user}:${req.params.name}/${req.params.recordID}`
     if (req.query.edit && req.owner) {
       res.sendVibe('dataset-record-editor', title, {
+        sidebar,
         recordID: req.params.recordID,
         recordData: codec.json.encode(record, '\t')
       }, error)
     } else {
-      res.sendVibe('dataset-record', title, record)
+      res.sendVibe('dataset-record', title, { record, sidebar })
     }
   } else {
     codec.respond(req, res, record)
