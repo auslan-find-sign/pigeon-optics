@@ -73,6 +73,17 @@ router.get('/datasets/:user\\::name/', async (req, res) => {
   }
 })
 
+// delete a dataset
+router.delete('/datasets/:user\\::name/', auth.ownerRequired, async (req, res) => {
+  await dataset.delete(req.params.user, req.params.name)
+
+  if (req.accepts('html')) {
+    res.redirect('/datasets/')
+  } else {
+    res.sendStatus(204)
+  }
+})
+
 router.all('/datasets/:user\\::name/configuration', auth.ownerRequired, async (req, res) => {
   const config = await dataset.readConfig(req.params.user, req.params.name)
   let error = false
