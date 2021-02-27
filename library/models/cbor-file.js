@@ -78,6 +78,7 @@ module.exports.write = async (dataPath, data) => {
  * @async
  */
 module.exports.delete = async (dataPath) => {
+  await fs.remove(fullPath(dataPath, ''))
   await fs.remove(fullPath(dataPath, '.cbor'))
   await fs.remove(fullPath(dataPath, '.cbor.backup'))
 }
@@ -89,6 +90,7 @@ module.exports.delete = async (dataPath) => {
  */
 module.exports.exists = async (dataPath) => {
   const results = await Promise.all([
+    fs.pathExists(fullPath(dataPath)),
     fs.pathExists(fullPath(dataPath, '.cbor')),
     fs.pathExists(fullPath(dataPath, '.cbor.backup'))
   ])
