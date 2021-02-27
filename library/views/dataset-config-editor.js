@@ -9,20 +9,20 @@ const uri = require('encodeuricomponent-tag')
  */
 module.exports = (req, data, error = null) => {
   return layout(req, v => {
-    v.form({ class: 'simple-form', method: 'PUT', action: data.create ? '' : uri`/datasets/${req.params.user}:${req.params.name}` }, v => {
-      if (req.owner && !data.create) {
-        v.panelTabs(
-          { label: 'View', href: uri`/datasets/${req.params.user}:${req.params.name}/` },
-          { label: 'Edit', href: uri`/datasets/${req.params.user}:${req.params.name}/configuration`, current: true }
-        )
-      }
-
+    v.form({ class: 'simple-form', method: 'PUT', action: data.create ? '' : uri`/datasets/${req.params.user}:${req.params.name}/configuration` }, v => {
       v.panel(v => {
-        v.breadcrumbs(v => {
-          v.a('Home', { href: '/' })
-          v.a('Datasets', { href: '/datasets/' })
-          v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}` })
-          v.iconLink('cassette', req.params.name, { href: uri`/datasets/${req.params.user}:${req.params.name}/` })
+        v.header(v => {
+          v.breadcrumbs(v => {
+            v.a('Datasets', { href: '/datasets/' })
+            v.iconLink('cassette', 'Create Dataset', { href: uri`/datasets/create` })
+          })
+
+          if (req.owner && !data.create) {
+            v.panelTabs(
+              { label: 'View', href: uri`/datasets/${req.params.user}:${req.params.name}/` },
+              { label: 'Edit', href: uri`/datasets/${req.params.user}:${req.params.name}/configuration`, current: true }
+            )
+          }
         })
 
         if (data.create) {
@@ -35,20 +35,23 @@ module.exports = (req, data, error = null) => {
           v.p(v => { v.glitch('Error: '); v.text(error) })
         }
 
-        v.dl(v => {
+        v.dl({ class: ['expand'] }, v => {
           v.dt('Dataset Name')
           v.dd(v => v.input({ name: 'name', value: data.name, minlength: 1, maxlength: 60, pattern: "[^!*'();:@&=+$,/?%#[\\]]+", disabled: !data.create }))
 
           v.dt('Memo (short description)')
           v.dd(v => v.textarea(data.memo, { name: 'memo', spellcheck: 'true', wrap: 'off' }))
         })
-      })
 
-      v.panelActions(
-        data.create && { label: 'Create', attributes: { type: 'submit' } },
-        !data.create && { label: 'Save', attributes: { type: 'submit', formmethod: 'PUT' } },
-        !data.create && { label: 'Delete', attributes: { type: 'submit', formmethod: 'DELETE' } }
-      )
+        v.footer(v => {
+          if (data.create) {
+            v.button('Create', { type: 'submit' })
+          } else {
+            v.button('Save', { type: 'submit' })
+            v.button('Delete', { type: 'submit', formaction: uri`/datasets/${req.params.user}:${req.params.name}`, formmethod: 'DELETE' })
+          }
+        })
+      })
     })
   })
 }

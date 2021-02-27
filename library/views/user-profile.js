@@ -10,15 +10,15 @@ const uri = require('encodeuricomponent-tag')
 module.exports = (req, profile, datasets, lenses) => {
   return layout(req, v => {
     v.panel(v => {
-      v.breadcrumbs(v => {
-        v.a('Home', { href: '/' })
-        v.a('Users', { href: '/users/' })
-        v.iconLink('user-circle', 'Users', { href: uri`/users/${profile.user}/` })
+      v.header(v => {
+        v.breadcrumbs(v => {
+          v.a('Users', { href: '/users/' })
+          v.iconLink('user-circle', profile.user, { href: uri`/users/${profile.user}/` })
+        })
       })
 
-      v.heading(`${profile.auth}: ${profile.user}`)
       if (profile.memo) {
-        v.p(profile.memo)
+        v.p('Memo: ' + profile.memo)
       }
 
       v.heading('Datasets:', { level: 3 })
@@ -34,6 +34,13 @@ module.exports = (req, profile, datasets, lenses) => {
           v.li(v => v.iconLink('3dglasses', lens, { href: uri`/lenses/${profile.user}:${lens}/` }))
         }
       })
+
+      if (profile.user === req.user) {
+        v.footer(v => {
+          v.button('Create Dataset', { href: '/datasets/create' })
+          v.button('Create Lens', { href: '/datasets/create' })
+        })
+      }
     })
   })
 }

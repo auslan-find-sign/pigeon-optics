@@ -5,19 +5,21 @@ const codec = require('../models/codec')
 
 module.exports = (req, { mapOutputs }) => {
   return layout(req, v => {
-    v.panelTabs(
-      { label: 'Lens', href: uri`/lenses/${req.params.user}:${req.params.name}/` },
-      req.owner && { label: 'Edit', href: uri`/lenses/${req.params.user}:${req.params.name}/configuration` },
-      { label: 'Logs', href: uri`/lenses/${req.params.user}:${req.params.name}/logs`, current: true }
-    )
-
     v.panel(v => {
-      v.breadcrumbs(v => {
-        v.a('Home', { href: '/' })
-        v.a('Lenses', { href: '/lenses/' })
-        v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}/` })
-        v.iconLink('3dglasses', req.params.name, { href: uri`/lenses/${req.params.user}:${req.params.name}/` })
-        v.a('Lens Build Logs', { href: uri`/lenses/${req.params.user}:${req.params.name}/logs` })
+      v.header(v => {
+        v.breadcrumbs(v => {
+          v.a('Home', { href: '/' })
+          v.a('Lenses', { href: '/lenses/' })
+          v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}/` })
+          v.iconLink('3dglasses', req.params.name, { href: uri`/lenses/${req.params.user}:${req.params.name}/` })
+          v.a('Lens Build Logs', { href: uri`/lenses/${req.params.user}:${req.params.name}/logs` })
+        })
+
+        v.panelTabs(
+          { label: 'Lens', href: uri`/lenses/${req.params.user}:${req.params.name}/` },
+          req.owner && { label: 'Edit', href: uri`/lenses/${req.params.user}:${req.params.name}/configuration` },
+          { label: 'Logs', href: uri`/lenses/${req.params.user}:${req.params.name}/logs`, current: true }
+        )
       })
 
       for (const { input, error, logs } of mapOutputs) {

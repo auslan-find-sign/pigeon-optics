@@ -4,9 +4,8 @@ const uri = require('encodeuricomponent-tag')
 module.exports = (req, { list }) => {
   return layout(req, v => {
     v.panel(v => {
-      v.breadcrumbs(v => {
-        v.a('Home', { href: '/' })
-        v.a('Lenses', { href: '/lenses/' })
+      v.header(v => {
+        v.breadcrumbs(v => v.a('Lenses', { href: '/lenses/' }))
       })
 
       for (const [user, tapes] of Object.entries(list)) {
@@ -19,6 +18,10 @@ module.exports = (req, { list }) => {
             v.li(v => v.iconLink('3dglasses', tape, { href: uri`/lenses/${user}:${tape}/` }))
           }
         })
+      }
+
+      if (req.session.auth) {
+        v.footer(v => v.button('Create', { href: '/lenses/create' }))
       }
     })
   })

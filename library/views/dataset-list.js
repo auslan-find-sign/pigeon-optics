@@ -4,9 +4,10 @@ const uri = require('encodeuricomponent-tag')
 module.exports = (req, { list }) => {
   return layout(req, v => {
     v.panel(v => {
-      v.breadcrumbs(v => {
-        v.a('Home', { href: '/' })
-        v.a('Datasets', { href: '/datasets/' })
+      v.header(v => {
+        v.breadcrumbs(v => {
+          v.a('Datasets', { href: '/datasets/' })
+        })
       })
 
       for (const [user, tapes] of Object.entries(list)) {

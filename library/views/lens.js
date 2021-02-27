@@ -9,30 +9,29 @@ const uri = require('encodeuricomponent-tag')
  */
 module.exports = (req, config, records) => {
   return layout(req, v => {
-    v.panelTabs(
-      { label: 'Lens', href: uri`/lenses/${req.params.user}:${req.params.name}/`, current: true },
-      req.owner && { label: 'Edit', href: uri`/lenses/${req.params.user}:${req.params.name}/configuration` },
-      { label: 'Logs', href: uri`/lenses/${req.params.user}:${req.params.name}/logs` }
-    )
-
     v.panel(v => {
-      v.breadcrumbs(v => {
-        v.a('Home', { href: '/' })
-        v.a('Lenses', { href: '/lenses/' })
-        v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}/` })
-        v.iconLink('3dglasses', req.params.name, { href: uri`/lenses/${req.params.user}:${req.params.name}/` })
+      v.header(v => {
+        v.breadcrumbs(v => {
+          v.a('Home', { href: '/' })
+          v.a('Lenses', { href: '/lenses/' })
+          v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}/` })
+          v.iconLink('3dglasses', req.params.name, { href: uri`/lenses/${req.params.user}:${req.params.name}/` })
+        })
+
+        v.panelTabs(
+          { label: 'Lens', href: uri`/lenses/${req.params.user}:${req.params.name}/`, current: true },
+          req.owner && { label: 'Edit', href: uri`/lenses/${req.params.user}:${req.params.name}/configuration` },
+          { label: 'Logs', href: uri`/lenses/${req.params.user}:${req.params.name}/logs` }
+        )
       })
 
-      v.heading(`Lens ${req.params.user}:${req.params.name}`)
       if (config.memo) {
-        v.p(config.memo)
+        v.p('Memo: ' + config.memo)
       }
 
       v.p(v => {
-        v.text('Data feeding in from ')
-        v.inlineList(config.inputs, x => {
-          v.a(x, { href: x })
-        })
+        v.text('Data from ')
+        v.inlineList(config.inputs, x => v.a(x, { href: x }))
       })
 
       if (config.mapType === 'javascript') {
@@ -48,10 +47,12 @@ module.exports = (req, config, records) => {
 
       v.heading('Records:', { level: 3 })
       v.linkList(records, name => uri`/lenses/${req.params.user}:${req.params.name}/records/${name}`)
-    })
 
-    if (req.session.auth) {
-      v.panelActions({ label: 'Clone', attributes: { href: uri`/lenses/create?clone=${req.params.user}:${req.params.name}` } })
-    }
+      if (req.session.auth) {
+        v.footer(v => {
+          v.button('Clone', { href: uri`/lenses/create?clone=${req.params.user}:${req.params.name}` })
+        })
+      }
+    })
   })
 }

@@ -10,23 +10,24 @@ const uri = require('encodeuricomponent-tag')
 module.exports = (req, data, error = null) => {
   return layout(req, v => {
     v.form({ class: 'simple-form', method: 'PUT' }, v => {
-      v.panelTabs(
-        { label: 'Lens', href: uri`/lenses/${req.params.user}:${req.params.name}/` },
-        req.owner && { label: 'Edit', href: uri`/lenses/${req.params.user}:${req.params.name}/configuration`, current: true },
-        { label: 'Logs', href: uri`/lenses/${req.params.user}:${req.params.name}/logs` }
-      )
-
       v.panel(v => {
-        v.breadcrumbs(v => {
-          v.a('Home', { href: '/' })
-          v.a('Lenses', { href: '/lenses/' })
-          if (data.create) {
-            v.a('Create Lens', { href: '/lenses/create' })
-          } else {
-            v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}/` })
-            v.iconLink('3dglasses', req.params.name, { href: uri`/lenses/${req.params.user}:${req.params.name}/` })
-            v.a('Edit Lens', { href: uri`/lenses/${req.params.user}:${req.params.name}/configuration` })
-          }
+        v.header(v => {
+          v.breadcrumbs(v => {
+            v.a('Lenses', { href: '/lenses/' })
+            if (data.create) {
+              v.a('Create Lens', { href: '/lenses/create' })
+            } else {
+              v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}/` })
+              v.iconLink('3dglasses', req.params.name, { href: uri`/lenses/${req.params.user}:${req.params.name}/` })
+              v.a('Edit Lens', { href: uri`/lenses/${req.params.user}:${req.params.name}/configuration` })
+            }
+          })
+
+          v.panelTabs(
+            { label: 'Lens', href: uri`/lenses/${req.params.user}:${req.params.name}/` },
+            req.owner && { label: 'Edit', href: uri`/lenses/${req.params.user}:${req.params.name}/configuration`, current: true },
+            { label: 'Logs', href: uri`/lenses/${req.params.user}:${req.params.name}/logs` }
+          )
         })
 
         if (data.create) v.heading('Create a Lens')
@@ -73,25 +74,15 @@ module.exports = (req, data, error = null) => {
           })
         })
 
-        v.flexRow(v => {
-          v.flexSpacer(5)
+        v.footer(v => {
           if (data.create) {
             v.button('Create', { type: 'submit' })
           } else {
-            v.button('Delete', { type: 'submit', formaction: 'DELETE' })
             v.button('Save', { type: 'submit' })
+            v.button('Delete', { type: 'submit', formaction: 'DELETE' })
           }
         })
       })
-
-      if (data.create) {
-        v.panelActions({ label: 'Create', attributes: { type: 'submit' } })
-      } else {
-        v.panelActions(
-          { label: 'Save', attributes: { type: 'submit' } },
-          { label: 'Delete', attributes: { type: 'submit', formaction: 'DELETE' } }
-        )
-      }
     })
   })
 }

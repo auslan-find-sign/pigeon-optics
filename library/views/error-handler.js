@@ -7,6 +7,12 @@ const layout = require('./layout')
 module.exports = (req, error) => {
   return layout(req, v => {
     v.panel(v => {
+      v.header(v => {
+        v.breadcrumbs(v => {
+          v.span('Error')
+        })
+      })
+
       v.heading(`Error processing request (${error.name} ${error.code}):`)
       v.p(error.message)
       if (error.stack && (process.env.NODE_ENV !== 'production' || (req.session && req.session.auth && req.session.auth.auth === 'admin'))) {

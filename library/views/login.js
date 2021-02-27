@@ -10,6 +10,10 @@ module.exports = (req, data, error = null) => {
   return layout(req, v => {
     v.form({ method: 'POST' }, v => {
       v.panel(v => {
+        v.header(v => {
+          v.breadcrumbs(v => v.a('Login', { href: '/auth' }))
+        })
+
         v.heading('Login to Pigeon Optics')
 
         if (data.return) {
@@ -31,12 +35,12 @@ module.exports = (req, data, error = null) => {
           v.dt('Password')
           v.dd(v => v.input({ name: 'password', value: data.password || '', type: 'password', minlength: 8, maxlength: 500 }))
         })
-      })
 
-      v.panelActions(
-        { label: 'Login', attributes: { type: 'submit', name: 'login', value: 'true' } },
-        { label: 'Register', attributes: { type: 'submit', name: 'register', value: 'true' } }
-      )
+        v.footer(v => {
+          v.button('Login', { type: 'submit', name: 'login', value: 'true' })
+          v.button('Register', { type: 'submit', name: 'register', value: 'true' })
+        })
+      })
     })
   })
 }
