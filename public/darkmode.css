@@ -22,3 +22,24 @@ footer a {
   color: inherit;
   text-decoration-color: currentColor !important;
 }
+
+.source-code {
+  /*  theme: FlatUI Dark */
+  --background: #222;
+  --background-selected: #3c424c;
+  --gutter-background: #222;
+  --gutter-foreground: #ddd;
+  --gutter-background-selected: #555;
+  --gutter-foreground-selected: #ccc;
+  --default:  #ccc;
+  --comment:  #5c6370;
+  --jsdoc:    #5C6370;
+  --keyword:  #e06c75;
+  --value:    #d19a66;
+  --strlit:   #67a058;
+  --template: #e06c75;
+  --regexp:   #57B6C2;
+  --operator: #abb2bf;
+  --punctual: #ccc;
+  --fn-name:  #3193c6;
+}

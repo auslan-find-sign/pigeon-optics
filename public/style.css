@@ -248,23 +248,23 @@ form > button[type="submit"] {
 /* Source Code widget */
 .source-code {
   /*  theme: FlatUI Dark */
-  --background: #222;
-  --background-selected: #3c424c;
-  --gutter-background: #222;
-  --gutter-foreground: #ddd;
-  --gutter-background-selected: #555;
-  --gutter-foreground-selected: #ccc;
-  --default:  #ccc;
-  --comment:  #5c6370;
-  --jsdoc:    #5C6370;
-  --keyword:  #e06c75;
-  --value:    #d19a66;
-  --strlit:   #67a058;
-  --template: #e06c75;
-  --regexp:   #57B6C2;
-  --operator: #abb2bf;
-  --punctual: #ccc;
-  --fn-name:  #3193c6;
+  --background: var(--bg-panel);
+  --background-selected: #EFEFEF;
+  --gutter-background: #F5F6F6;
+  --gutter-foreground: #4D4E4C;
+  --gutter-background-selected: #DBDCDD;
+  --gutter-foreground-selected: #4D4E4C;
+  --default:  #4E4E4C;
+  --comment:  #8E908D;
+  --jsdoc:    #767775;
+  --keyword:  #8959A8;
+  --value:    #E58C3B;
+  --strlit:   #768A29;
+  --template: #4E4D4C;
+  --regexp:   #3D999F;
+  --operator: #3D999F;
+  --punctual: #4E4E4C;
+  --fn-name:  #4371AE;
 
   line-height: 1.3;
   border-radius: 2mm;
