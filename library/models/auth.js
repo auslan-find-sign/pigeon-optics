@@ -18,6 +18,11 @@ exports.basicAuthMiddleware = async (req, res, next) => {
     }
   }
 
+  if (req.session && req.session.auth && req.session.auth.user) {
+    req.user = req.session.auth.user
+    req.auth = req.session.auth.auth
+  }
+
   next()
 }
 
