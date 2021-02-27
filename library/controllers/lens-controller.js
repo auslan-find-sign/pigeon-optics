@@ -62,7 +62,7 @@ router.all('/lenses/create', auth.required, async (req, res) => {
   res.sendVibe('lens-editor', 'Create a Lens', state, state.error)
 })
 
-router.get('/lenses/:user\\::name/configuration', auth.ownerRequired, async (req, res) => {
+router.get('/lenses/:user\\::name/configuration', async (req, res) => {
   const config = await lens.readConfig(req.params.user, req.params.name)
   const state = {
     ...config,
@@ -99,6 +99,16 @@ router.put('/lenses/:user\\::name/configuration', auth.ownerRequired, async (req
     console.log(err.stack)
     res.sendVibe('lens-editor', 'Edit a Lens', state, err.message)
   }
+})
+
+router.get('/lenses/:user\\::name/configuration/map.js', async (req, res) => {
+  const config = await lens.readConfig(req.params.user, req.params.name)
+  res.type('js').send(config.mapCode)
+})
+
+router.get('/lenses/:user\\::name/configuration/reduce.js', async (req, res) => {
+  const config = await lens.readConfig(req.params.user, req.params.name)
+  res.type('js').send(config.reduceCode)
 })
 
 router.get('/lenses/:user\\::name/logs', async (req, res) => {
