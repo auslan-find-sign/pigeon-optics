@@ -6,17 +6,17 @@
   --fg-link: hsl(150, 5%, 6%);
   --fg-link-underline: hsl(150, 3%, 12%, 50%);
   --fg-panel: var(--fg);
-  --bg: rgb(230, 239, 234);
+  --bg: hsl(147, 22%, 92%);
   --bg-panel: white;
-  --bg-panel-deemphasised: rgb(243, 243, 243);
-  --button-bg: hsl(167, 21%, 87%);
-  --button-fg: var(--fg-panel);
-  --button-hover-bg: hsl(203, 33%, 95%);
-  --button-hover-fg: black;
+  --bg-panel-deemphasised: hsl(0, 0%, 95%);
+  --button-bg: hsl(166, 23%, 67%);
+  --button-fg: hsl(160, 13%, 9%);
+  --button-hover-bg: hsl(203, 66%, 77%);
+  --button-hover-fg: hsl(206, 12%, 11%);
   --edge-controls-bg: var(--fg);
   --edge-controls-fg: var(--bg);
-  --selection-accent-bg: rgb(168, 235, 213);
-  --selection-accent-fg: rgb(37, 35, 35);
+  --selection-accent-bg: hsl(160, 63%, 79%);
+  --selection-accent-fg: hsl(0, 3%, 14%);
 }
 
 * {
@@ -32,10 +32,10 @@ body {
 }
 
 a {
-  color: var(--fg-link);
+  color: inherit;
   text-decoration: underline;
   text-decoration-style: dotted;
-  text-decoration-color: var(--fg-link-underline);
+  text-decoration-color: inherit;
 }
 
 a svg.icon {
@@ -45,7 +45,7 @@ a svg.icon {
 }
 
 a:hover {
-  text-decoration-color: var(--fg-link);
+  text-decoration-color: inherit;
   text-decoration-style: solid;
 }
 
@@ -56,6 +56,30 @@ input, textarea {
   margin-bottom: 10px;
   padding: 5px;
   width: 100%;
+}
+
+button {
+  border: none;
+    margin: 0;
+    padding: 0;
+    width: auto;
+    overflow: visible;
+
+    background: transparent;
+
+    /* inherit font & color from ancestor */
+    color: inherit;
+    font: inherit;
+
+    /* Normalize `line-height`. Cannot be changed from `normal` in Firefox 4+. */
+    line-height: normal;
+
+    /* Corrects font smoothing for webkit */
+    -webkit-font-smoothing: inherit;
+    -moz-osx-font-smoothing: inherit;
+
+    /* Corrects inability to style clickable `input` types in iOS */
+    -webkit-appearance: none;
 }
 
 body > footer {
@@ -77,8 +101,8 @@ button, a[role=button] {
   -webkit-user-select: none;
   -moz-user-select: none;
   user-select: none;
-  padding: 0.5mm 2mm;
-  margin: 2px;
+  padding: 0.25rem 0.5rem 0.25rem 0.5rem;
+  margin: 0;
   text-decoration: none;
 }
 
@@ -109,7 +133,8 @@ h6 { font-size: 15pt; font-weight: 450; }
 /* navigation heading */
 body > header {
   display: flex;
-  background-color: white;
+  background-color: var(--fg-panel);
+  color: var(--bg-panel);
   border-radius: 1em;
   box-shadow: 0 1px 2.5px rgba(0, 0, 0, 30%);
   margin: 0 auto 1em auto;
@@ -164,8 +189,8 @@ div.sidebar {
 }
 
 div.sidebar > h1 {
-  background-color: var(--fg-panel);
-  color: var(--bg-panel);
+  background-color: var(--edge-controls-bg);
+  color: var(--edge-controls-fg);
   display: flex;
   margin: 0;
   height: 2.4em;
@@ -212,8 +237,8 @@ div.panel > h1 {
 }
 
 div.panel > header {
-  background-color: var(--fg-panel);
-  color: var(--bg-panel);
+  background-color: var(--edge-controls-bg);
+  color: var(--edge-controls-fg);
   --fg-link: currentColor;
   display: flex;
   justify-content: space-between;
@@ -227,6 +252,7 @@ div.panel > .expand {
   margin: -1rem;
   padding: 0;
   border-radius: 0;
+  --code-editor-radius: 0;
 }
 
 div.panel > *:not(header) + .expand {
@@ -299,11 +325,11 @@ div.panel > footer {
 
 div.panel > footer > * {
   display: block;
-  border-radius: 1em;
-  box-shadow: 0 0 0.5ex rgba(0, 0, 0, 60%);
+  border-radius: 0.8rem;
   border: 0 none;
   margin: 0 1ex 0 1ex;
-  padding: 0.5ex 2ex;
+  padding: 0.2ex 1.5ex;
+  height: 1.6rem;
 }
 
 div.panel > dl {
@@ -411,16 +437,17 @@ div.panel > dl > dd > input {
 }
 
 /* ace code editor styling */
-.code-editor.ace_editor {
-  border-radius: 1ex;
+.code-editor .ace_editor {
+  --code-editor-radius: 1ex;
+  border-radius: var(--code-editor-radius);
 }
-.code-editor.ace_editor .ace_gutter {
-  border-top-left-radius: 1ex;
-  border-bottom-left-radius: 1ex;
+.code-editor .ace_editor .ace_gutter {
+  border-top-left-radius: var(--code-editor-radius);
+  border-bottom-left-radius: var(--code-editor-radius);
 }
-.code-editor.ace_editor .ace_scroller {
-  border-top-right-radius: 1ex;
-  border-bottom-right-radius: 1ex;
+.code-editor .ace_editor .ace_scroller {
+  border-top-right-radius: var(--code-editor-radius);
+  border-bottom-right-radius: var(--code-editor-radius);
 }
 
 /* Styled Text widget */

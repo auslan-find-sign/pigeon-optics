@@ -1,9 +1,19 @@
 :root {
+  --bg-panel-deemphasised: hsl(150, 4%, 31%);
+  --button-bg: hsl(0deg, 0%, 20%);
+  --button-fg: hsl(130, 5%, 53%);
+  --button-hover-bg: hsl(200, 9%, 13%);
+  --button-hover-fg: hsl(131, 8%, 60%);
+  --edge-controls-bg: var(--fg-panel);
+  --edge-controls-fg: var(--bg-panel);
+  --selection-accent-bg: rgb(168, 235, 213);
+  --selection-accent-fg: rgb(37, 35, 35);
+
   --bg: hsl(150, 3%, 12%);
   --fg: hsl(150, 10%, 80%);
-  --bg-panel: hsl(130, 5%, 53%);
-  --fg-panel: hsl(0deg, 0%, 20%);
-  --selection-accent-bg: rgb(12, 56, 41);
+  --bg-panel: hsl(0deg, 0%, 20%);
+  --fg-panel: hsl(130, 5%, 53%);
+  --selection-accent-bg: rgb(47, 83, 71);
   --selection-accent-fg: rgb(220, 236, 230);
 }
 
@@ -18,6 +28,13 @@ body > header a:hover, body > header a.button:hover {
 
 div.panel {
   box-shadow: 0 -1px 2.5px hsla(115, 42%, 84%, 0.5);
+}
+
+nav.breadcrumbs,
+div.panel > header,
+div.sidebar > h1,
+div.panel > dl > dt {
+  font-weight: 300;
 }
 
 body > footer a {

@@ -23,11 +23,13 @@ module.exports = (req, data, error = null) => {
             }
           })
 
-          v.panelTabs(
-            { label: 'Lens', href: uri`/lenses/${req.params.user}:${req.params.name}/` },
-            req.owner && { label: 'Edit', href: uri`/lenses/${req.params.user}:${req.params.name}/configuration`, current: true },
-            { label: 'Logs', href: uri`/lenses/${req.params.user}:${req.params.name}/logs` }
-          )
+          if (!data.create) {
+            v.panelTabs(
+              { label: 'Lens', href: uri`/lenses/${req.params.user}:${req.params.name}/` },
+              req.owner && { label: 'Edit', href: uri`/lenses/${req.params.user}:${req.params.name}/configuration`, current: true },
+              { label: 'Logs', href: uri`/lenses/${req.params.user}:${req.params.name}/logs` }
+            )
+          }
         })
 
         if (data.create) v.heading('Create a Lens')

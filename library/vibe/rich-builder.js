@@ -1,7 +1,6 @@
 const VibeBuilder = require('./builder')
 const highlight = require('h.js')
 const path = require('path')
-const uri = require('encodeuricomponent-tag')
 
 /** gets or adds attributes object to args list when proxying calls to tag builder
  * note, this sometimes changes the args array to inject an object, beware side-effects
