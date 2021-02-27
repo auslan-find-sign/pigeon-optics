@@ -71,17 +71,7 @@ Object.assign(exports, queueify.object({
           path: meta.path,
           data: await meta.read()
         }
-        let output
-        const logs = []
-        const logger = (type, ...args) => logs.push({ timestamp: Date.now(), type, args })
-        try {
-          output = await userMapFunc(input, logger)
-          output.error = false
-          output.logs = logs
-        } catch (err) {
-          const [snippedStack] = err.stack.split('at (<isolated-vm boundary>)')
-          output = { input: input.path, outputs: [], error: snippedStack, logs }
-        }
+        const output = await userMapFunc(input)
         await file.write(cachePath, output)
       }
     }
@@ -179,10 +169,11 @@ Object.assign(exports, queueify.object({
       const { path, data } = input
       const context = await Isolate.createContext()
       const outputs = []
+      const logs = []
 
       // Adjust the jail to have a console.log/warn/error/info api, and to remove some non-deterministic features
       const log = (type, ...args) => {
-        console.info(`Lens ${config.user}:${config.name}/map console.${type}:`, ...args)
+        logs.push({ timestamp: Date.now(), type, args })
         if (logger) logger(type, ...args)
       }
       const emit = (key, recordData) => {
@@ -214,17 +205,27 @@ Object.assign(exports, queueify.object({
         string: path,
         ...codec.path.decode(path)
       }
-      await context.evalClosure(lines.join('\n'), [pathInfo, codec.cloneable.encode(data), log, emit], {
-        timeout: defaults.lensTimeout,
-        arguments: { reference: true },
-        filename: `${defaults.url}/lenses/${config.user}:${config.name}/functions/map.js`,
-        lineOffset: (-lines.length) + 2
-      })
 
-      // ask v8 to free this context's memory
-      context.release()
+      try {
+        await context.evalClosure(lines.join('\n'), [pathInfo, codec.cloneable.encode(data), log, emit], {
+          timeout: defaults.lensTimeout,
+          arguments: { reference: true },
+          filename: `${defaults.url}/lenses/${config.user}:${config.name}/configuration/map.js`,
+          lineOffset: (-lines.length) + 2
+        })
 
-      return { input: path, outputs }
+        // ask v8 to free this context's memory
+        context.release()
+
+        return { input: input.path, outputs, logs, error: false }
+      } catch (err) {
+        // ask v8 to free this context's memory
+        context.release()
+
+        /** @type {string} */
+        const snippedStack = err.stack.split('at (<isolated-vm boundary>)')[0]
+        return { input: input.path, outputs: [], logs, error: snippedStack.trim() }
+      }
     }
   },
 
@@ -249,7 +250,7 @@ Object.assign(exports, queueify.object({
         result: { copy: true },
         lineOffset: -2,
         columnOffset: -8,
-        filename: `${defaults.url}/lenses/${config.user}:${config.name}/functions/reduce.js`
+        filename: `${defaults.url}/lenses/${config.user}:${config.name}/configuration/reduce.js`
       })
 
       // ask v8 to free this context's memory
