@@ -42,9 +42,9 @@ Object.assign(exports, queueify.object({
     assert(typeof config.reduceCode === 'string', 'reduce code must be a string')
     assert(Array.isArray(config.inputs), 'inputs must be an array')
     assert(config.inputs.every(x => typeof x === 'string'), 'inputs entries must be strings')
-    for (const input of config.inputs) {
-      assert(await readPath.exists(input), `${input} doesn’t exist`)
-    }
+    // for (const input of config.inputs) {
+    //   assert(await readPath.exists(input), `${input} doesn’t exist`)
+    // }
   },
 
   // iterates through logs and errors in lens's last build
