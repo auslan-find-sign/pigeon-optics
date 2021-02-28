@@ -3,8 +3,9 @@
  */
 const datasets = require('./dataset')
 const lenses = require('./lens')
+const metaVFS = require('./meta-vfs')
 const codec = require('./codec')
-const sources = { datasets, lenses }
+const sources = { datasets, lenses, meta: metaVFS }
 
 /** ReadPathOutput is what readPath yields
  * @typedef {Object} ReadPathOutput
