@@ -207,14 +207,14 @@ module.exports.respond = async (req, res, object) => {
       res.write(null)
     } else if (bestMatch === 'application/json') {
       res.type(bestMatch)
-      res.write('[\n')
+      if (req.query.encoding !== 'json-lines') res.write('[\n')
       let first = true
       for await (const entry of object) {
-        if (!first) res.write(',\n')
+        if (!first && req.query.encoding !== 'json-lines') res.write(',\n')
         res.write('\t' + module.exports.json.encode(entry))
         first = false
       }
-      res.write('\n]\n')
+      if (req.query.encoding !== 'json-lines') res.write('\n]\n')
       res.write(null)
     } else {
       Vibe.docStream('API Object Response Stream', layout(req, async v => {
