@@ -1,6 +1,6 @@
 const got = require('got')
 const codec = require('../models/codec')
-const defaults = require('../../package.json').defaults
+const settings = require('../models/settings')
 const objectHash = require('object-hash')
 
 module.exports = (webhookURL, viewportUser, viewportName, format = 'json') => {
@@ -19,7 +19,7 @@ module.exports = (webhookURL, viewportUser, viewportName, format = 'json') => {
       const queryString = Object.entries(queryStringInfo).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&')
       const body = codec[format].encode({
         path: inputID,
-        returnURL: `${defaults.url}/webhook/viewport-response?${queryString}`,
+        returnURL: `${settings.url}/webhook/viewport-response?${queryString}`,
         input
       })
 

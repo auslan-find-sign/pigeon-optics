@@ -14,7 +14,7 @@ const fs = require('fs-extra')
 const file = require('./cbor-file')
 const codec = require('./codec')
 const ivm = require('isolated-vm')
-const defaults = require('../../package.json').defaults
+const settings = require('./settings')
 const queueify = require('../utility/queueify')
 
 const readPath = require('./read-path')
@@ -208,9 +208,9 @@ Object.assign(exports, queueify.object({
 
       try {
         await context.evalClosure(lines.join('\n'), [pathInfo, codec.cloneable.encode(data), log, emit], {
-          timeout: defaults.lensTimeout,
+          timeout: parseMs(settings.lensTimeout).milliseconds,
           arguments: { reference: true },
-          filename: `${defaults.url}/lenses/${config.user}:${config.name}/configuration/map.js`,
+          filename: `${settings.url}/lenses/${config.user}:${config.name}/configuration/map.js`,
           lineOffset: (-lines.length) + 2
         })
 
@@ -245,12 +245,12 @@ Object.assign(exports, queueify.object({
         ${config.reduceCode}
       })(...codec.cloneable.decode([$0, $1])))`,
       codec.cloneable.encode([left, right]), {
-        timeout: defaults.lensTimeout,
+        timeout: parseMs(settings.lensTimeout).milliseconds,
         arguments: { copy: true },
         result: { copy: true },
         lineOffset: -2,
         columnOffset: -8,
-        filename: `${defaults.url}/lenses/${config.user}:${config.name}/configuration/reduce.js`
+        filename: `${settings.url}/lenses/${config.user}:${config.name}/configuration/reduce.js`
       })
 
       // ask v8 to free this context's memory

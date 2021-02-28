@@ -1,6 +1,6 @@
 // server.js
 // This is the application server for the Sign Dataset
-const defaults = require('./package.json').defaults
+const settings = require('./library/models/settings')
 const express = require('express')
 const cookieSession = require('cookie-session')
 const methodOverride = require('method-override')
@@ -23,7 +23,7 @@ app.use(require('compression')())
 // If forms are submitted, parse the data in to request.query and request.body
 app.use(express.urlencoded({ extended: true }))
 // If JSON is submitted, parse that in to request.body
-app.use(express.raw({ limit: defaults.maxPostSize, type: ['application/json', 'application/cbor'] }))
+app.use(express.raw({ limit: settings.maxPostSize, type: ['application/json', 'application/cbor'] }))
 app.use((req, res, next) => {
   try {
     if (req.is('application/json')) {
@@ -67,7 +67,7 @@ app.use(require('./library/controllers/meta-controller'))
 app.use('/npm', express.static('node_modules'))
 
 app.get('/', (req, res) => {
-  res.sendVibe('homepage', defaults.title)
+  res.sendVibe('homepage', settings.title)
 })
 
 app.use((req, res, next) => {

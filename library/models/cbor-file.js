@@ -3,7 +3,7 @@ const fs = require('fs-extra')
 const path = require('path')
 const os = require('os')
 const crypto = require('crypto')
-const defaults = require('../../package.json').defaults
+const settings = require('./settings')
 
 // encodes a string to be a valid filename but not use meaningful characters like . or /
 // takes a brutalist approach, using decodeURIComponent format, but encoding anything that isn't [a-zA-Z0-9-_]
@@ -16,9 +16,9 @@ function decodePathSegment (string) {
 
 // normalise and check path for danger
 function fullPath (dataPath, suffix = '') {
-  const jail = path.resolve(defaults.data)
+  const jail = path.resolve(settings.data)
   dataPath = [dataPath].flat().map(encodePathSegment)
-  const segments = [defaults.data, ...dataPath]
+  const segments = [settings.data, ...dataPath]
   const result = `${path.resolve(...segments)}${suffix}`
   if (!result.startsWith(jail)) throw new Error('path would escape data jail somehow, nope!')
   return result

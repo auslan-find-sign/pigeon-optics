@@ -23,6 +23,7 @@
     "compression": "^1.7.4",
     "cookie-session": "^1.4.0",
     "dateformat": "^4.5.1",
+    "death": "^1.1.0",
     "encodeuricomponent-tag": "^1.0.1",
     "express": "^5.0.0-alpha.8",
     "fs-extra": "^9.1.0",
@@ -38,19 +39,42 @@
     "object-hash": "^2.1.1",
     "p-queue": "^6.6.2",
     "param-case": "^3.0.4",
+    "parse-ms": "^2.1.0",
     "path-to-regexp": "^6.2.0",
     "sse-writer": "^3.0.4",
+    "stacktracey": "^2.0.18",
     "tweetnacl": "^1.0.3",
     "uglify-es": "^3.3.9",
+    "unicode": "^13.0.0",
     "xbytes": "^1.7.0",
     "zip-stream": "^4.0.4"
   },
   "defaults": {
     "title": "Pigeon Optics",
     "data": "./.data",
-    "url": "https://data.auslan.fyi",
-    "lensTimeout": 10,
-    "maxPostSize": "250 MB"
+    "url": "https://localhost:3000",
+    "lensTimeout": "10ms",
+    "lensCodeSize": "5 MB",
+    "maxPostSize": "250 MB",
+    "garbageCollectAttachmentsInterval": "1d",
+    "forbiddenUsernames": [
+      "system",
+      "admin",
+      "owner",
+      "root",
+      "user",
+      "test",
+      "support",
+      "guest",
+      "operator",
+      "debug",
+      "..",
+      "."
+    ],
+    "forbiddenEntityNames": [
+      "..",
+      "."
+    ]
   },
   "devDependencies": {
     "standard": "^16.0.3"
