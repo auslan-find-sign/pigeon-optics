@@ -317,11 +317,16 @@ RichVibeBuilder.expressMiddleware = (req, res, next) => {
    * @param {any} ...args - args to pass to view
    */
   res.sendVibe = (viewName, title, ...args) => {
-    RichVibeBuilder.docStream(title, v => {
-      const viewPath = path.resolve(RichVibeBuilder.viewsPath, viewName)
-      const view = require(viewPath)
-      view.call(v, req, ...args).call(v, v)
-    }).pipe(res.type('html'))
+    return new Promise((resolve, reject) => {
+      const stream = RichVibeBuilder.docStream(title, v => {
+        const viewPath = path.resolve(RichVibeBuilder.viewsPath, viewName)
+        const view = require(viewPath)
+        view.call(v, req, ...args).call(v, v)
+      })
+      stream.pipe(res.type('html'))
+      stream.on('close', () => resolve())
+      stream.on('error', err => reject(err))
+    })
   }
   next()
 }
