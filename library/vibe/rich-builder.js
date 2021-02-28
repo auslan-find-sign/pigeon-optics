@@ -250,14 +250,16 @@ class RichVibeBuilder extends VibeBuilder {
     const aceOptions = {
       lightTheme: 'ace/theme/tomorrow',
       darkTheme: 'ace/theme/tomorrow_night',
+      ...options,
       name,
+      language,
       ace: {
         mode: `ace/mode/${language}`,
         autoScrollEditorIntoView: true,
         maxLines: 30,
         minLines: 2,
         tabSize: 2,
-        esVersion: 9,
+        useSoftTabs: true,
         ...(options.ace || {})
       }
     }
@@ -270,6 +272,7 @@ class RichVibeBuilder extends VibeBuilder {
 
       v.script(`window.addEventListener('load', () => setupAceEditor(${JSON.stringify(aceOptions)}))`)
       v.input({ type: 'hidden', name, id: `${name}-form-input` })
+      v.input({ type: 'hidden', name: `${name}CursorInfo`, id: `${name}-cursor-info-input` })
       v.pre(code, { id: `${name}-editor` })
     })
   }
@@ -315,6 +318,7 @@ RichVibeBuilder.expressMiddleware = (req, res, next) => {
    * @param {string} viewName - filename of view
    * @param {string} pageTitle - title for html document
    * @param {any} ...args - args to pass to view
+   * @async
    */
   res.sendVibe = (viewName, title, ...args) => {
     return new Promise((resolve, reject) => {
