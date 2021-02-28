@@ -217,15 +217,17 @@ module.exports.respond = async (req, res, object) => {
       if (req.query.encoding !== 'json-lines') res.write('\n]\n')
       res.write(null)
     } else {
-      Vibe.docStream('API Object Response Stream', layout(req, async v => {
-        await v.panel(async v => {
-          v.heading('API Object Response Stream:')
+      await new Promise((resolve, reject) => {
+        Vibe.docStream('API Object Response Stream', layout(req, async v => {
+          await v.panel(async v => {
+            v.heading('API Object Response Stream:')
 
-          for await (const entry of object) {
-            v.sourceCode(module.exports.json.encode(entry, 2))
-          }
-        })
-      })).pipe(res)
+            for await (const entry of object) {
+              v.sourceCode(module.exports.json.encode(entry, 2))
+            }
+          })
+        })).pipe(res).on('close', () => resolve()).on('error', e => reject(e))
+      })
     }
   } else {
     if (bestMatch === 'application/cbor') {
@@ -233,12 +235,14 @@ module.exports.respond = async (req, res, object) => {
     } else if (bestMatch === 'application/json') {
       res.type(bestMatch).send(module.exports.json.encode(object))
     } else {
-      Vibe.docStream('API Object Response', layout(req, v => {
-        v.panel(v => {
-          v.heading('API Object Response:')
-          v.sourceCode(module.exports.json.encode(object, 2))
-        })
-      })).pipe(res)
+      await new Promise((resolve, reject) => {
+        Vibe.docStream('API Object Response', layout(req, v => {
+          v.panel(v => {
+            v.heading('API Object Response:')
+            v.sourceCode(module.exports.json.encode(object, 2))
+          })
+        })).pipe(res).on('close', () => resolve()).on('error', e => reject(e))
+      })
     }
   }
 }
