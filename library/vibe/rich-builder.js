@@ -321,7 +321,7 @@ RichVibeBuilder.expressMiddleware = (req, res, next) => {
       const stream = RichVibeBuilder.docStream(title, v => {
         const viewPath = path.resolve(RichVibeBuilder.viewsPath, viewName)
         const view = require(viewPath)
-        view.call(v, req, ...args).call(v, v)
+        return view.call(v, req, ...args).call(v, v)
       })
       stream.pipe(res.type('html'))
       stream.on('close', () => resolve())
