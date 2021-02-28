@@ -198,7 +198,6 @@ router.post('/lenses/ephemeral', async (req, res) => {
   const [user, name] = ['system', `ephemeral-${Date.now()}-${codec.objectHash(req.body).slice(0, 4).toString('hex')}`]
 
   try {
-    console.log(1)
     await lens.create(user, name, {
       memo: `Ephemeral Test Lens: ${req.body.memo}`,
       inputs: req.body.inputs.split('\n').map(x => x.trim()).filter(x => !!x),
@@ -207,27 +206,20 @@ router.post('/lenses/ephemeral', async (req, res) => {
       reduceCode: req.body.reduceCode,
       garbageCollect: false
     })
-    console.log(2)
+
     await lens.build(user, name)
-    console.log(3)
+
     async function * iter () {
-      console.log(4)
       for await (const log of lens.iterateLogs(user, name)) yield { log }
-      console.log(5)
       for await (const record of lens.iterateEntries(user, name)) yield { record }
-      console.log(6)
     }
 
-    console.log(7)
     if (req.accepts('html')) {
-      console.log(8)
       await res.sendVibe('lens-ephemeral-output', 'Ephemeral Test Lens Output', { iter: iter() })
-      console.log(9)
     } else {
       await codec.respond(req, res, iter())
     }
   } finally {
-    console.log(10)
     await lens.delete(user, name)
   }
 })
