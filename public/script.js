@@ -16,10 +16,30 @@ window.setupAceEditor = (options) => {
 
   editor.renderer.setScrollMargin(10, 10, 0, 0)
 
-  const hidden = document.getElementById(`${options.name}-form-input`)
-  const updateHidden = function () { hidden.value = editor.getValue() }
-  if (hidden.form) {
-    hidden.form.addEventListener('submit', updateHidden)
+  const dataInput = document.getElementById(`${options.name}-form-input`)
+  const cursorInput = document.getElementById(`${options.name}-cursor-info-input`)
+  const updateHidden = function () {
+    dataInput.value = editor.getValue()
+    const { row, column } = editor.getCursorPosition()
+    cursorInput.value = `${row + 1}:${column}`
+  }
+  if (dataInput.form) {
+    dataInput.form.addEventListener('submit', updateHidden)
     updateHidden()
   }
+
+  // place cursor at specified location if requested
+  if (options.cursor) {
+    const [row, column] = options.cursor.split(':').map(x => parseInt(x))
+    editor.gotoLine(row, column)
+  }
+
+  // disable semicolon errors in javascript language, enable ecmascript v9 linting
+  if (options.language === 'javascript') {
+    editor.session.on('changeAnnotation', () => {
+      editor.session.$worker.send('changeOptions', [{ asi: true, esversion: 9 }])
+    })
+  }
+
+  window.aceEditor = editor
 }
