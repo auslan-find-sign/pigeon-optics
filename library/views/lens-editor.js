@@ -77,6 +77,7 @@ module.exports = (req, data, error = null) => {
         })
 
         v.footer(v => {
+          v.button('Test', { type: 'submit', formmethod: 'POST', formaction: '/lenses/ephemeral' })
           if (data.create) {
             v.button('Create', { type: 'submit' })
           } else {
