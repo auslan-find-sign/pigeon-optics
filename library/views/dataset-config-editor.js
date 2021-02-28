@@ -37,7 +37,7 @@ module.exports = (req, data, error = null) => {
 
         v.dl({ class: ['expand'] }, v => {
           v.dt('Dataset Name')
-          v.dd(v => v.input({ name: 'name', value: data.name, minlength: 1, maxlength: 60, pattern: "[^!*'();:@&=+$,/?%#[\\]]+", disabled: !data.create }))
+          v.dd(v => v.input({ name: 'name', value: data.name, minlength: 1, maxlength: 250, pattern: "[^!*'();:@&=+$,/?%#[\\]]+", disabled: !data.create }))
 
           v.dt('Memo (short description)')
           v.dd(v => v.textarea(data.memo, { name: 'memo', spellcheck: 'true', wrap: 'off' }))

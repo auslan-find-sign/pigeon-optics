@@ -43,7 +43,7 @@ module.exports = (req, data, error = null) => {
         v.dl(v => {
           v.dt('Lens Name')
           if (data.create) {
-            v.dd(v => v.input({ name: 'name', value: data.name, minlength: 1, maxlength: 60, pattern: "[^!*'();:@&=+$,/?%#[\\]]+" }))
+            v.dd(v => v.input({ name: 'name', value: data.name, minlength: 1, maxlength: 250, pattern: "[^!*'();:@&=+$,/?%#[\\]]+" }))
           } else {
             v.dd(data.name)
             v.hiddenFormData({ name: data.name })

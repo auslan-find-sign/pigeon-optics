@@ -231,7 +231,7 @@ module.exports = queueify.object({
       throw new Error('Name cannot be empty')
     }
 
-    if (name.length > 60) {
+    if (name.length > 250) {
       throw new Error('Name must be less than 60 characters long')
     }
 
@@ -240,7 +240,7 @@ module.exports = queueify.object({
     }
 
     config.version = 0
-    config.garbageCollect = true
+    if (!('garbageCollect' in config)) config.garbageCollect = true
     config.created = Date.now()
 
     await this.validateConfig(config)
