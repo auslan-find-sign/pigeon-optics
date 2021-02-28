@@ -68,7 +68,11 @@ readPath.exists = async function readPathExists (path) {
   const params = codec.path.decode(path)
   if (!params) return false
   const source = sources[params.source]
-  return await source.exists(params.user, params.name, params.recordID)
+  if (source.recordID) {
+    return await source.exists(params.user, params.name, params.recordID)
+  } else {
+    return await source.exists(params.user, params.name)
+  }
 }
 
 module.exports = readPath
