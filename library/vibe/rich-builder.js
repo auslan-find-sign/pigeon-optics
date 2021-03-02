@@ -8,7 +8,7 @@ const path = require('path')
  * @returns {object}
  */
 const getAttribs = (args) => {
-  let opts = args.find(x => typeof x === 'object')
+  let opts = args.find(x => typeof x === 'object' && x !== null /* I hate you */)
   if (!opts) args.push(opts = {})
   return opts
 }

@@ -12,7 +12,7 @@ const escapeText = (string) => `${string}`.replace(/&/g, '&amp;').replace(/</g, 
 
 // handle 'data' attribute with object value, converting in to data-prop-name=value1 type of formatting for html data attributes / dataset
 const attributeMapDataConvert = (tagName, key, value) => {
-  if (key === 'data' && typeof value === 'object') {
+  if (key === 'data' && typeof value === 'object' && value !== null /* I hate you */) {
     return Object.entries(value).map(([propName, propVal]) => {
       if (typeof propVal !== 'string') propVal = JSON.stringify(propVal)
       return [`data-${propName}`, propVal]
@@ -24,7 +24,7 @@ const attributeMapDataConvert = (tagName, key, value) => {
 
 // handle 'style' attribute with object value, converting in to a style attribute
 const attributeMapStyleConvert = (tagName, key, value) => {
-  if (key === 'style' && typeof value === 'object') {
+  if (key === 'style' && typeof value === 'object' && value !== null /* I hate you */) {
     return Object.entries(value).map(([propName, propVal]) => `${hyphenate(propName)}:${propVal}`).join(';')
   } else {
     return [[key, value]]
@@ -105,7 +105,7 @@ class VibeBuilder {
   /** processes args to this.tag() and returns an attributes string safe to stream out in html */
   _attributeStringFromArgs (tagName, ...args) {
     const options = secret(this).options
-    const objs = args.filter(x => typeof x === 'object')
+    const objs = args.filter(x => typeof x === 'object' && x !== null /* I hate you */)
     let entries = objs.flatMap(x => Object.entries(x))
     const attribFilters = [
       attributeMapDropReservedKeys,
@@ -146,7 +146,9 @@ class VibeBuilder {
    */
   async tag (tagName, ...args) {
     const block = args.find(x => typeof x === 'function')
-    const attribs = Object.fromEntries(args.filter(x => typeof x === 'object').flatMap(x => Object.entries(x)))
+    const attribs = Object.fromEntries(
+      args.filter(x => typeof x === 'object' && x !== null /* I hate you */)
+        .flatMap(x => Object.entries(x)))
     const stringContents = args.find(x => typeof x === 'string')
     const selfClosing = SelfClosingTags.has(tagName.toLowerCase())
 
@@ -204,7 +206,7 @@ class VibeBuilder {
 
   // special case, script has strange escaping rules
   style (...args) {
-    const attribs = args.find(x => typeof x === 'object') || {}
+    const attribs = args.find(x => typeof x === 'object' && x !== null /* I hate you */) || {}
     const stringContents = args.find(x => typeof x === 'string') || ''
     // for inline styles, if there's data that would glitch the html parser, base64 encode the whole blob to avoid it
     if (stringContents.includes('</')) {
@@ -217,7 +219,7 @@ class VibeBuilder {
 
   // special case, script has strange escaping rules
   script (...args) {
-    const attribs = args.find(x => typeof x === 'object') || {}
+    const attribs = args.find(x => typeof x === 'object' && x !== null /* I hate you */) || {}
     const stringContents = args.find(x => typeof x === 'string')
     if (stringContents) {
       // if there is an inline script, with some suss maybe parser breaking markup, do data uri embedding
