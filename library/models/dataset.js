@@ -1,9 +1,9 @@
 /**
  * Dataset Model - provides access to a dataset stored on the service
  */
-const file = require('./cbor-file')
 const attachmentStore = require('./attachment-storage')
 const codec = require('./codec')
+const file = require('./file/cbor')
 const auth = require('./auth')
 const queueify = require('../utility/queueify')
 const itToArray = require('../utility/async-iterable-to-array')

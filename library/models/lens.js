@@ -11,7 +11,7 @@
  */
 const assert = require('assert')
 const fs = require('fs-extra')
-const file = require('./cbor-file')
+const file = require('./file/cbor')
 const codec = require('./codec')
 const ivm = require('isolated-vm')
 const settings = require('./settings')

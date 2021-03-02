@@ -1,15 +1,14 @@
-const cbor = require('./codec').cbor
 const fs = require('fs-extra')
 const path = require('path')
 const os = require('os')
-const crypto = require('crypto')
-const settings = require('./settings')
+const settings = require('../settings')
+const assert = require('assert')
 
 // encodes a string to be a valid filename but not use meaningful characters like . or /
-// takes a brutalist approach, using decodeURIComponent format, but encoding anything that isn't [a-zA-Z0-9-_]
 function encodePathSegment (string) {
   return encodeURIComponent(string).replace('.', '%2e')
 }
+
 function decodePathSegment (string) {
   return decodeURIComponent(string)
 }
@@ -24,44 +23,51 @@ function fullPath (dataPath, suffix = '') {
   return result
 }
 
-/** Read a cbor encoded object from a path inside the data directory configured in package.json/defaults/data
+exports.extension = '.data'
+
+/** Read raw buffer of a file path path inside the data directory configured in package.json/defaults/data
  * If the data is unreadable or corrupt, attempts to read backup instead, printing an error in the process, if that's missing
  * or broken too, you can expect an error to throw, otherwise the older version will be returned with the error printed
  * @param {string|string[]} path - relative path inside data directory the data is located at
- * @returns {object}
+ * @returns {Buffer}
  * @async
  */
-module.exports.read = async (dataPath) => {
-  const tryRead = async (dataPath, ext) => {
-    const buffer = await fs.readFile(fullPath(dataPath, ext))
-    return cbor.decode(buffer)
-  }
+exports.read = async function (dataPath) {
+  assert(Array.isArray(dataPath), 'dataPath must be an array of path segments')
+
+  const tryRead = (dataPath, ext) => fs.readFile(fullPath(dataPath, ext))
 
   try {
-    return await tryRead(dataPath, '.cbor')
+    return await tryRead(dataPath, this.extension)
   } catch (err) {
-    console.error(`Data at path ${dataPath} unavailable: ${err}, trying .cbor.backup`)
-    return await tryRead(dataPath, '.cbor.backup')
+    console.error(`Data at path ${dataPath} unavailable: ${err}, trying .backup`)
+    return await tryRead(dataPath, `${this.extension}.backup`)
   }
 }
 
-/** Create or update a cbor data file, creating a .backup file of the previous version in the process
+exports.getPath = function (dataPath) {
+  return fullPath(dataPath, this.extension)
+}
+
+/** Create or update a raw file, creating a .backup file of the previous version in the process
  * @param {string|string[]} path - relative path inside data directory the data is located at
- * @param {object} data - cbor encodable object to store
+ * @param {Buffer} data - cbor encodable object to store
  * @async
  */
-module.exports.write = async (dataPath, data) => {
-  const path1 = fullPath(dataPath, '.cbor')
-  const path2 = fullPath(dataPath, '.cbor.backup')
-  const encoded = cbor.encode(data)
+exports.write = async function (dataPath, data) {
+  assert(Array.isArray(dataPath), 'dataPath must be an array of path segments')
+  assert(Buffer.isBuffer(data), 'data must be a Buffer instance')
+
+  const path1 = fullPath(dataPath, this.extension)
+  const path2 = fullPath(dataPath, `${this.extension}.backup`)
 
   // ensure directory exists
   const folderPath = path.dirname(path1)
   await fs.ensureDir(folderPath)
 
-  const rand = crypto.randomBytes(32).toString('hex')
-  const tempPath = path.join(os.tmpdir(), `datasets-writing-${rand}.tmp.cbor`)
-  await fs.writeFile(tempPath, encoded)
+  const rand = `${Math.round(Math.random() * 0xFFFFFF)}-${Math.round(Math.random() * 0xFFFFFF)}`
+  const tempPath = path.join(os.tmpdir(), `pigeon-optics-writing-${rand}${this.extension}`)
+  await fs.writeFile(tempPath, data)
 
   // update backup with a copy of what was here previously if something old exists
   if (await fs.pathExists(path1)) {
@@ -73,14 +79,13 @@ module.exports.write = async (dataPath, data) => {
   await fs.remove(path2) // everything succeeded, we can erase the backup
 }
 
-/** Remove a cbor data file
+/** Remove a raw file or directory
  * @param {string|string[]} path - relative path inside data directory the data is located at
  * @async
  */
-module.exports.delete = async (dataPath) => {
-  await fs.remove(fullPath(dataPath, ''))
-  await fs.remove(fullPath(dataPath, '.cbor'))
-  await fs.remove(fullPath(dataPath, '.cbor.backup'))
+exports.delete = async function (dataPath) {
+  await fs.remove(fullPath(dataPath, this.extension))
+  await fs.remove(fullPath(dataPath, `${this.extension}.backup`))
 }
 
 /** Checks a given data path for an existing record, and returns true or false async
@@ -88,11 +93,11 @@ module.exports.delete = async (dataPath) => {
  * @returns {boolean}
  * @async
  */
-module.exports.exists = async (dataPath) => {
+module.exports.exists = async function (dataPath) {
   const results = await Promise.all([
-    fs.pathExists(fullPath(dataPath)),
-    fs.pathExists(fullPath(dataPath, '.cbor')),
-    fs.pathExists(fullPath(dataPath, '.cbor.backup'))
+    fs.pathExists(fullPath(dataPath, '')),
+    fs.pathExists(fullPath(dataPath, this.extension)),
+    fs.pathExists(fullPath(dataPath, `${this.extension}.backup`))
   ])
 
   return results.some(x => x === true)
@@ -107,8 +112,8 @@ module.exports.list = async function * list (dataPath) {
   try {
     const dir = await fs.opendir(fullPath(dataPath))
     for await (const dirent of dir) {
-      if (dirent.isFile() && dirent.name.endsWith('.cbor')) {
-        yield decodePathSegment(dirent.name.replace(/\.cbor$/, ''))
+      if (dirent.isFile() && dirent.name.endsWith(this.extension)) {
+        yield decodePathSegment(dirent.name.slice(0, -this.extension.length))
       }
     }
   } catch (err) {

@@ -1,6 +1,6 @@
-const file = require('./cbor-file')
 const nacl = require('tweetnacl')
 const uri = require('encodeuricomponent-tag')
+const file = require('./file/cbor')
 const codec = require('./codec')
 
 exports.basicAuthMiddleware = async (req, res, next) => {
