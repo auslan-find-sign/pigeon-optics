@@ -6,12 +6,14 @@
   --fg-link: hsl(150, 5%, 6%);
   --fg-link-underline: hsl(150, 3%, 12%, 50%);
   --fg-panel: var(--fg);
+  --fg-nav: var(--fg);
   --bg: hsl(147, 22%, 92%);
   --bg-panel: white;
   --bg-panel-deemphasised: hsl(0, 0%, 95%);
+  --bg-nav: var(--bg-panel);
   --button-bg: hsl(166, 23%, 67%);
   --button-fg: hsl(160, 13%, 9%);
-  --button-hover-bg: hsl(203, 66%, 77%);
+  --button-hover-bg: hsl(207, 59%, 93%);
   --button-hover-fg: hsl(206, 12%, 11%);
   --edge-controls-bg: var(--fg);
   --edge-controls-fg: var(--bg);
@@ -133,8 +135,8 @@ h6 { font-size: 15pt; font-weight: 450; }
 /* navigation heading */
 body > header {
   display: flex;
-  background-color: var(--fg-panel);
-  color: var(--bg-panel);
+  background-color: var(--bg-nav);
+  color: var(--fg-nav);
   border-radius: 1em;
   box-shadow: 0 1px 2.5px rgba(0, 0, 0, 30%);
   margin: 0 auto 1em auto;
