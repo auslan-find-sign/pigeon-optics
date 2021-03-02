@@ -14,9 +14,9 @@ function decodePathSegment (string) {
 }
 
 // normalise and check path for danger
-function fullPath (dataPath, suffix = '') {
+exports.fullPath = function (dataPath, suffix = '') {
   const jail = path.resolve(settings.data)
-  dataPath = [dataPath].flat().map(encodePathSegment)
+  dataPath = [...this.rootPath, dataPath].flat().map(encodePathSegment)
   const segments = [settings.data, ...dataPath]
   const result = `${path.resolve(...segments)}${suffix}`
   if (!result.startsWith(jail)) throw new Error('path would escape data jail somehow, nope!')
@@ -24,6 +24,7 @@ function fullPath (dataPath, suffix = '') {
 }
 
 exports.extension = '.data'
+exports.rootPath = []
 
 /** Read raw buffer of a file path path inside the data directory configured in package.json/defaults/data
  * If the data is unreadable or corrupt, attempts to read backup instead, printing an error in the process, if that's missing
@@ -35,18 +36,22 @@ exports.extension = '.data'
 exports.read = async function (dataPath) {
   assert(Array.isArray(dataPath), 'dataPath must be an array of path segments')
 
-  const tryRead = (dataPath, ext) => fs.readFile(fullPath(dataPath, ext))
+  const tryRead = (dataPath, ext) => fs.readFile(this.fullPath(dataPath, ext))
 
   try {
     return await tryRead(dataPath, this.extension)
   } catch (err) {
     console.error(`Data at path ${dataPath} unavailable: ${err}, trying .backup`)
-    return await tryRead(dataPath, `${this.extension}.backup`)
+    try {
+      return await tryRead(dataPath, `${this.extension}.backup`)
+    } catch (err2) {
+      throw err
+    }
   }
 }
 
 exports.getPath = function (dataPath) {
-  return fullPath(dataPath, this.extension)
+  return this.fullPath(dataPath, this.extension)
 }
 
 /** Create or update a raw file, creating a .backup file of the previous version in the process
@@ -58,8 +63,8 @@ exports.write = async function (dataPath, data) {
   assert(Array.isArray(dataPath), 'dataPath must be an array of path segments')
   assert(Buffer.isBuffer(data), 'data must be a Buffer instance')
 
-  const path1 = fullPath(dataPath, this.extension)
-  const path2 = fullPath(dataPath, `${this.extension}.backup`)
+  const path1 = this.fullPath(dataPath, this.extension)
+  const path2 = this.fullPath(dataPath, `${this.extension}.backup`)
 
   // ensure directory exists
   const folderPath = path.dirname(path1)
@@ -80,37 +85,37 @@ exports.write = async function (dataPath, data) {
 }
 
 /** Remove a raw file or directory
- * @param {string|string[]} path - relative path inside data directory the data is located at
+ * @param {string|string[]} [path] - relative path inside data directory the data is located at
  * @async
  */
-exports.delete = async function (dataPath) {
-  await fs.remove(fullPath(dataPath, this.extension))
-  await fs.remove(fullPath(dataPath, `${this.extension}.backup`))
+exports.delete = async function (dataPath = []) {
+  await fs.remove(this.fullPath(dataPath, this.extension))
+  await fs.remove(this.fullPath(dataPath, `${this.extension}.backup`))
 }
 
 /** Checks a given data path for an existing record, and returns true or false async
- * @param {string|string[]} path - relative path inside data directory
+ * @param {string|string[]} [path] - relative path inside data directory
  * @returns {boolean}
  * @async
  */
-module.exports.exists = async function (dataPath) {
+module.exports.exists = async function (dataPath = []) {
   const results = await Promise.all([
-    fs.pathExists(fullPath(dataPath, '')),
-    fs.pathExists(fullPath(dataPath, this.extension)),
-    fs.pathExists(fullPath(dataPath, `${this.extension}.backup`))
+    fs.pathExists(this.fullPath(dataPath, '')),
+    fs.pathExists(this.fullPath(dataPath, this.extension)),
+    fs.pathExists(this.fullPath(dataPath, `${this.extension}.backup`))
   ])
 
   return results.some(x => x === true)
 }
 
 /** List all the records in a data path
- * @param {string[]} path - relative path inside data directory to a folder containing multiple records
+ * @param {string[]} [path] - relative path inside data directory to a folder containing multiple records
  * @returns {string[]}
  * @async
  */
-module.exports.list = async function * list (dataPath) {
+module.exports.list = async function * list (dataPath = []) {
   try {
-    const dir = await fs.opendir(fullPath(dataPath))
+    const dir = await fs.opendir(this.fullPath(dataPath))
     for await (const dirent of dir) {
       if (dirent.isFile() && dirent.name.endsWith(this.extension)) {
         yield decodePathSegment(dirent.name.slice(0, -this.extension.length))
@@ -125,13 +130,13 @@ module.exports.list = async function * list (dataPath) {
 }
 
 /** List all the folders in a data path
- * @param {string[]} path - relative path inside data directory to a folder containing multiple records
+ * @param {string[]} [path] - relative path inside data directory to a folder containing multiple records
  * @returns {string[]}
  * @async
  */
-module.exports.listFolders = async function * list (dataPath) {
+module.exports.listFolders = async function * list (dataPath = []) {
   try {
-    const dir = await fs.opendir(fullPath(dataPath))
+    const dir = await fs.opendir(this.fullPath(dataPath))
     for await (const dirent of dir) {
       if (dirent.isDirectory()) {
         yield decodePathSegment(dirent.name)
@@ -142,4 +147,11 @@ module.exports.listFolders = async function * list (dataPath) {
       throw err
     }
   }
+}
+
+// create a configured instance of the raw file store
+exports.instance = function ({ rootPath = exports.rootPath, extension = exports.extension }) {
+  return Object.assign(Object.create(this), {
+    rootPath, extension
+  })
 }

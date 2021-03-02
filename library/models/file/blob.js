@@ -1,10 +1,11 @@
 // blob store is a thing for storing blobs or objects by hash
 // used to store objects in datasets and lens outputs
-// used to store attachments in attachment store
-const raw = Object.create(require('./raw'))
+const asyncIterableToArray = require('../../utility/async-iterable-to-array')
 
-// set file extension
-raw.extension = '.blob'
+// used to store attachments in attachment store
+exports.raw = require('./raw').instance({
+  extension: '.blob'
+})
 
 // default codec just passes through buffers
 // but this could be set to codec.cbor, codec.json, etc
@@ -15,15 +16,15 @@ exports.codec = {
 
 // hash function that takes an input and makes a hash of it
 exports.hash = async (input) => {
-  throw new Error('Blob Storage hash function needs to be defined')
+  const crypto = require('crypto')
+  const digester = crypto.createHash('sha256')
+  digester.update(input)
+  return digester.digest()
 }
-
-// default path
-exports.rootPath = ['blobs']
 
 // get path to hash file in real filesystem (for web server streaming or whatever)
 exports.getPath = function (hash) {
-  return raw.getPath([...this.rootPath, hash.toString('hex')])
+  return this.raw.getPath([hash.toString('hex')])
 }
 
 /** read something from the hash
@@ -32,7 +33,7 @@ exports.getPath = function (hash) {
  * @async
  */
 exports.read = async function (hash) {
-  const data = await raw.read([...this.rootPath, hash.toString('hex')])
+  const data = await this.raw.read([hash.toString('hex')])
   return await this.codec.decode(data)
 }
 
@@ -42,11 +43,12 @@ exports.read = async function (hash) {
  * @async
  */
 exports.write = async function (data) {
-  const [hash, encoded] = await Promise.all([this.hash(data), this.codec.encode(data)])
-  const dataPath = [...this.rootPath, hash.toString('hex')]
+  const encoded = await this.codec.encode(data)
+  const hash = await this.hash(encoded)
+  const dataPath = [hash.toString('hex')]
 
-  if (!await raw.exists(dataPath)) {
-    await raw.write(dataPath, encoded)
+  if (!await this.raw.exists(dataPath)) {
+    await this.raw.write(dataPath, encoded)
   }
   return hash
 }
@@ -56,7 +58,7 @@ exports.write = async function (data) {
  * @async
  */
 exports.delete = async function (hash) {
-  return await raw.delete([...this.rootPath, hash.toString('hex')])
+  return await this.raw.delete([hash.toString('hex')])
 }
 
 /** Checks a given data path for an existing record, and returns true or false async
@@ -65,18 +67,25 @@ exports.delete = async function (hash) {
  * @async
  */
 exports.exists = async function (hash) {
-  return await raw.exists([...this.rootPath, hash.toString('hex')])
+  return await this.raw.exists([hash.toString('hex')])
+}
+
+/** Async Iterator of all the stored blob's hashes as buffers
+ * @yields {Buffer[32]}
+ * @async
+ */
+exports.iterate = async function * () {
+  for await (const name of this.raw.list()) {
+    yield Buffer.from(name, 'hex')
+  }
 }
 
 /** List all the records in a data path
- * @param {string[]} path - relative path inside data directory to a folder containing multiple records
  * @returns {string[]}
  * @async
  */
-exports.list = async function * list (dataPath) {
-  for await (const name of raw.list(dataPath)) {
-    yield Buffer.from(name, 'hex')
-  }
+exports.list = async function () {
+  return await asyncIterableToArray(this.iterate())
 }
 
 /** create an instance of blob store with settings configured
@@ -89,6 +98,8 @@ exports.instance = function ({
   hash = exports.hash
 }) {
   return Object.assign(Object.create(exports), {
-    extension, rootPath, codec, hash
+    codec,
+    hash,
+    raw: require('./raw').instance({ rootPath, extension })
   })
 }
