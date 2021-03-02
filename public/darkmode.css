@@ -13,6 +13,7 @@
   --fg: hsl(150, 10%, 80%);
   --bg-panel: hsl(0deg, 0%, 20%);
   --fg-panel: hsl(130, 5%, 53%);
+  --fg-nav: var(--bg);
   --selection-accent-bg: rgb(47, 83, 71);
   --selection-accent-fg: rgb(220, 236, 230);
 }
