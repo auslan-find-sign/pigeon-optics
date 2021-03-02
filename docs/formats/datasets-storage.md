@@ -2,7 +2,7 @@ Datasets are stored in a fairly complex way.
 
 Dataset record values:
 
-these are hashed using a customised object-hash, then stored under the objects folder dataset/objects/(hash)
+these are hashed and stored under the objects folder dataset/objects/(hash)
 
 dataset versions:
 

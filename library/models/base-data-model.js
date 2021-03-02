@@ -86,9 +86,9 @@ exports.readEntryMeta = async function (user, name, recordID, version = null) {
  */
 exports.iterateEntries = async function * (user, name, filter = null) {
   for await (const meta of this.iterateEntriesMeta(user, name, filter)) {
+    const { id, hash, version } = meta
     const data = await meta.read()
-    const read = async () => data
-    yield { ...meta, data, read }
+    yield { id, hash, version, data }
   }
 }
 
