@@ -365,7 +365,6 @@ exports.getFileStore = function (user, name) {
  * @async
  */
 exports.garbageCollect = async function (user, name) {
-  console.log(`garbage collecting ${codec.path.encode(this.source, user, name)}`)
   const snapshot = await this.readVersion(user, name)
   const hashes = Object.values(snapshot.records).map(x => x.hash)
   const objectStore = this.getObjectStore(user, name)
@@ -373,13 +372,10 @@ exports.garbageCollect = async function (user, name) {
 
   // remove dereferenced objects
   for await (const objectHash of objectStore.iterate()) {
-    console.log('looking at object', objectHash)
     if (!hashes.some(x => objectHash.equals(x))) {
-      console.log('object store plz delete', objectHash)
       await objectStore.delete(objectHash)
     }
   }
-  console.log('done with objects, phew')
 
   // remove any versions older than 1 month
   const cutoff = Date.now() - (1000 * 60 * 60 * 24 * 30)

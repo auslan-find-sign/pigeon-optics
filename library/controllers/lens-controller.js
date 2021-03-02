@@ -90,9 +90,7 @@ router.put('/lenses/:user\\::name/configuration', auth.ownerRequired, async (req
       reduceCode: req.body.reduceCode
     })
     // rebuild since settings may have changed
-    console.log('starting build')
     await lens.build(req.session.auth.user, req.body.name)
-    console.log('build finished, sending redirect')
 
     if (req.accepts('html')) {
       return res.redirect(uri`/lenses/${req.params.user}:${req.params.name}/`)
