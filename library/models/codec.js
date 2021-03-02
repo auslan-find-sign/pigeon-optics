@@ -146,7 +146,7 @@ module.exports.cloneable = {
 }
 
 const ptr = require('path-to-regexp')
-const datasetPath = '/:source(lenses|datasets)/:user\\::name'
+const datasetPath = '/:source(lenses|datasets|meta)/:user\\::name'
 const datasetMatch = ptr.match(datasetPath)
 const datasetCompile = ptr.compile(datasetPath)
 const recordPath = `${datasetPath}/records/:recordID`

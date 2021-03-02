@@ -30,6 +30,14 @@ const iterators = {
         }
       }
     }
+  },
+
+  stats: async function () {
+    return {
+      memory: process.memoryUsage(),
+      cpu: process.cpuUsage(),
+      uptime: process.uptime()
+    }
   }
 }
 
@@ -42,7 +50,12 @@ exports.exists = (user, name, record) => {
 exports.readEntry = (user, name, record) => {
   if (user !== 'system') return undefined
   if (name !== 'system') return undefined
-  return itToArray(iterators[record]())
+  const output = iterators[record]()
+  if (output.next) {
+    return itToArray(output)
+  } else {
+    return output
+  }
 }
 
 exports.readEntryMeta = (user, name, record) => {
