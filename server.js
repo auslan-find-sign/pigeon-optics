@@ -1,6 +1,7 @@
 // server.js
 // This is the application server for the Sign Dataset
 const settings = require('./library/models/settings')
+const parseMs = require('parse-ms')
 const express = require('express')
 const cookieSession = require('cookie-session')
 const methodOverride = require('method-override')
@@ -94,6 +95,14 @@ app.use((error, req, res, next) => {
     codec.respond(req, res, { error: error.message })
   }
 })
+
+// if (settings.garbageCollectAttachmentsInterval) {
+//   const attachmentStore = require('./library/models/attachment-storage')
+//   function attachmentsGC () {
+//     attachmentStore.
+//   }
+//   setInterval(attachmentsGC, parseMs(settings.garbageCollectAttachmentsInterval).milliseconds)
+// }
 
 const port = process.env.PORT || 3000
 app.listen(port, () => {

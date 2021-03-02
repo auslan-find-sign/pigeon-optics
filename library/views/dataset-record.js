@@ -38,7 +38,7 @@ module.exports = (req, { record, sidebar }) => {
         }
       })
 
-      v.sourceCode(codec.json.encode(record, 2), { class: 'expand' })
+      v.sourceCode(codec.json.print(record), { class: 'expand' })
     })
   })
 }

@@ -17,7 +17,7 @@ module.exports = (req, { iter }) => {
         const [type, value] = Object.entries(obj)[0]
         if (type === 'log' && (value.logs.length || value.error)) {
           v.heading(`Logs for ${value.input}`)
-          if (value.error) v.pre(`Error: ${value.error}`)
+          if (value.error) v.pre(`Error:\n${JSON.stringify(value.error, null, 2)}`)
           if (value.logs.length) {
             v.ul(v => {
               for (const { type, timestamp, args } of value.logs) {

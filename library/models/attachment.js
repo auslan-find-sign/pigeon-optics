@@ -1,6 +1,6 @@
 const cbor = require('borc')
 const crypto = require('crypto')
-const defaults = require('../../package.json').defaults
+const settings = require('./settings')
 
 /**
  * Attachment is a little tagged thing to represent a file that is attached to an object in the dataset store
@@ -37,12 +37,16 @@ class AttachmentReference {
    * @returns {string}
    */
   toURL () {
-    return `${defaults.url}/attachments/${this.toString()}?type=${encodeURIComponent(this.mimeType)}`
+    return `${settings.url}/attachments/${this.toString()}?type=${encodeURIComponent(this.mimeType)}`
   }
 
   // internal, handles cbor encoding
   encodeCBOR (gen) {
     return gen.pushAny(new cbor.Tagged(27, ['pigeon-optics/AttachmentReference', this.hash, this.mimeType]))
+  }
+
+  toJSON () {
+    return { class: this.constructor.name, hash: this.hash.toString('hex').toLowerCase(), mimeType: this.mimeType }
   }
 }
 
@@ -70,13 +74,22 @@ class Attachment extends AttachmentReference {
   toURL () {
     return `data:${this.mimeType};base64,${this.data.toString('base64')}`
   }
+
+  toJSON () {
+    return {
+      class: this.constructor.name,
+      hash: this.hash.toString('hex').toLowerCase(),
+      mimeType: this.mimeType,
+      data: this.data.toString('base64')
+    }
+  }
 }
 
 // crawls a structure of arrays and objects to find all attachments referenced
 function listReferences (input) {
   if (Array.isArray(input)) {
     return input.flatMap(x => listReferences(x))
-  } else if (typeof input === 'object') {
+  } else if (typeof input === 'object' && input !== null /* I hate you */) {
     if (input.constructor === AttachmentReference) {
       return [input]
     } else if (typeof input.values === 'function') {

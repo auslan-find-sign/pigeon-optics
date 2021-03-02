@@ -16,13 +16,13 @@ module.exports = (req, data, error = null) => {
         v.ul(v => {
           for (const recordID of data.sidebar.recordIDs) {
             const attribs = recordID === req.params.recordID ? { class: 'selected' } : {}
-            v.li(attribs, v => v.a(recordID, { href: uri`/datasets/${req.params.user}:${req.params.name}/records/${recordID}` }))
+            v.li(attribs, v => v.a(recordID, { href: uri`/datasets/${req.params.user}:${req.params.name}/records/${recordID}?edit=1` }))
           }
         })
       })
     }
 
-    v.form({ method: 'PUT' }, v => {
+    v.form({ method: 'PUT', action: '?edit=1' }, v => {
       v.panel(v => {
         v.header(v => {
           v.breadcrumbs(v => {

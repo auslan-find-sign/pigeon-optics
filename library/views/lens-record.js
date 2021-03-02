@@ -21,7 +21,7 @@ module.exports = (req, { record, sidebar }) => {
           v.a('Lenses', { href: '/lenses/' })
           v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}` })
           v.iconLink('3dglasses', req.params.name, { href: uri`/lenses/${req.params.user}:${req.params.name}/` })
-          v.iconLink('newspaper', req.params.recordID, { href: uri`/lenses/${req.params.user}:${req.params.name}/${req.params.recordID}` })
+          v.iconLink('newspaper', req.params.recordID, { href: uri`/lenses/${req.params.user}:${req.params.name}/records/${req.params.recordID}` })
         })
       })
 

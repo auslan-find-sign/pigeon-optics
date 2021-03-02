@@ -5,6 +5,7 @@ const auth = require('../models/auth')
 const codec = require('../models/codec')
 const dataset = require('../models/dataset')
 const uri = require('encodeuricomponent-tag')
+const httpError = require('../utility/http-error')
 
 // add req.owner boolean for any routes with a :user param
 router.param('user', auth.ownerParam)
@@ -13,7 +14,7 @@ router.param('user', auth.ownerParam)
 router.get('/datasets/', async (req, res) => {
   const list = {}
   for await (const user of auth.iterateUsers()) {
-    const datasets = await dataset.listDatasets(user)
+    const datasets = await dataset.list(user)
     if (datasets && datasets.length > 0) {
       list[user] = datasets
     }
@@ -28,7 +29,7 @@ router.get('/datasets/', async (req, res) => {
 
 // get a list of datasets owned by a specific user
 router.get('/datasets/:user\\:', async (req, res) => {
-  const datasets = await dataset.listDatasets(req.params.user)
+  const datasets = await dataset.list(req.params.user)
 
   if (req.accepts('html')) {
     res.sendVibe('dataset-list', `${req.params.user}’s Datasets`, { list: { [req.params.user]: datasets } })
@@ -171,7 +172,7 @@ router.get('/datasets/:user\\::name/records/', async (req, res) => {
 })
 
 router.post('/datasets/:user\\::name/records/', auth.ownerRequired, async (req, res) => {
-
+  // todo, implement dataset.merge
 })
 
 // get a record from a user's dataset
@@ -187,7 +188,11 @@ router.all('/datasets/:user\\::name/records/:recordID', async (req, res) => {
       // write record
       const { version } = await dataset.writeEntry(req.params.user, req.params.name, req.params.recordID, req.body)
 
-      if (!req.accepts('html')) return req.set('X-Version', version).sendStatus(204)
+      if (req.accepts('html')) {
+        return res.redirect(uri`/datasets/${req.params.user}:${req.params.name}/records/${req.params.recordID}`)
+      } else {
+        return req.set('X-Version', version).sendStatus(204)
+      }
     } catch (err) {
       error = err.message
     }
@@ -195,13 +200,14 @@ router.all('/datasets/:user\\::name/records/:recordID', async (req, res) => {
     if (!req.owner) throw new Error('You do not have write access to this dataset')
     const { version } = await dataset.deleteEntry(req.params.user, req.params.name, req.params.recordID)
     if (req.accepts('html')) {
-      return req.redirect(uri`/datasets/${req.params.user}:${req.params.name}/`)
+      return res.redirect(uri`/datasets/${req.params.user}:${req.params.name}/`)
     } else {
       return res.set('X-Version', version).sendStatus(204)
     }
   }
 
   const record = await dataset.readEntry(req.params.user, req.params.name, req.params.recordID)
+  if (!record) throw httpError(404, 'Record Not Found')
 
   if (req.accepts('html')) {
     const sidebar = {
@@ -209,11 +215,11 @@ router.all('/datasets/:user\\::name/records/:recordID', async (req, res) => {
     }
 
     const title = `${req.params.user}:${req.params.name}/${req.params.recordID}`
-    if (req.query.edit && req.owner) {
+    if ((req.query.edit && req.owner) || req.method !== 'GET') {
       res.sendVibe('dataset-record-editor', title, {
         sidebar,
         recordID: req.params.recordID,
-        recordData: codec.json.encode(record, '\t')
+        recordData: codec.json.print(record, '\t')
       }, error)
     } else {
       res.sendVibe('dataset-record', title, { record, sidebar })

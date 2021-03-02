@@ -27,7 +27,7 @@ codec.cloneable = {}
 codec.cloneable.decode = function (object) {
   if (Array.isArray(object)) {
     return object.map(entry => codec.cloneable.decode(entry))
-  } else if (typeof object === 'object') {
+  } else if (typeof object === 'object' && object !== null /* I hate you */) {
     if ('_bufferArrayBytes' in object) {
       return Uint8Array.from(object._bufferArrayBytes)
     } else if (object._class === 'Attachment') {
@@ -64,7 +64,7 @@ codec.cloneable.encode = function (object) {
       _mimeType: object.mimeType,
       _hash: [...object.hash]
     }
-  } else if (typeof object === 'object') {
+  } else if (typeof object === 'object' && value !== null /* I hate you */) {
     return Object.fromEntries(Object.entries(object).map(([key, value]) => {
       return [key, codec.cloneable.encode(value)]
     }))

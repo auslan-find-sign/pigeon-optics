@@ -1,7 +1,15 @@
 const nacl = require('tweetnacl')
 const uri = require('encodeuricomponent-tag')
+const assert = require('assert')
+const unicodeSpaces = require('unicode/category/Zs')
+const unicodeControl = require('unicode/category/Cc')
+const unicodeFormat = require('unicode/category/Cf')
+const unicodeLineSep = require('unicode/category/Zl')
+const unicodeParaSep = require('unicode/category/Zp')
+
 const file = require('./file/cbor')
 const codec = require('./codec')
+const settings = require('./settings')
 
 exports.basicAuthMiddleware = async (req, res, next) => {
   // handle http basic auth
@@ -11,7 +19,7 @@ exports.basicAuthMiddleware = async (req, res, next) => {
     if (type.toLowerCase() === 'basic') {
       const [user, pass] = Buffer.from(credsb64, 'base64').toString()
       try {
-        req.session.auth = await module.exports.login(user, pass)
+        req.session.auth = await exports.login(user, pass)
       } catch (err) {
         return res.sendJSON({ err: 'Invalid credentials supplied with Basic HTTP authentication' })
       }
@@ -75,7 +83,7 @@ exports.userFolder = (username) => ['users', username]
  * @param {string} username
  * @returns {string}
 */
-exports.userAccountPath = (username) => [...module.exports.userFolder(username), 'account']
+exports.userAccountPath = (username) => [...exports.userFolder(username), 'account']
 
 /** check a login attempt for a user account
  * @param {string} username
@@ -86,7 +94,7 @@ exports.login = async (user, pass) => {
   let account
 
   try {
-    account = await file.read(module.exports.userAccountPath(user))
+    account = await file.read(exports.userAccountPath(user))
   } catch (err) {
     throw new Error('Account not found: ' + err.message)
   }
@@ -110,27 +118,22 @@ exports.login = async (user, pass) => {
  * @returns {object} - { user: "string username", auth: "string authorization level" }
  */
 exports.register = async (user, pass, auth = 'user') => {
-  const path = module.exports.userAccountPath(user)
+  const path = exports.userAccountPath(user)
+  const badChars = "!*'();:@&=+$,/?%#[]`“‘’’”".split('')
+  const userChars = user.split('')
 
-  if (await file.exists(path)) {
-    throw new Error('This username is already in use')
-  }
+  assert(!await file.exists(path), 'This username is already in use')
+  assert(!badChars.some(char => user.includes(char)), `Username must not contain any of ${badChars.join(' ')}`)
+  assert(!userChars.some(x => unicodeSpaces[x.charCodeAt(0)]), 'Username must not contain spaces')
+  assert(!userChars.some(x => unicodeControl[x.charCodeAt(0)]), 'Username must not contain control characters')
+  assert(!userChars.some(x => unicodeFormat[x.charCodeAt(0)]), 'Username must not contain unicode format characters')
+  assert(!userChars.some(x => unicodeLineSep[x.charCodeAt(0)]), 'Username must not contain unicode line seperator characters')
+  assert(!userChars.some(x => unicodeParaSep[x.charCodeAt(0)]), 'Username must not contain unicode paragraph seperator characters')
 
-  if (!user.match(/^[^!*'();:@&=+$,/?%#[\]\r\n\t ]+$/i)) {
-    throw new Error('Username name must not contain any of ! * \' ( ) ; : @ & = + $ , / ? % # [ ] or whitespace')
-  }
-
-  if (user.length < 3) {
-    throw new Error('Username must be at least 3 characters long')
-  }
-
-  if (user.length > 30) {
-    throw new Error('Username must not be longer than 30 characters')
-  }
-
-  if (pass.length < 8) {
-    throw new Error('Password must be at least 8 characters long')
-  }
+  assert(!settings.forbiddenUsernames.includes(user), 'Username is not allowed by site settings')
+  assert(user.length >= 3, 'Username must be at least 3 characters long')
+  assert(user.length <= 100, 'Username must not be longer than 100 characters')
+  assert(pass.length >= 8, 'Password must be at least 8 characters long')
 
   const salt = Buffer.from(nacl.randomBytes(64))
   const userData = {
@@ -150,7 +153,7 @@ exports.register = async (user, pass, auth = 'user') => {
  * @param {string} newPassword
  */
 exports.changePassword = async (user, newPass) => {
-  const path = module.exports.userAccountPath(user)
+  const path = exports.userAccountPath(user)
   const account = await file.read(path)
   account.passSalt = Buffer.from(nacl.randomBytes(64))
   account.passHash = Buffer.from(nacl.hash(Buffer.concat([account.passSalt, Buffer.from(`${newPass}`), account.passSalt])))
@@ -162,7 +165,7 @@ exports.changePassword = async (user, newPass) => {
  * @param {string} authorization - default "user"
  */
 exports.changeAuth = async (user, auth) => {
-  const path = module.exports.userAccountPath(user)
+  const path = exports.userAccountPath(user)
   const account = await file.read(path)
   account.auth = auth
   await file.write(path, account)
@@ -170,7 +173,7 @@ exports.changeAuth = async (user, auth) => {
 
 /** get a user's profile */
 exports.getProfile = async (user) => {
-  const account = await file.read(module.exports.userAccountPath(user))
+  const account = await file.read(exports.userAccountPath(user))
   return account
 }
 
@@ -178,19 +181,23 @@ exports.getProfile = async (user) => {
  * @param {string} username
  */
 exports.delete = async (user) => {
-  await file.delete(module.exports.userFolder(user))
+  await file.delete(exports.userFolder(user))
 }
 
 /** check if user account exists
  * @param {string} username
  */
 exports.exists = async (user) => {
-  return await file.exists(module.exports.userAccountPath(user))
+  return await file.exists(exports.userAccountPath(user))
 }
 
 /** list all users known to the system
  * @returns {AsyncIterable} - yields string account names
  */
-exports.iterateUsers = () => {
-  return file.listFolders(['users'])
+exports.iterateUsers = async function * () {
+  for await (const user of file.listFolders(['users'])) {
+    if (!settings.forbiddenUsernames.includes(user)) {
+      yield user
+    }
+  }
 }

@@ -49,7 +49,7 @@ module.exports.json = {
    */
   decode (jsonString) {
     const reviver = (key, value) => {
-      if (typeof value === 'object') {
+      if (typeof value === 'object' && value !== null /* I hate you */) {
         if (value.class === 'Attachment') {
           return new Attachment(Buffer.from(value.data, 'base64'), value.mimeType)
         } else if (value.class === 'AttachmentReference') {
@@ -75,19 +75,17 @@ module.exports.json = {
    * @returns {string} - json string containing object with attachments suitably encoded
    */
   encode (object, spaces = 0) {
-    const replacer = (key, value) => {
-      if (value instanceof AttachmentReference) {
-        if (value.data) {
-          return { class: value.constructor.name, hash: value.hash.toString('hex').toLowerCase(), mimeType: value.mimeType, data: value.data.toString('base64') }
-        } else {
-          return { class: value.constructor.name, hash: value.hash.toString('hex').toLowerCase(), mimeType: value.mimeType }
-        }
-      } else {
-        return value
-      }
-    }
+    return JSON.stringify(object, null, spaces)
+  },
 
-    return JSON.stringify(object, replacer, spaces)
+  /**
+   * Pretty prints an object using json5, with Attachments encoded in json format
+   * @param {any} data - arbitrary object to encode
+   * @param {Number} spaces - how many spaces of indent to use, defaults 0 for no whitespace
+   * @returns {string} - json string containing object with attachments suitably encoded
+   */
+  print (object, spaces = 2) {
+    return json5.stringify(object, null, spaces)
   }
 }
 
@@ -100,7 +98,7 @@ module.exports.cloneable = {
   decode (object) {
     if (Array.isArray(object)) {
       return object.map(entry => this.decode(entry))
-    } else if (typeof object === 'object') {
+    } else if (typeof object === 'object' && object !== null /* I hate you */) {
       if ('_bufferArrayBytes' in object) {
         return Buffer.from(object._bufferArrayBytes)
       } else if (object._class === 'Attachment') {
@@ -135,7 +133,7 @@ module.exports.cloneable = {
         _mimeType: object.mimeType,
         _hash: [...object.hash]
       }
-    } else if (typeof object === 'object') {
+    } else if (typeof object === 'object' && object !== null /* I hate you */) {
       return Object.fromEntries(Object.entries(object).map(([key, value]) => {
         return [key, this.decode(value)]
       }))

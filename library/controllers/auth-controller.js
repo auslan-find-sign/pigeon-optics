@@ -47,8 +47,8 @@ router.get('/users/', async (req, res) => {
 
 router.get('/users/:user/', async (req, res) => {
   const profile = await auth.getProfile(req.params.user)
-  const datasets = await dataset.listDatasets(req.params.user)
-  const lenses = await lens.listDatasets(req.params.user)
+  const datasets = await dataset.list(req.params.user)
+  const lenses = await lens.list(req.params.user)
 
   if (req.accepts('html')) {
     res.sendVibe('user-profile', `${req.params.user}’s Profile`, profile, datasets, lenses)

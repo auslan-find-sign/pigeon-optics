@@ -36,7 +36,7 @@ router.all('/lenses/create', auth.required, async (req, res) => {
     state.memo = `Cloned from /lenses/${req.query.clone}/: ${state.memo}`
   }
 
-  if (typeof req.body === 'object') {
+  if (typeof req.body === 'object' && req.body !== null /* I hate you */) {
     Object.assign(state, req.body)
   }
 
@@ -69,7 +69,12 @@ router.get('/lenses/:user\\::name/configuration', async (req, res) => {
     create: false,
     name: req.params.name
   }
-  res.sendVibe('lens-editor', 'Edit a Lens', state)
+  res.set('X-Version', config.version)
+  if (req.accepts('html')) {
+    res.sendVibe('lens-editor', 'Edit a Lens', state)
+  } else {
+    codec.respond(req, res, config)
+  }
 })
 
 router.put('/lenses/:user\\::name/configuration', auth.ownerRequired, async (req, res) => {
@@ -89,7 +94,11 @@ router.put('/lenses/:user\\::name/configuration', auth.ownerRequired, async (req
     await lens.build(req.session.auth.user, req.body.name)
     console.log('build finished, sending redirect')
 
-    return res.redirect(uri`/lenses/${req.params.user}:${req.params.name}/`)
+    if (req.accepts('html')) {
+      return res.redirect(uri`/lenses/${req.params.user}:${req.params.name}/`)
+    } else {
+      return res.sendStatus(204)
+    }
   } catch (err) {
     const state = {
       ...req.body,
@@ -103,12 +112,12 @@ router.put('/lenses/:user\\::name/configuration', auth.ownerRequired, async (req
 
 router.get('/lenses/:user\\::name/configuration/map.js', async (req, res) => {
   const config = await lens.readConfig(req.params.user, req.params.name)
-  res.type('js').send(config.mapCode)
+  res.type('js').set('X-Version', config.version).send(config.mapCode)
 })
 
 router.get('/lenses/:user\\::name/configuration/reduce.js', async (req, res) => {
   const config = await lens.readConfig(req.params.user, req.params.name)
-  res.type('js').send(config.reduceCode)
+  res.type('js').set('X-Version', config.version).send(config.reduceCode)
 })
 
 router.get('/lenses/:user\\::name/logs', async (req, res) => {
@@ -129,7 +138,7 @@ router.delete('/lenses/:user\\::name/', auth.ownerRequired, async (req, res) => 
 router.get('/lenses/', async (req, res) => {
   const list = {}
   for await (const user of auth.iterateUsers()) {
-    const lenses = await lens.listDatasets(user)
+    const lenses = await lens.list(user)
     if (lenses && lenses.length > 0) {
       list[user] = lenses
     }
@@ -144,23 +153,20 @@ router.get('/lenses/', async (req, res) => {
 
 // get a list of datasets owned by a specific user
 router.get('/lenses/:user\\:', async (req, res) => {
-  try {
-    const lenses = await lens.listDatasets(req.params.user)
+  const lenses = await lens.list(req.params.user)
 
-    if (req.accepts('html')) {
-      const title = `${req.params.user}’s Viewports`
-      res.sendVibe('lens-list', title, { list: { [req.params.user]: lenses } })
-    } else {
-      codec.respond(req, res, lenses)
-    }
-  } catch (err) {
-    codec.respond(req, res.status(404), { error: err.message })
+  if (req.accepts('html')) {
+    const title = `${req.params.user}’s Viewports`
+    res.sendVibe('lens-list', title, { list: { [req.params.user]: lenses } })
+  } else {
+    codec.respond(req, res, lenses)
   }
 })
 
 // list contents of dataset
 router.get('/lenses/:user\\::name/', async (req, res) => {
   const config = await lens.readConfig(req.params.user, req.params.name)
+  res.set('X-Version', config.version)
 
   if (req.accepts('html')) {
     const recordIDs = await lens.listEntries(req.params.user, req.params.name)
@@ -177,9 +183,19 @@ router.get('/lenses/:user\\::name/', async (req, res) => {
   }
 })
 
+router.get('/lenses/:user\\::name/records/', async (req, res) => {
+  const config = await lens.readConfig(req.params.user, req.params.name)
+  const records = await lens.listEntryMeta(req.params.user, req.params.name)
+  res.set('X-Version', config.version)
+  res.set('ETag', `"${config.version}"`)
+  codec.respond(req, res, records)
+})
+
 // get a record from a user's dataset
 router.get('/lenses/:user\\::name/records/:recordID', async (req, res) => {
-  const record = await lens.readEntry(req.params.user, req.params.name, req.params.recordID)
+  const meta = await lens.readEntryMeta(req.params.user, req.params.name, req.params.recordID)
+  const record = await meta.read()
+  res.set('X-Version', meta.version)
 
   if (req.accepts('html')) {
     const title = `${req.params.user}:${req.params.name}/${req.params.recordID}`
@@ -189,6 +205,7 @@ router.get('/lenses/:user\\::name/records/:recordID', async (req, res) => {
     }
     res.sendVibe('lens-record', title, state)
   } else {
+    res.set('ETag', `"${meta.hash.toString('hex')}"`)
     codec.respond(req, res, record)
   }
 })

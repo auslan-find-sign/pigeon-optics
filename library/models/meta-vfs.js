@@ -10,7 +10,7 @@ const iterators = {
 
   datasets: async function * () {
     for await (const user of iterators.users()) {
-      for await (const name of datasets.iterateDatasets(user)) {
+      for await (const name of datasets.iterate(user)) {
         yield {
           path: `/datasets/${user}:${name}/`,
           user,
@@ -22,7 +22,7 @@ const iterators = {
 
   lenses: async function * () {
     for await (const user of iterators.users()) {
-      for await (const name of lenses.iterateDatasets(user)) {
+      for await (const name of lenses.iterate(user)) {
         yield {
           path: `/lenses/${user}:${name}/`,
           user,
