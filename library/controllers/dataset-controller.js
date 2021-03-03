@@ -95,8 +95,8 @@ router.all('/datasets/:user\\::name/configuration', auth.ownerRequired, async (r
         ...config,
         memo: req.body.memo
       })
-      if (req.accepts('html')) res.redirect(uri`/datasets/${req.params.user}:${req.params.name}/`)
-      else res.sendStatus(204)
+      if (req.accepts('html')) return res.redirect(uri`/datasets/${req.params.user}:${req.params.name}/`)
+      else return res.sendStatus(204)
     } catch (err) {
       error = err.message
     }

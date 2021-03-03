@@ -67,7 +67,7 @@ A new version of the dataset is created, removing this recordID from the collect
 
 ## A note on attachments
 
-Documents may include attached files, these are encoded in various ways depending if JSON or CBOR formatting are used. Attachments maybe inline in the document (if they are small) or maybe seperated and stored in a hash content addressed storage seperately. See [attachments.md](attachments.md) for information.
+Documents may include attached files, these are encoded in various ways depending if JSON or CBOR formatting are used. Attachments maybe inline in the document (if they are small) or maybe seperated and stored in a hash content addressed storage seperately. See [attachments.md](attachments.md) for information. Attachments will be garbage collected and deleted from the server some time after they stop being referenced by any datasets or lenses.
 
 ## A note on lenses
 
