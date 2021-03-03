@@ -1,7 +1,7 @@
 // server.js
 // This is the application server for the Sign Dataset
 const settings = require('./library/models/settings')
-const parseMs = require('parse-ms')
+const timestring = require('timestring')
 const express = require('express')
 const cookieSession = require('cookie-session')
 const methodOverride = require('method-override')
@@ -101,7 +101,7 @@ if (settings.garbageCollectAttachmentsInterval) {
   function attachmentsGC () {
     attachmentStore.pruneRandom()
   }
-  setInterval(attachmentsGC, parseMs(settings.garbageCollectAttachmentsInterval).milliseconds)
+  setInterval(attachmentsGC, timestring(settings.garbageCollectAttachmentsInterval, 'ms'))
 }
 
 const port = process.env.PORT || 3000

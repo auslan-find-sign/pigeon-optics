@@ -19,7 +19,7 @@ const StackTracey = require('stacktracey')
 
 const auth = require('./auth')
 const xbytes = require('xbytes')
-const parseMs = require('parse-ms')
+const timestring = require('timestring')
 const updateEvents = require('../utility/update-events')
 
 // Setup a VM for executing javascript lenses
@@ -245,7 +245,7 @@ lens.loadMapFunction = function (config) {
     const mapFunctionURL = `${settings.url}/lenses/${config.user}:${config.name}/configuration/map.js`
     try {
       await context.evalClosure(lines.join('\n'), [pathInfo, codec.cloneable.encode(data), log, emit], {
-        timeout: parseMs(settings.lensTimeout).milliseconds,
+        timeout: timestring(settings.lensTimeout, 'ms'),
         arguments: { reference: true },
         filename: mapFunctionURL,
         lineOffset: (-lines.length) + 2
@@ -290,7 +290,7 @@ lens.loadReduceFunction = async function (config) {
       ${config.reduceCode}
     })(...codec.cloneable.decode([$0, $1])))`,
     codec.cloneable.encode([left, right]), {
-      timeout: parseMs(settings.lensTimeout).milliseconds,
+      timeout: timestring(settings.lensTimeout, 'ms'),
       arguments: { copy: true },
       result: { copy: true },
       lineOffset: -2,
