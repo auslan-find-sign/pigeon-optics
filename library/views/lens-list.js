@@ -3,7 +3,7 @@ const uri = require('encodeuricomponent-tag')
 
 module.exports = (req, { list }) => {
   return layout(req, v => {
-    v.panel(v => {
+    v.panel({ class: 'lens-list' }, v => {
       v.header(v => {
         v.breadcrumbs(v => v.a('Lenses', { href: '/lenses/' }))
       })

@@ -63,3 +63,7 @@ body > footer a {
   --punctual: #ccc;
   --fn-name:  #3193c6;
 }
+
+div.panel {
+  background-blend-mode: screen;
+}

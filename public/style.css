@@ -491,3 +491,16 @@ code .f /* function name */ { color: var(--fn-name) }
   box-shadow: 0 2mm 3mm rgba(0, 0, 0, 20%);
   padding: 2mm 2mm 2mm 2mm;
 }
+
+/* background artwork settings */
+div.panel {
+  background-position: bottom right;
+  background-repeat: no-repeat;
+  background-size: 14em;
+  background-blend-mode: darken;
+}
+
+div.panel.lens-list {
+  background-image: url(/design/commissioned-art/lens-inspector.png);
+
+}
