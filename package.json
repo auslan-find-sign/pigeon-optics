@@ -15,11 +15,8 @@
   "author": "Phoenix Fox",
   "license": "SEE LICENSE IN LICENSE.txt",
   "dependencies": {
-    "@bluebie/style-object": "^1.0.1",
     "ace-builds": "^1.4.12",
     "borc": "^2.1.2",
-    "browserify": "^17.0.0",
-    "codemirror": "^5.59.2",
     "compression": "^1.7.4",
     "cookie-session": "^1.4.0",
     "dateformat": "^4.5.1",
@@ -44,7 +41,6 @@
     "sse-writer": "^3.0.4",
     "stacktracey": "^2.0.18",
     "tweetnacl": "^1.0.3",
-    "uglify-es": "^3.3.9",
     "unicode": "^13.0.0",
     "xbytes": "^1.7.0",
     "zip-stream": "^4.0.4"
