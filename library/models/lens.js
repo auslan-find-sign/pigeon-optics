@@ -20,6 +20,7 @@ const StackTracey = require('stacktracey')
 const auth = require('./auth')
 const xbytes = require('xbytes')
 const parseMs = require('parse-ms')
+const updateEvents = require('../utility/update-events')
 
 // Setup a VM for executing javascript lenses
 const Isolate = new ivm.Isolate({ memoryLimit: 64 })
@@ -65,6 +66,24 @@ lens.validateRecord = async function (id, data) {
   assert(id !== '', 'recordID must not be empty')
   assert(id.length <= 10000, 'recordID cannot be longer than 10 thousand characters')
   assert(data !== undefined, 'record data cannot be set to undefined, use delete operation instead')
+}
+
+// returns an object, with dataPath keys, and [user, name] values
+lens.getInputs = async function () {
+  // TODO: consider optimising/caching this somehow? seems expensive to do frequently
+  const inputMap = {}
+  for await (const user of auth.iterateUsers()) {
+    for await (const name of lens.iterate(user)) {
+      const lensConfig = await lens.readConfig(user, name)
+      for (const path of lensConfig.inputs) {
+        const normalized = codec.path.encode(codec.path.decode(path))
+        if (!Array.isArray(inputMap[normalized])) inputMap[normalized] = []
+        inputMap[normalized].push({ user, name })
+      }
+    }
+  }
+
+  return inputMap
 }
 
 lens.getMapOutputStore = function (user, name) {
@@ -287,3 +306,16 @@ lens.loadReduceFunction = async function (config) {
 }
 
 Object.assign(exports, queueify.object(lens))
+
+// setup listening for changes to inputs
+updateEvents.events.on('change', async ({ path, source, user, name, recordID }) => {
+  const matcher = codec.path.encode({ source, user, name })
+  const inputs = await lens.getInputs()
+  for (const [path, receivers] of Object.entries(inputs)) {
+    if (path === matcher) {
+      for (const { user: lensUser, name: lensName } of receivers) {
+        await lens.build(lensUser, lensName)
+      }
+    }
+  }
+})

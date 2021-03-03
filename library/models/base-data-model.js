@@ -4,6 +4,7 @@
 const codec = require('./codec')
 const itToArray = require('../utility/async-iterable-to-array')
 const assert = require('assert')
+const updateEvents = require('../utility/update-events')
 
 // read a version state info, a frozen representation of everything about the dataset's contents at that moment in time
 exports.readVersion = async function (user, name, version = null) {
@@ -36,6 +37,8 @@ exports.writeVersion = async function (user, name, snapshot) {
   if (config.garbageCollect === true) {
     await this.garbageCollect(user, name)
   }
+
+  process.nextTick(() => updateEvents.pathUpdated(codec.path.encode(this.source, user, name)))
 
   return snapshot
 }
@@ -234,8 +237,13 @@ exports.create = async function (user, name, config = {}) {
   assert(!(await this.exists(user, name)), 'Name already in use already exists, choose another name')
   await this.validateConfig(user, name, config)
 
-  await file.write(['config'], config)
   await file.write(['versions', '0'], { version: 0, records: {}, created: Date.now() })
+  await this.writeConfig(user, name, config)
+
+  process.nextTick(() => {
+    updateEvents.pathUpdated(codec.path.encode('meta', 'system', 'system', this.source))
+    updateEvents.pathUpdated(codec.path.encode(this.source, user, name))
+  })
 }
 
 /** read config of existing dataset
@@ -274,6 +282,7 @@ exports.writeConfig = async function (user, name, config) {
 exports.delete = async function (user, name) {
   const file = this.getFileStore(user, name)
   await file.delete([])
+  process.nextTick(() => updateEvents.pathUpdated(codec.path.encode('meta', 'system', 'system', this.source)))
 }
 
 /** overwrite all the entries in a dataset, removing any straglers

@@ -132,7 +132,7 @@ router.all('/datasets/:user\\::name/create-record', auth.ownerRequired, async (r
     ...req.body || {}
   }
 
-  let error = null
+  let error
   if (req.method === 'PUT') {
     try {
       const data = codec.json.decode(req.body.recordData)
@@ -177,7 +177,7 @@ router.post('/datasets/:user\\::name/records/', auth.ownerRequired, async (req, 
 
 // get a record from a user's dataset
 router.all('/datasets/:user\\::name/records/:recordID', async (req, res) => {
-  let error = null
+  let error
 
   if (req.method === 'PUT') {
     if (!req.owner) throw new Error('You do not have write access to this dataset')

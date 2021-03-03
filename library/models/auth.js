@@ -10,6 +10,7 @@ const unicodeParaSep = require('unicode/category/Zp')
 const file = require('./file/cbor')
 const codec = require('./codec')
 const settings = require('./settings')
+const updateEvents = require('../utility/update-events')
 
 exports.basicAuthMiddleware = async (req, res, next) => {
   // handle http basic auth
@@ -145,6 +146,8 @@ exports.register = async (user, pass, auth = 'user') => {
 
   await file.write(path, userData)
 
+  process.nextTick(() => updateEvents.pathUpdated('/meta/system:system/users'))
+
   return { user, auth }
 }
 
@@ -182,6 +185,7 @@ exports.getProfile = async (user) => {
  */
 exports.delete = async (user) => {
   await file.delete(exports.userFolder(user))
+  process.nextTick(() => updateEvents.pathUpdated('/meta/system:system/users'))
 }
 
 /** check if user account exists
