@@ -57,17 +57,19 @@ module.exports = (req, data, error = null) => {
 
           v.dt('Javascript Map Function')
           v.dd(v => {
-            v.p(`Map code receives recordPath string and recordData object from dataset, and can then
-            call output('recordID', { complex object }) to create a lens record with the recordID as
-            the entry's name. Values can be any JSON type, or Buffer, or Attachment instances to
-            represent file data. Buffers should only be used for small pieces of data like hashes.
-            Attachments should always be used for any large information for better performance.`)
+            v.div({
+              innerHTML: `Map function receives <code>path</code> and <code>data</code>. <code>path</code> is an object
+              containing <code>string</code> (full data path of input), and <code>source</code>, <code>user</code>,
+              <code>name</code>, and <code>recordID</code> properties. data contains the value of the underlying
+              dataset/lens output. Use <code>output(recordID, recordData)</code> to add an output to the lens.
+              <code>console.log/warn/info/error()</code> is also available for debugging.`
+            })
             v.sourceCodeEditor('mapCode', 'javascript', data.mapCode)
           })
 
           v.dt('Javascript Reduce Function')
           v.dd(v => {
-            v.p({
+            v.div({
               innerHTML: `When map functions output the same recordID multiple times, this function
               is called with <code>left</code> and <code>right</code> values. It should combine, and return
               a single result.`
