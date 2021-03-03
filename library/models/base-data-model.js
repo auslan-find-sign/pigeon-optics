@@ -21,6 +21,7 @@ exports.readVersion = async function (user, name, version = null) {
 exports.writeVersion = async function (user, name, snapshot) {
   const file = this.getFileStore(user, name)
   const config = await this.readConfig(user, name)
+  const prevVersion = await this.readVersion(user, name)
   config.version += 1
 
   snapshot.created = Date.now()
@@ -34,6 +35,21 @@ exports.writeVersion = async function (user, name, snapshot) {
   await file.write(['versions', `${snapshot.version}`], snapshot)
   await this.writeConfig(user, name, config)
 
+  // calculate changes, and ask attachment store to check and prune stuff that changed
+  const deletes = Object.keys(prevVersion.records).filter(x => !snapshot.records[x])
+  const changes = Object.keys(snapshot.records).filter(x => snapshot.records[x] && (!prevVersion.records[x] || !prevVersion.records[x].hash.equals(snapshot.records[x].hash)))
+
+  const { listReferences } = require('./attachment')
+  const attachmentStore = require('./attachment-storage')
+  for (const key of [...deletes, ...changes]) {
+    const oldEntry = await this.readEntry(user, name, key, prevVersion.version)
+    const refs = listReferences(oldEntry)
+    for (const attachRef of refs) {
+      await attachmentStore.prune(attachRef)
+    }
+  }
+
+  // garbage collect old objects and versions if enabled
   if (config.garbageCollect === true) {
     await this.garbageCollect(user, name)
   }
