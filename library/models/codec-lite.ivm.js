@@ -64,7 +64,7 @@ codec.cloneable.encode = function (object) {
       _mimeType: object.mimeType,
       _hash: [...object.hash]
     }
-  } else if (typeof object === 'object' && value !== null /* I hate you */) {
+  } else if (typeof object === 'object' && object !== null /* I hate you */) {
     return Object.fromEntries(Object.entries(object).map(([key, value]) => {
       return [key, codec.cloneable.encode(value)]
     }))
