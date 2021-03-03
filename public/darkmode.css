@@ -43,7 +43,7 @@ body > footer a {
   text-decoration-color: currentColor !important;
 }
 
-.source-code {
+.source-code, code.inline-source-code {
   /*  theme: FlatUI Dark */
   --background: #222;
   --background-selected: #3c424c;

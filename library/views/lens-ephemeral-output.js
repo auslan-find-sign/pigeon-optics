@@ -1,5 +1,4 @@
 const layout = require('./layout')
-const dateFormat = require('dateformat')
 const codec = require('../models/codec')
 
 module.exports = (req, { iter }) => {
@@ -17,25 +16,8 @@ module.exports = (req, { iter }) => {
         const [type, value] = Object.entries(obj)[0]
         if (type === 'log' && (value.logs.length || value.error)) {
           v.heading(`Logs for ${value.input}`)
-          if (value.error) v.pre(`Error:\n${JSON.stringify(value.error, null, 2)}`)
-          if (value.logs.length) {
-            v.ul(v => {
-              for (const { type, timestamp, args } of value.logs) {
-                const friendlyTimestamp = dateFormat(timestamp, 'ddd mmm dd yyyy HH:MM:ss.l')
-                const machineTimestamp = dateFormat(timestamp, "UTC:yyyy-mm-dd'T'HH:MM:ss.l'Z'")
-                v.li({ class: [`log-entry log-entry-type-${type}`] }, v => {
-                  v.time(friendlyTimestamp, { datetime: machineTimestamp })
-                  v.text(': [')
-                  v.code(`console.${type}`, { class: 'log-type' })
-                  v.text(']')
-                  for (const arg of args) {
-                    v.text(' ')
-                    v.code(typeof arg === 'string' ? arg : codec.json.encode(arg))
-                  }
-                })
-              }
-            })
-          }
+          if (value.error) v.stacktrace(value.error)
+          if (value.logs.length) v.logs(value.logs)
         } else if (type === 'record') {
           v.heading(`Output Record: ${value.id}`)
           v.sourceCode(codec.json.encode(value.data, 2))

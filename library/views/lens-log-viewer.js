@@ -1,7 +1,7 @@
 const layout = require('./layout')
 const uri = require('encodeuricomponent-tag')
-const dateFormat = require('dateformat')
 const codec = require('../models/codec')
+const highlight = require('h.js')
 
 module.exports = (req, { mapOutputs }) => {
   return layout(req, v => {
@@ -25,28 +25,11 @@ module.exports = (req, { mapOutputs }) => {
       for (const { input, error, logs } of mapOutputs) {
         v.heading({ level: 3 }, v => v.a(input, { href: input }))
 
-        if (error) {
-          v.heading({ level: 4 }, v => { v.icon('notice-in-circle'); v.text('Error:') })
-          v.pre(error)
-        }
+        if (error) v.stacktrace(error)
 
         if (logs && logs.length > 0) {
-          v.ul(v => {
-            for (const { type, timestamp, args } of logs) {
-              const friendlyTimestamp = dateFormat(timestamp, 'ddd mmm dd yyyy HH:MM:ss.l')
-              const machineTimestamp = dateFormat(timestamp, "UTC:yyyy-mm-dd'T'HH:MM:ss.l'Z'")
-              v.li({ class: [`log-entry log-entry-type-${type}`] }, v => {
-                v.time(friendlyTimestamp, { datetime: machineTimestamp })
-                v.text(': [')
-                v.code(`console.${type}`, { class: 'log-type' })
-                v.text(']')
-                for (const arg of args) {
-                  v.text(' ')
-                  v.code(typeof arg === 'string' ? arg : codec.json.encode(arg))
-                }
-              })
-            }
-          })
+          v.heading('console.log/warn/info/error:')
+          v.logs(logs)
         }
       }
     })

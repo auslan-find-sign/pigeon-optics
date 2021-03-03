@@ -223,11 +223,12 @@ lens.loadMapFunction = function (config) {
       ...codec.path.decode(path)
     }
 
+    const mapFunctionURL = `${settings.url}/lenses/${config.user}:${config.name}/configuration/map.js`
     try {
       await context.evalClosure(lines.join('\n'), [pathInfo, codec.cloneable.encode(data), log, emit], {
         timeout: parseMs(settings.lensTimeout).milliseconds,
         arguments: { reference: true },
-        filename: `${settings.url}/lenses/${config.user}:${config.name}/configuration/map.js`,
+        filename: mapFunctionURL,
         lineOffset: (-lines.length) + 2
       })
 
@@ -239,11 +240,17 @@ lens.loadMapFunction = function (config) {
       // ask v8 to free this context's memory
       context.release()
 
-      // /** @type {string} */
-      // const snippedStack = err.stack.split('at (<isolated-vm boundary>)')[0]
-      // return { input: input.path, outputs: [], logs, error: snippedStack.trim() }
-      const trace = StackTracey(err)
-      return { input: input.path, outputs: [], logs, error: trace }
+      const trace = new StackTracey(err)
+      const filteredTrace = trace.filter(x => x.file === mapFunctionURL && x.line >= 1)
+      const error = {
+        message: err.message,
+        type: err.constructor.name,
+        stacktrace: filteredTrace.items.map(x => ({
+          ...x,
+          codeAtLine: config.mapCode.split('\n')[x.line - 1]
+        }))
+      }
+      return { input: input.path, outputs: [], logs, error }
     }
   }
 }

@@ -1,5 +1,6 @@
 const VibeBuilder = require('./builder')
 const highlight = require('h.js')
+const json5 = require('json5')
 const path = require('path')
 
 /** gets or adds attributes object to args list when proxying calls to tag builder
@@ -287,6 +288,54 @@ class RichVibeBuilder extends VibeBuilder {
     } else {
       throw new Error('RichVibeBuilder.iconPath needs to point to a .svg symbol collection or a path ending in / with image files in it')
     }
+  }
+
+  // {
+  //   file: 'https://localhost:3000/lenses/system:ephemeral-1614727363645-b9b42251/configuration/map.js',
+  //   line: 4,
+  //   index: false,
+  //   callee: '',
+  //   column: 9,
+  //   native: false,
+  //   fileName: 'map.js',
+  //   fileShort: 'localhost:3000/lenses/system:ephemeral-1614727363645-b9b42251/configuration/map.js',
+  //   thirdParty: false,
+  //   beforeParse: 'at https://localhost:3000/lenses/system:ephemeral-1614727363645-b9b42251/configuration/map.js:4:9',
+  //   calleeShort: '',
+  //   fileRelative: 'localhost:3000/lenses/system:ephemeral-1614727363645-b9b42251/configuration/map.js',
+  //   codeAtLine: '  throw new Error('whatever')'
+  // },
+  stacktrace (error) {
+    return this.div({ class: 'stacktrace' }, v => {
+      v.heading(v => { v.icon('notice-in-circle'); v.text(` ${error.type}: ${error.message}`) })
+      v.ul(v => {
+        for (const item of error.stacktrace) {
+          v.li(v => {
+            v.span(`${item.fileName}`, { class: 'filename' })
+            v.span(`${item.line}`, { class: 'line' })
+            v.span(`${item.column}`, { class: 'column' })
+            v.code({ class: 'inline-source-code', innerHTML: highlight(`${item.codeAtLine}`) })
+          })
+        }
+      })
+    })
+  }
+
+  logs (logs) {
+    return this.ul({ class: 'logs' }, v => {
+      for (const { type, args } of logs) {
+        v.li({ class: [`log-entry log-entry-type-${type}`] }, v => {
+          v.code(`console.${type}(`, { class: 'log-type' })
+          let first = true
+          for (const arg of args) {
+            if (!first) v.text(', ')
+            v.code({ innerHTML: highlight(json5.stringify(arg)), class: 'inline-source-code' })
+            first = false
+          }
+          v.code(')')
+        })
+      }
+    })
   }
 }
 

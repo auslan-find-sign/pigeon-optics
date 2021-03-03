@@ -360,7 +360,7 @@ div.panel > dl > dd > input {
 }
 
 /* Source Code widget */
-.source-code {
+.source-code, code.inline-source-code {
   /*  theme: FlatUI Dark */
   --background: var(--bg-panel);
   --background-selected: #EFEFEF;
@@ -389,16 +389,26 @@ div.panel > dl > dd > input {
   color: var(--default);
 }
 
-.source-code > code .c /* comment */ { color: var(--comment) }
-.source-code > code .d /* JSDoc tag (only in comment) */ { color: var(--jsdoc) }
-.source-code > code .k /* keyword */ { color: var(--keyword) }
-.source-code > code .v /* value (number literal, boolean and some constants) */ { color: var(--value) }
-.source-code > code .s /* string literal (also means a template string) */ { color: var(--strlit) }
-.source-code > code .i /* interpolation content (only in template string) */ { color: var(--template) }
-.source-code > code .r /* regexp literal */ { color: var(--regexp) }
-.source-code > code .o /* operator symbol */ { color: var(--operator) }
-.source-code > code .p /* punctual symbol */ { color: var(--punctual) }
-.source-code > code .f /* function name */ { color: var(--fn-name) }
+.stacktrace li > span::after {
+  content: ":";
+}
+code.inline-source-code {
+  white-space: pre-wrap;
+  border-radius: 1mm;
+  padding-left: 1mm;
+  padding-right: 1mm;
+}
+
+code .c /* comment */ { color: var(--comment) }
+code .d /* JSDoc tag (only in comment) */ { color: var(--jsdoc) }
+code .k /* keyword */ { color: var(--keyword) }
+code .v /* value (number literal, boolean and some constants) */ { color: var(--value) }
+code .s /* string literal (also means a template string) */ { color: var(--strlit) }
+code .i /* interpolation content (only in template string) */ { color: var(--template) }
+code .r /* regexp literal */ { color: var(--regexp) }
+code .o /* operator symbol */ { color: var(--operator) }
+code .p /* punctual symbol */ { color: var(--punctual) }
+code .f /* function name */ { color: var(--fn-name) }
 
 
 .source-code code {
