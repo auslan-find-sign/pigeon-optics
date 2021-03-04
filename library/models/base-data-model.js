@@ -353,7 +353,7 @@ exports.merge = async function (user, name, entries) {
       const dataPath = codec.path.encode(this.source, user, name, id)
       const processed = await attachmentStore.storeAttachments(dataPath, data)
       const hash = await objectStore.write(processed)
-      if (!snapshot.records[id] || !hash.equals(snapshot.records[id])) {
+      if (!snapshot.records[id] || !hash.equals(snapshot.records[id].hash)) {
         snapshot.records[id] = { hash, version, changed: Date.now() }
       }
     } else {
