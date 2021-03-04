@@ -502,5 +502,8 @@ div.panel {
 
 div.panel.lens-list {
   background-image: url(/design/commissioned-art/lens-inspector.png);
+}
 
+div.panel.identity {
+  background-image: url(/design/commissioned-art/security-officer.png);
 }

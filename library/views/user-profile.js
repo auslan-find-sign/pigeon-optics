@@ -9,7 +9,7 @@ const uri = require('encodeuricomponent-tag')
  */
 module.exports = (req, profile, datasets, lenses) => {
   return layout(req, v => {
-    v.panel(v => {
+    v.panel({ class: 'identity' }, v => {
       v.header(v => {
         v.breadcrumbs(v => {
           v.a('Users', { href: '/users/' })
