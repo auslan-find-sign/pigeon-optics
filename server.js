@@ -89,6 +89,9 @@ app.use((error, req, res, next) => {
     res.status(500)
   }
 
+  console.error(error.name + ' Error: ' + error.message)
+  console.error(error.stack)
+
   if (req.accepts('html')) {
     res.sendVibe('error-handler', 'Request Error', error)
   } else {
