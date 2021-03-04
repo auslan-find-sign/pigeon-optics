@@ -146,7 +146,7 @@ exports.writeEntry = async function (user, name, recordID, data) {
   const dataPath = codec.path.encode(this.source, user, name, recordID)
   const processed = await attachmentStore.storeAttachments(dataPath, data)
   const hash = await objectStore.write(processed)
-  snapshot.records[recordID] = { hash, version: snapshot.version + 1 }
+  snapshot.records[recordID] = { hash, version: snapshot.version + 1, changed: Date.now() }
   await this.writeVersion(user, name, snapshot)
   return snapshot
 }

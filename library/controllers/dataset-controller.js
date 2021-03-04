@@ -6,6 +6,7 @@ const codec = require('../models/codec')
 const dataset = require('../models/dataset')
 const uri = require('encodeuricomponent-tag')
 const httpError = require('../utility/http-error')
+const assert = require('assert')
 
 // add req.owner boolean for any routes with a :user param
 router.param('user', auth.ownerParam)
@@ -172,7 +173,17 @@ router.get('/datasets/:user\\::name/records/', async (req, res) => {
 })
 
 router.post('/datasets/:user\\::name/records/', auth.ownerRequired, async (req, res) => {
-  // todo, implement dataset.merge
+  assert(req.body !== null, 'request body must not be null')
+  assert(typeof req.body === 'object', 'request body must be an object')
+  await dataset.merge(req.params.user, req.params.name, Object.entries(req.body))
+  return res.sendStatus(204)
+})
+
+router.put('/datasets/:user\\::name/records/', auth.ownerRequired, async (req, res) => {
+  assert(req.body !== null, 'request body must not be null')
+  assert(typeof req.body === 'object', 'request body must be an object')
+  await dataset.overwrite(req.params.user, req.params.name, Object.entries(req.body))
+  return res.sendStatus(204)
 })
 
 // get a record from a user's dataset

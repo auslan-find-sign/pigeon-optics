@@ -1,7 +1,6 @@
 /**
  * Dataset Model - provides access to a dataset stored on the service
  */
-const file = require('./file/cbor')
 const auth = require('./auth')
 const queueify = require('../utility/queueify')
 const assert = require('assert')
