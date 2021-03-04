@@ -30,9 +30,7 @@ async function * readPath (path) {
 readPath.meta = async function * readPathMeta (path) {
   if (Array.isArray(path)) {
     for (const entry of path) {
-      for await (const result of readPath.meta(entry)) {
-        yield result
-      }
+      yield * readPath.meta(entry)
     }
   } else if (typeof path === 'string') {
     const params = codec.path.decode(path)

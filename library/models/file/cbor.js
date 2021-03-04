@@ -47,9 +47,7 @@ exports.exists = async function (dataPath = []) {
  * @async
  */
 exports.list = async function * list (dataPath = []) {
-  for await (const name of this.raw.list(dataPath)) {
-    yield name
-  }
+  yield * this.raw.list(dataPath)
 }
 
 /** List all the folders in a data path
@@ -58,9 +56,7 @@ exports.list = async function * list (dataPath = []) {
  * @async
  */
 exports.listFolders = async function * list (dataPath = []) {
-  for await (const name of this.raw.listFolders(dataPath)) {
-    yield name
-  }
+  yield * this.raw.listFolders(dataPath)
 }
 
 // create an instance scoped in to a rootPath
