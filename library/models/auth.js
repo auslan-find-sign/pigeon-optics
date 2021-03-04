@@ -18,11 +18,11 @@ exports.basicAuthMiddleware = async (req, res, next) => {
     const authHeader = req.get('Authorization')
     const [type, credsb64] = authHeader.split(' ', 2)
     if (type.toLowerCase() === 'basic') {
-      const [user, pass] = Buffer.from(credsb64, 'base64').toString()
+      const [user, pass] = Buffer.from(credsb64, 'base64').toString().split(':', 2)
       try {
         req.session.auth = await exports.login(user, pass)
       } catch (err) {
-        return res.sendJSON({ err: 'Invalid credentials supplied with Basic HTTP authentication' })
+        return res.type('json').send(JSON.stringify({ err: 'Invalid credentials supplied with Basic HTTP authentication' }))
       }
     }
   }
