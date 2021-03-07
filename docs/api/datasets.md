@@ -67,7 +67,29 @@ A new version of the dataset is created, removing this recordID from the collect
 
 ## A note on attachments
 
-Documents may include attached files, these are encoded in various ways depending if JSON or CBOR formatting are used. Attachments maybe inline in the document (if they are small) or maybe seperated and stored in a hash content addressed storage seperately. See [attachments.md](attachments.md) for information. Attachments will be garbage collected and deleted from the server some time after they stop being referenced by any datasets or lenses.
+Records can include attachments. Attachments are a mime type string, and a binary blob of arbitrary length. Attachments are the best way to represent large pieces of media like images and video files, or large outputs of AI inferrence. Attachments can also be served from the Pigeon Optics server directly, and support range requests, so they're suitable for in browser video streaming playback. Uploading new attachments requires implementing a multipart/related mime encoder, to better allow the client and server to stream large attachments.
+
+If you submit a record containing attachment references, and the server is missing any of the attachments referenced, the server will respond with a 400 Bad Request, including a header 'X-Pigeon-Optics-Resend-With-Attachments' which contains a comma seperated list of hex encoded sha256 content hashes for all the resources that need to be provided.
+
+Clients MAY always upload attachments using multipart/related, but clients SHOULD attempt to just submit a cbor document as the root body of their http request, and repeat the request as a multipart/related with attachments included only if the request fails with a 400 error and X-Pigeon-Optics-Resend-With-Attachments header present in response.
+
+When using multipart/related, the application/cbor/json record data should be the last entity in the mime collection. It MUST have headers:
+
+```
+Content-Disposition: inline
+Message-ID: <record>
+Content-Type: application/cbor or application/json
+```
+
+Attachments should preceed the record data, and MUST have headers:
+
+```
+Content-Disposition: attachment
+Message-ID: <hex-sha256-content-hash-here>
+Content-Type: mimetype-here
+```
+
+Message-ID should contain a correct hex sha256 hash of the file's contents. Content-Type should be appropriate to the content and should match the content-type of the AttachmentReference in the cbor/json record data.
 
 ## A note on lenses
 
