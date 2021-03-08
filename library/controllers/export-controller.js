@@ -7,9 +7,13 @@ const attach = require('../models/attachment')
 const attachStorage = require('../models/attachment-storage')
 const uri = require('encodeuricomponent-tag')
 const pkg = require('../../package.json')
+const updateEvents = require('../utility/update-events')
 
 const { Readable } = require('stream')
 const ZipStream = require('zip-stream')
+const expresse = require('@toverux/expresse')
+const onFinished = require('on-finished')
+const destroy = require('destroy')
 const fs = require('fs-extra')
 
 const encodingMimeTypes = {
@@ -20,13 +24,22 @@ const encodingMimeTypes = {
 
 /**
  * iterator which yields chunks of text or buffer in whichever encoding is requested
- * @param {string} dataPath - path in form '/realm/user:name'
- * @param {string} encoding - 'cbor', 'json', or 'json-lines'
+ * @param {string} path - path in form '/realm/user:name'
+ * @param {object} opts - query string options
+ * @param {string} opts.encoding - 'cbor', 'json', or 'json-lines'
+ * @param {string} [opts.at] - version number string, only output records with this version number or higher
+ * @param {string} [opts.after] - version number string, only output records with a newer version than this
+ * @yields {string|Buffer}
  */
-async function * encodePath (dataPath, encoding) {
+async function * encodePath (dataPath, opts) {
+  const { encoding, after, at } = opts
   if (encoding === 'json') yield '{\n'
   let first = true
-  for await (const { path, data } of readPath(dataPath)) {
+  for await (const { path, version, read } of readPath.meta(dataPath)) {
+    if (after !== undefined && version <= parseInt(after)) continue
+    if (at !== undefined && version < parseInt(at)) continue
+
+    const data = await read()
     const { recordID } = codec.path.decode(path)
     if (encoding === 'cbor') {
       yield codec.cbor.encode([recordID, data])
@@ -47,10 +60,14 @@ async function * encodePath (dataPath, encoding) {
 /**
  * creates a node readable stream which outputs export data from the specified path
  * @param {string} path - path in form '/realm/user:name'
- * @param {string} encoding - 'cbor', 'json', or 'json-lines'
+ * @param {object} opts - query string options
+ * @param {string} opts.encoding - 'cbor', 'json', or 'json-lines'
+ * @param {string} [opts.at] - version number string, only output records with this version number or higher
+ * @param {string} [opts.after] - version number string, only output records with a newer version than this
+ * @returns {Readable}
  */
-function readableStreamOfPath (path, encoding) {
-  return Readable.from(encodePath(path, encoding))
+function readableStreamOfPath (...args) {
+  return Readable.from(encodePath(...args))
 }
 
 function streamArchive (dataPath, archiveType, includeAttachments) {
@@ -115,7 +132,7 @@ function streamArchive (dataPath, archiveType, includeAttachments) {
 //  - json-lines: returns a text file, where each line is a json array in the same format as cbor, followed by newlines \n
 //  - json: returns a json object where each key is an entryID and each value is entry data
 // json-lines maybe easier to process with large datasets, as you can just read a line in at a time
-router.get('/export/:realm(datasets|lenses)/:user\\::name', async (req, res) => {
+router.get('/:source(datasets|lenses)/:user\\::name/export', async (req, res) => {
   const path = uri`/${req.params.realm}/${req.params.user}:${req.params.name}`
   const mimeType = encodingMimeTypes[req.query.encoding]
 
@@ -128,14 +145,14 @@ router.get('/export/:realm(datasets|lenses)/:user\\::name', async (req, res) => 
   }
 
   res.type(mimeType)
-  readableStreamOfPath(path, req.query.encoding).pipe(res)
+  readableStreamOfPath(path, req.query).pipe(res)
 })
 
 /**
  * export a dataset/viewport output as a zip file
  */
-router.get('/export/:realm(datasets|lenses)/:user\\::name/zip', async (req, res) => {
-  const path = uri`/${req.params.realm}/${req.params.user}:${req.params.name}`
+router.get('/:source(datasets|lenses)/:user\\::name/zip', async (req, res) => {
+  const path = codec.path.encode(req.params)
 
   if (!await readPath.exists(path)) {
     return res.status('404').send('Underlying data not found')
@@ -147,8 +164,37 @@ router.get('/export/:realm(datasets|lenses)/:user\\::name/zip', async (req, res)
 /**
  * stream out changes to a lens or dataset's contents
  */
-router.get('/export/:realm(datasets|lenses)/:user\\::name/event-stream', async (req, res) => {
+router.get('/:source(datasets|lenses)/:user\\::name/event-stream', expresse.sse({ flushAfterWrite: true }), async (req, res) => {
+  const sources = {
+    datasets: require('../models/dataset'),
+    lenses: require('../models/lens')
+  }
+  const source = sources[req.params.source]
 
+  async function send () {
+    const snapshot = await source.readVersion(req.params.user, req.params.name)
+    if (snapshot) {
+      // make a records collection with just version numbers as values
+      const records = Object.fromEntries(
+        Object.entries(snapshot.records).forEach(([id, { version }]) =>
+          [id, version]
+        )
+      )
+
+      res.sse.data({ version: snapshot.version, records })
+      return true
+    }
+    return false
+  }
+
+  function cb () { send() }
+  updateEvents.events.on('update', cb)
+
+  onFinished(res, () => {
+    updateEvents.events.off('update', cb)
+  })
+
+  send() // send's current version of underlying dataset
 })
 
 module.exports = router

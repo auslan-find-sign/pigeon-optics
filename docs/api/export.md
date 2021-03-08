@@ -1,8 +1,8 @@
-## GET /export/(realm)/(username):(collection-name)?encoding=(encoding-type)&after=(version)&at=(version)
+## GET /(source)/(username):(collection-name)/export?encoding=(encoding-type)&after=(version)&at=(version)
 
 Exports all the data in the specified collection, as a machine readable file
 
-* `(realm)` must be one of `datasets` or `lenses`
+* `(source)` must be one of `datasets` or `lenses`
 * `(username)` must be the resources owner username string, uri encoded
 * `(collection-name)` must be the string name of the dataset or lens, uri encoded
 * `(encoding-type)` must be one of `cbor`, `json`, or `json-lines`
@@ -17,33 +17,30 @@ If `after` query string parameter is provided, export will only include records 
 
 If `at` query string paramater is provided, it behaves like `after` but includes entries with an equal version number, useful in combination with the event-stream api (see below)
 
-## GET /export/(realm)/(username):(collection-name)/zip
+## GET /(source)/(username):(collection-name)/zip
 
 Exports all the data in the specified collection, as a zip file containing a json folder and a cbor folder, with each record
 contained in each format.
 
 The response will be a zip file, served with appropriate mime type. The zip is generated dynamically and streamed out to the user, so it may have poor compression, and does not support HTTP range requests or specify a Content Length as these are unknown at the start of the request.
 
-## GET /export/(realm)/(username):(collection-name)/zip?attachments=true
+## GET /(source)/(username):(collection-name)/zip?attachments=true
 
 As above, but also includes `/attachments/` folder containing the binary blobs of any attachments referenced in records that are in the cbor/json folders in the zip. The attachment filenames are just their hash, hex encoded, with no file extension. To determine file's mime type, search the json/cbor for attachment metadata.
 
-## GET /export/(realm)/(username):(collection-name)/event-stream
+## GET /(source)/(username):(collection-name)/event-stream
 
-Responds with a text/event-stream, which immediately outputs an event with the current version number of the underlying dataset as ID field, JSON data. The Data will contain an object like this:
+Responds with an event stream, which immediately outputs an event containing this object:
 
+```json
 {
-  "version": same value as ID
-  "recordIDs": String[],
-  "changed": String[],
+  "version": 123,
+  "records": { "recordID1": 123, "record-xyz": 122, "record-foo": 3 }
 }
+```
 
-`version` will be a string, which matches the event's ID header. version should be treated as an arbitrary string, and not parsed or processed by downstream software. It is only to be used when reconnecting with the event-stream `Last-Event-ID` header.
+Which can be understood as meaning the current version of the dataset/lens is `123`, and `recordID1` was modified in the most recent update (it's value has changed, it has a different hash), `record-xyz` changed in the previous update, and `record-foo` changed in the third update, ages ago. There are no other records in the dataset.
 
-When connecting without providing a `Last-Event-ID` header, the first response will contain the current version string, and both `recordIDs` and `changed` will be an array containing a full list of every recordID in the underlying dataset/lens output.
+For efficient syncing, the best approach is to remove any records from your local copy whose ID's aren't included in the `"records"` property of the event, and to request `/(source)/(username):(collection-name)/export?at=(event.version)&encoding=(cbor|json|json-lines)` to load a stream of just records that have changed in the specified version or more recently.
 
-When reconnecting with a valid `Last-Event-ID`, the server may, if possible, choose to not send you an immediate event (if you're already up to date).
-
-After receiving an initial catch up event, the server will stream you further events in the same format whenever data changes in the underlying dataset or lens output. the `changed` field will be a list of recordIDs whose contents has changed.
-
-You can use the server's normal APIs to query those records. If you want to fully sync down the dataset, a good option is to use the export interface at the top of this document, and specify the value of the `version` field with it's `at` query string parameter.
+Note, this API always responds with JSON encoded events. It does not have a CBOR mode as event-stream is a text based format and doesn't efficiently support CBOR.
