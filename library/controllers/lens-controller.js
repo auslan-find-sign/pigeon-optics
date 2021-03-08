@@ -53,7 +53,7 @@ router.all('/lenses/create', auth.required, async (req, res) => {
       })
       // rebuild since settings may have changed
       await lens.build(req.session.auth.user, req.body.name)
-      return res.redirect(uri`/lenses/${req.session.auth.user}:${req.body.name}/`)
+      return res.redirect(303, uri`/lenses/${req.session.auth.user}:${req.body.name}/`)
     } catch (err) {
       state.error = err.stack || err.message
     }
@@ -93,7 +93,7 @@ router.put('/lenses/:user\\::name/configuration', auth.ownerRequired, async (req
     await lens.build(req.session.auth.user, req.body.name)
 
     if (req.accepts('html')) {
-      return res.redirect(uri`/lenses/${req.params.user}:${req.params.name}/`)
+      return res.redirect(303, uri`/lenses/${req.params.user}:${req.params.name}/`)
     } else {
       return res.sendStatus(204)
     }
@@ -130,7 +130,7 @@ router.get('/lenses/:user\\::name/logs', async (req, res) => {
 
 router.delete('/lenses/:user\\::name/', auth.ownerRequired, async (req, res) => {
   await lens.delete(req.params.user, req.params.name)
-  res.redirect(`/lenses/${req.params.user}:`)
+  res.redirect(303, `/lenses/${req.params.user}:`)
 })
 
 router.get('/lenses/', async (req, res) => {

@@ -47,7 +47,7 @@ exports.ownerParam = (req, res, next, value, id) => {
 exports.required = (req, res, next) => {
   if (!req.session || !req.session.auth || !req.session.auth.user) {
     if (req.accepts('html')) {
-      return res.redirect(uri`/auth?return=${req.originalUrl}`)
+      return res.redirect(303, uri`/auth?return=${req.originalUrl}`)
     } else {
       return res.status(401).set('WWW-Authenticate', 'Basic realm="Datasets", charset="UTF-8"]').sendJSON({
         err: 'This request requires you be logged in with basic auth or a cookie'
@@ -67,7 +67,7 @@ exports.ownerRequired = (req, res, next) => {
   } else {
     const msg = { err: 'You need to login as someone with permission to edit this' }
     if (req.accepts('html')) {
-      return res.redirect(uri`/auth?err=${msg.err}&return=${req.originalUrl}`)
+      return res.redirect(303, uri`/auth?err=${msg.err}&return=${req.originalUrl}`)
     } else {
       return codec.respond(req, res.status(403), msg)
     }

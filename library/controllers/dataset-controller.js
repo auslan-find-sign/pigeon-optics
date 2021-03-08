@@ -5,9 +5,9 @@ const auth = require('../models/auth')
 const codec = require('../models/codec')
 const dataset = require('../models/dataset')
 const uri = require('encodeuricomponent-tag')
-const httpError = require('../utility/http-error')
+const createError = require('http-errors')
 const assert = require('assert')
-
+s
 // add req.owner boolean for any routes with a :user param
 router.param('user', auth.ownerParam)
 
@@ -47,7 +47,7 @@ router.all('/datasets/create', auth.required, async (req, res) => {
   if (req.method === 'PUT' && req.body) {
     try {
       await dataset.create(req.session.auth.user, req.body.name, { memo: req.body.memo })
-      return res.redirect(uri`/datasets/${req.session.auth.user}:${req.body.name}/`)
+      return res.redirect(303, uri`/datasets/${req.session.auth.user}:${req.body.name}/`)
     } catch (err) {
       if (!req.accepts('html')) throw err
       error = err.message
@@ -80,7 +80,7 @@ router.delete('/datasets/:user\\::name/', auth.ownerRequired, async (req, res) =
   await dataset.delete(req.params.user, req.params.name)
 
   if (req.accepts('html')) {
-    res.redirect('/datasets/')
+    res.redirect(303, '/datasets/')
   } else {
     res.sendStatus(204)
   }
@@ -96,7 +96,7 @@ router.all('/datasets/:user\\::name/configuration', auth.ownerRequired, async (r
         ...config,
         memo: req.body.memo
       })
-      if (req.accepts('html')) return res.redirect(uri`/datasets/${req.params.user}:${req.params.name}/`)
+      if (req.accepts('html')) return res.redirect(303, uri`/datasets/${req.params.user}:${req.params.name}/`)
       else return res.sendStatus(204)
     } catch (err) {
       error = err.message
@@ -138,7 +138,7 @@ router.all('/datasets/:user\\::name/create-record', auth.ownerRequired, async (r
     try {
       const data = codec.json.decode(req.body.recordData)
       await dataset.writeEntry(req.params.user, req.params.name, req.body.recordID, data)
-      return res.redirect(uri`/datasets/${req.params.user}:${req.params.name}/records/${req.body.recordID}`)
+      return res.redirect(303, uri`/datasets/${req.params.user}:${req.params.name}/records/${req.body.recordID}`)
     } catch (err) {
       error = err.message
     }
@@ -152,7 +152,7 @@ router.post('/datasets/:user\\::name/create-record', auth.ownerRequired, async (
     req.body.data = codec.json.decode(req.body.recordData)
     await dataset.writeEntry(req.params.user, req.params.name, req.body.recordID, req.body.data)
     const path = uri`/datasets/${req.params.user}:${req.params.name}/${req.body.recordID}`
-    res.redirect(path)
+    res.redirect(303, path)
   } catch (err) {
     const title = `Creating a record inside ${req.params.user}:${req.params.name}/`
     const state = {
@@ -200,7 +200,7 @@ router.all('/datasets/:user\\::name/records/:recordID', async (req, res) => {
       const { version } = await dataset.writeEntry(req.params.user, req.params.name, req.params.recordID, req.body)
 
       if (req.accepts('html')) {
-        return res.redirect(uri`/datasets/${req.params.user}:${req.params.name}/records/${req.params.recordID}`)
+        return res.redirect(303, uri`/datasets/${req.params.user}:${req.params.name}/records/${req.params.recordID}`)
       } else {
         return req.set('X-Version', version).sendStatus(204)
       }
@@ -211,14 +211,14 @@ router.all('/datasets/:user\\::name/records/:recordID', async (req, res) => {
     if (!req.owner) throw new Error('You do not have write access to this dataset')
     const { version } = await dataset.deleteEntry(req.params.user, req.params.name, req.params.recordID)
     if (req.accepts('html')) {
-      return res.redirect(uri`/datasets/${req.params.user}:${req.params.name}/`)
+      return res.redirect(303, uri`/datasets/${req.params.user}:${req.params.name}/`)
     } else {
       return res.set('X-Version', version).sendStatus(204)
     }
   }
 
   const record = await dataset.readEntry(req.params.user, req.params.name, req.params.recordID)
-  if (!record) throw httpError(404, 'Record Not Found')
+  if (!record) throw createError.NotFound('Record Not Found')
 
   if (req.accepts('html')) {
     const sidebar = {

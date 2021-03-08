@@ -10,9 +10,9 @@ const sources = { datasets, lenses, meta: metaVFS }
 /** ReadPathOutput is what readPath yields
  * @typedef {Object} ReadPathOutput
  * @property {string} path - data path
- * @property {*} data - the record's value
- * @property {Buffer[32]} hash - the record's hash
  * @property {number} version - version number the record is sourced from
+ * @property {Buffer} hash - the record's hash
+ * @property {*} data - the record's value
  */
 
 /** reads a data path, which could be one specific record, or a whole dataset/viewport
@@ -27,6 +27,18 @@ async function * readPath (path) {
   }
 }
 
+/** ReadPathOutput is what readPath yields
+ * @typedef {Object} ReadPathMetaOutput
+ * @property {string} path - data path
+ * @property {number} version - version number the record is sourced from
+ * @property {Buffer} hash - the record's hash
+ * @property {async function} read - async read and return the value/data of this path
+ */
+
+/** reads a data path, which could be one specific record, or a whole dataset/viewport
+ * @param {string|Array} path - can be a path, or array of paths to read sequentially
+ * @yields {ReadPathMetaOutput}
+ */
 readPath.meta = async function * readPathMeta (path) {
   if (Array.isArray(path)) {
     for (const entry of path) {

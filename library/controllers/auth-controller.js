@@ -18,7 +18,7 @@ router.all('/auth', async (req, res) => {
       } else {
         req.session.auth = await auth.login(req.body.username, req.body.password)
       }
-      return res.redirect(req.body.return)
+      return res.redirect(303, req.body.return)
     } catch (err) {
       error = err.message
     }
@@ -33,7 +33,7 @@ router.all('/auth', async (req, res) => {
 
 router.get('/auth/logout', (req, res) => {
   delete req.session.auth
-  res.redirect(req.query.return || req.get('Referrer') || '/')
+  res.redirect(303, req.query.return || req.get('Referrer') || '/')
 })
 
 router.get('/users/', async (req, res) => {

@@ -79,7 +79,7 @@ app.use((req, res, next) => {
 })
 
 app.use((error, req, res, next) => {
-  if (error.httpCode) {
+  if (error.statusCode) {
     res.status(error.httpCode)
   } else if (error.code === 'ENOENT') {
     res.status(404) // something tried to read a file that doesn't exist
