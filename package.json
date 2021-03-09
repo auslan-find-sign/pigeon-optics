@@ -52,9 +52,10 @@
     "title": "Pigeon Optics",
     "data": "./.data",
     "url": "https://localhost:3000",
-    "lensTimeout": "10ms",
+    "lensTimeout": "50ms",
     "lensCodeSize": "5 MB",
-    "maxPostSize": "250 MB",
+    "maxRecordSize": "20 MB",
+    "maxAttachmentSize": "1 GB",
     "garbageCollectAttachmentsInterval": "1d",
     "forbiddenUsernames": [
       "system",

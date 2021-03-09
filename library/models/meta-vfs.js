@@ -38,6 +38,11 @@ const iterators = {
       cpu: process.cpuUsage(),
       uptime: process.uptime()
     }
+  },
+
+  settings: async function () {
+    const { title, lensTimeout, lensCodeSize, maxRecordSize, maxAttachmentSize } = require('./settings')
+    return { title, lensTimeout, lensCodeSize, maxRecordSize, maxAttachmentSize }
   }
 }
 
