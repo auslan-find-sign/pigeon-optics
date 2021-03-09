@@ -146,26 +146,6 @@ router.all('/datasets/:user\\::name/create-record', auth.ownerRequired, async (r
   res.sendVibe('dataset-record-editor', title, state, error)
 })
 
-// create a new record
-router.post('/datasets/:user\\::name/create-record', auth.ownerRequired, async (req, res) => {
-  try {
-    req.body.data = codec.json.decode(req.body.recordData)
-    await dataset.writeEntry(req.params.user, req.params.name, req.body.recordID, req.body.data)
-    const path = uri`/datasets/${req.params.user}:${req.params.name}/${req.body.recordID}`
-    res.redirect(303, path)
-  } catch (err) {
-    const title = `Creating a record inside ${req.params.user}:${req.params.name}/`
-    const state = {
-      create: true,
-      recordID: req.body.recordID,
-      recordData: req.body.recordData
-    }
-    console.log(err.stack)
-
-    res.sendVibe('dataset-record-editor', title, state, err.message)
-  }
-})
-
 // list records of dataset
 router.get('/datasets/:user\\::name/records/', async (req, res) => {
   const records = await dataset.listEntryMeta(req.params.user, req.params.name)
