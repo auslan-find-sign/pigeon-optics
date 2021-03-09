@@ -13,7 +13,6 @@ const { Readable } = require('stream')
 const ZipStream = require('zip-stream')
 const expresse = require('@toverux/expresse')
 const onFinished = require('on-finished')
-const destroy = require('destroy')
 const fs = require('fs-extra')
 
 const encodingMimeTypes = {
@@ -189,10 +188,7 @@ router.get('/:source(datasets|lenses)/:user\\::name/event-stream', expresse.sse(
 
   function cb () { send() }
   updateEvents.events.on('update', cb)
-
-  onFinished(res, () => {
-    updateEvents.events.off('update', cb)
-  })
+  onFinished(res, () => { updateEvents.events.off('update', cb) })
 
   send() // send's current version of underlying dataset
 })

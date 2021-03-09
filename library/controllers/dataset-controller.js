@@ -7,7 +7,7 @@ const dataset = require('../models/dataset')
 const uri = require('encodeuricomponent-tag')
 const createError = require('http-errors')
 const assert = require('assert')
-s
+
 // add req.owner boolean for any routes with a :user param
 router.param('user', auth.ownerParam)
 
