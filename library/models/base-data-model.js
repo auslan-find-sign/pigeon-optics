@@ -7,9 +7,9 @@ const assert = require('assert')
 const updateEvents = require('../utility/update-events')
 
 // read a version state info, a frozen representation of everything about the dataset's contents at that moment in time
-exports.readVersion = async function (user, name, version = null) {
+exports.readVersion = async function (user, name, version = undefined) {
   const file = this.getFileStore(user, name)
-  if (version === null) version = (await this.readConfig(user, name)).version
+  if (version === undefined) version = (await this.readConfig(user, name)).version
   if (await file.exists(['versions', `${version}`])) {
     return await file.read(['versions', `${version}`])
   } else {
@@ -67,7 +67,7 @@ exports.writeVersion = async function (user, name, snapshot) {
  * @returns {object} - parsed dataset record data
  * @async
  */
-exports.readEntry = async function (user, name, recordID, version = null) {
+exports.readEntry = async function (user, name, recordID, version = undefined) {
   const info = await this.readEntryMeta(user, name, recordID, version)
   if (info) {
     return await info.read()
@@ -82,7 +82,7 @@ exports.readEntry = async function (user, name, recordID, version = null) {
  * @returns {Object} { version: int, hash: Buffer[32], read: {Async Function} }
  * @async
  */
-exports.readEntryMeta = async function (user, name, recordID, version = null) {
+exports.readEntryMeta = async function (user, name, recordID, version = undefined) {
   const snapshot = await this.readVersion(user, name, version)
   const record = snapshot.records[recordID]
   if (record) {
@@ -103,7 +103,7 @@ exports.readEntryMeta = async function (user, name, recordID, version = null) {
  * @param {function} filter - optional filter function, gets { id, version, hash } object as arg, boolean return decides if iterator loads and outputs this result
  * @yields {Array} - { id: "recordID", data: {any}, hash: Buffer[32], version: {number} }
  */
-exports.iterateEntries = async function * (user, name, filter = null) {
+exports.iterateEntries = async function * (user, name, filter = undefined) {
   for await (const meta of this.iterateEntriesMeta(user, name, filter)) {
     const { id, hash, version } = meta
     const data = await meta.read()
@@ -117,7 +117,7 @@ exports.iterateEntries = async function * (user, name, filter = null) {
  * @param {function} filter - optional filter function, gets { id, version, hash } object as arg, boolean return decides if iterator loads and outputs this result
  * @yields {Array} - { id: "recordID", data: {any}, hash: Buffer[32], version: {number} }
  */
-exports.iterateEntriesMeta = async function * (user, name, filter = null) {
+exports.iterateEntriesMeta = async function * (user, name, filter = undefined) {
   const objectStore = this.getObjectStore(user, name)
   const snapshot = await this.readVersion(user, name)
   for (const [id, { version, hash }] of Object.entries(snapshot.records)) {
@@ -173,7 +173,7 @@ exports.deleteEntry = async function (user, name, recordID) {
  * @returns {string[]} - dataset entry id's
  * @async
  */
-exports.listEntries = async function (user, name, filter = null) {
+exports.listEntries = async function (user, name, filter = undefined) {
   return Object.keys(await this.listEntryMeta(user, name, filter))
 }
 
@@ -184,7 +184,7 @@ exports.listEntries = async function (user, name, filter = null) {
  * @returns {object} - keyed with recordIDs and values are { version: num, hash: Buffer[32], read: {AsyncFunction} }
  * @async
  */
-exports.listEntryMeta = async function (user, name, filter = null) {
+exports.listEntryMeta = async function (user, name, filter = undefined) {
   return Object.fromEntries((await itToArray(this.iterateEntriesMeta(user, name, filter))).map(x => [x.id, x]))
 }
 
