@@ -67,29 +67,15 @@ A new version of the dataset is created, removing this recordID from the collect
 
 ## A note on attachments
 
-Records can include attachments. Attachments are a mime type string, and a binary blob of arbitrary length. Attachments are the best way to represent large pieces of media like images and video files, or large outputs of AI inferrence. Attachments can also be served from the Pigeon Optics server directly, and support range requests, so they're suitable for in browser video streaming playback. Uploading new attachments requires implementing a multipart/related mime encoder, to better allow the client and server to stream large attachments.
+For regular object style records, you can use normal PUT messages to upload data, but taking advantage of Attachments is useful for uploading things like video files, AI model weights or outputs, or any other large binary blobs. Attachment uploads are normally handled using `multipart/form-data` mime messages, just like a web browser would use for file uploads in a html form.
 
-If you submit a record containing attachment references, and the server is missing any of the attachments referenced, the server will respond with a 400 Bad Request, including a header 'X-Pigeon-Optics-Resend-With-Attachments' which contains a comma seperated list of hex encoded sha256 content hashes for all the resources that need to be provided.
+You can include attachments as form data file uploads, with the field name `"attachment"`. For efficiency, it's usually a good idea to attempt to write the record as a regular PUT first. The Pigeon Optics server will check for attachments in the document, and if it already has the attachments it will accept the PUT immediately. If one or more attachments are missing, it will respond with a `400 Bad Request` error, and nothing will be modified in the dataset server side. This error response includes a header `X-Pigeon-Optics-Resend-With-Attachments` with a comma seperated list of hex encoded strings, which are the sha256 hash of each attachment that is missing server side.
 
-Clients MAY always upload attachments using multipart/related, but clients SHOULD attempt to just submit a cbor document as the root body of their http request, and repeat the request as a multipart/related with attachments included only if the request fails with a 400 error and X-Pigeon-Optics-Resend-With-Attachments header present in response.
+It's recommended that clients should use the `X-Pigeon-Optics-Resend-With-Attachments` header to select the attachments the server needs, and retry the request, as with a `multipart/form-data` body. A properly formatted body will include one or more `"attachment"` fields, containing file uploads, and a `"body"` attachment field with a file of either application/cbor or application/json mime type.
 
-When using multipart/related, the application/cbor/json record data should be the last entity in the mime collection. It MUST have headers:
+The server will understand the `"body"` attachment as being the body of the POST/PUT request, and store the provided attachments in it's global attachment store. If the client receives another `400 Bad Request` error, it maybe a server error, it maybe a client error (the hashes in the document's attachment references didn't match the uploaded files contents), or a race condition where the server could have removed an attachment from the global attachment store and may now require some extra attachments. If the `X-Pigeon-Optics-Resend-With-Attachments` hasn't changed, treat the response as a severe error. If the list has updated to include new entries, it's worth retrying again, with the new attachments required.
 
-```
-Content-Disposition: inline
-Message-ID: <record>
-Content-Type: application/cbor or application/json
-```
-
-Attachments should preceed the record data, and MUST have headers:
-
-```
-Content-Disposition: attachment
-Message-ID: <hex-sha256-content-hash-here>
-Content-Type: mimetype-here
-```
-
-Message-ID should contain a correct hex sha256 hash of the file's contents. Content-Type should be appropriate to the content and should match the content-type of the AttachmentReference in the cbor/json record data.
+Uploaded attachments will get cleared out of disk after a while, if they aren't referenced in any current dataset or lens outputs.
 
 ## A note on lenses
 
