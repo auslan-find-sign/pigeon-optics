@@ -62,6 +62,7 @@ module.exports.json = {
     }
 
     try {
+      if (Buffer.isBuffer(jsonString)) jsonString = jsonString.toString('utf-8')
       return JSON.parse(jsonString, reviver)
     } catch (err) {
       return json5.parse(jsonString, reviver)
