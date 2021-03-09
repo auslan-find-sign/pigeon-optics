@@ -23,8 +23,9 @@ app.use(require('compression')())
 
 // If forms are submitted, parse the data in to request.query and request.body
 app.use(express.urlencoded({ extended: true }))
-// If JSON is submitted, parse that in to request.body
-app.use(express.raw({ limit: settings.maxPostSize, type: ['application/json', 'application/cbor'] }))
+
+// handle decoding json and cbor
+app.use(express.raw({ limit: settings.maxRecordSize, type: ['application/json', 'application/cbor'] }))
 app.use((req, res, next) => {
   try {
     if (req.is('application/json')) {
