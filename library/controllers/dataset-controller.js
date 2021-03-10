@@ -7,6 +7,10 @@ const dataset = require('../models/dataset')
 const uri = require('encodeuricomponent-tag')
 const createError = require('http-errors')
 const assert = require('assert')
+const multipartAttachments = require('../utility/multipart-attachments')
+const { listReferences } = require('../models/attachment')
+const attachmentStore = require('../models/attachment-storage')
+const fs = require('fs-extra')
 
 // add req.owner boolean for any routes with a :user param
 router.param('user', auth.ownerParam)
@@ -152,22 +156,62 @@ router.get('/datasets/:user\\::name/records/', async (req, res) => {
   codec.respond(req, res, records)
 })
 
-router.post('/datasets/:user\\::name/records/', auth.ownerRequired, async (req, res) => {
+router.post('/datasets/:user\\::name/records/', auth.ownerRequired, multipartAttachments, async (req, res) => {
   assert(req.body !== null, 'request body must not be null')
   assert(typeof req.body === 'object', 'request body must be an object')
+
+  // import attachments?
+  if (req.attachments) {
+    for (const recordID in req.body) {
+      const references = new Set(listReferences(req.body[recordID]).map(x => x.hash.toString('hex')))
+      for (const hexhash of references.values()) {
+        if (req.attachments[hexhash]) {
+          const dataPath = codec.path.encode('datasets', req.params.user, req.params.name, recordID)
+          await attachmentStore.writeHashedStream(dataPath, Buffer.from(hexhash, 'hex'), fs.createReadStream(req.attachments[hexhash]))
+        }
+      }
+    }
+  }
+
+  // validate all references are available
+  const missing = await attachmentStore.listMissing([...new Set(listReferences(req.body).map(x => x.hash.toString('hex')))])
+  if (missing.length > 0) {
+    return res.set('X-Pigeon-Optics-Resend-With-Attachments', missing.join(',')).sendStatus(400)
+  }
+
   await dataset.merge(req.params.user, req.params.name, Object.entries(req.body))
   return res.sendStatus(204)
 })
 
-router.put('/datasets/:user\\::name/records/', auth.ownerRequired, async (req, res) => {
+router.put('/datasets/:user\\::name/records/', auth.ownerRequired, multipartAttachments, async (req, res) => {
   assert(req.body !== null, 'request body must not be null')
   assert(typeof req.body === 'object', 'request body must be an object')
+
+  // import attachments?
+  if (req.attachments) {
+    for (const recordID in req.body) {
+      const references = [...new Set(listReferences(req.body[recordID]).map(x => x.hash.toString('hex')))]
+      for (const hexhash of references) {
+        if (req.attachments[hexhash]) {
+          const dataPath = codec.path.encode('datasets', req.params.user, req.params.name, recordID)
+          await attachmentStore.writeHashedStream(dataPath, Buffer.from(hexhash, 'hex'), fs.createReadStream(req.attachments[hexhash]))
+        }
+      }
+    }
+  }
+
+  // validate all references are available
+  const missing = await attachmentStore.listMissing([...new Set(listReferences(req.body).map(x => x.hash.toString('hex')))])
+  if (missing.length > 0) {
+    return res.set('X-Pigeon-Optics-Resend-With-Attachments', missing.join(',')).sendStatus(400)
+  }
+
   await dataset.overwrite(req.params.user, req.params.name, Object.entries(req.body))
   return res.sendStatus(204)
 })
 
 // get a record from a user's dataset
-router.all('/datasets/:user\\::name/records/:recordID', async (req, res) => {
+router.all('/datasets/:user\\::name/records/:recordID', multipartAttachments, async (req, res) => {
   let error
 
   if (req.method === 'PUT') {
@@ -176,6 +220,24 @@ router.all('/datasets/:user\\::name/records/:recordID', async (req, res) => {
       if (req.is('urlencoded')) {
         req.body = codec.json.decode(req.body.recordData)
       }
+
+      const references = [...new Set(listReferences(req.body).map(x => x.hash.toString('hex')))]
+      // first, write any attachments included in a form-data request body
+      if (req.attachments) {
+        for (const hexhash of references) {
+          if (req.attachments[hexhash]) {
+            const dataPath = codec.path.encode('datasets', req.params.user, req.params.name, req.params.recordID)
+            await attachmentStore.writeHashedStream(dataPath, Buffer.from(hexhash, 'hex'), fs.createReadStream(req.attachments[hexhash]))
+          }
+        }
+      }
+
+      // validate all references are available
+      const missing = await attachmentStore.listMissing([...new Set(listReferences(req.body).map(x => x.hash.toString('hex')))])
+      if (missing.length > 0) {
+        return res.set('X-Pigeon-Optics-Resend-With-Attachments', missing.join(',')).sendStatus(400)
+      }
+
       // write record
       const { version } = await dataset.writeEntry(req.params.user, req.params.name, req.params.recordID, req.body)
 

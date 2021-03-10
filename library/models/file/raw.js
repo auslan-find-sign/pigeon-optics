@@ -3,6 +3,7 @@ const path = require('path')
 const os = require('os')
 const settings = require('../settings')
 const assert = require('assert')
+const { Readable } = require('stream')
 
 // encodes a string to be a valid filename but not use meaningful characters like . or /
 function encodePathSegment (string) {
@@ -55,13 +56,32 @@ exports.getPath = function (dataPath) {
 }
 
 /** Create or update a raw file, creating a .backup file of the previous version in the process
- * @param {string|string[]} path - relative path inside data directory the data is located at
+ * @param {string[]} path - relative path inside data directory the data is located at
  * @param {Buffer} data - cbor encodable object to store
  * @async
  */
 exports.write = async function (dataPath, data) {
   assert(Array.isArray(dataPath), 'dataPath must be an array of path segments')
   assert(Buffer.isBuffer(data), 'data must be a Buffer instance')
+
+  return await this.writeStream(dataPath, Readable.from(data))
+}
+
+/** Create or update a raw file, creating a .backup file of the previous version in the process
+ * @param {string[]} path - relative path inside data directory the data is located at
+ * @param {ReadableStream} stream - binary data to stream to file
+ * @async
+ */
+exports.writeStream = async function (dataPath, stream) {
+  assert(Array.isArray(dataPath), 'dataPath must be an array of path segments')
+
+  // little utility to listen to events on stuff with an async await style
+  function event (obj, event, errEvent = 'error') {
+    return new Promise((resolve, reject) => {
+      obj.once(event, (arg) => resolve(arg))
+      obj.once(errEvent, (err) => reject(err))
+    })
+  }
 
   const path1 = this.fullPath(dataPath, this.extension)
   const path2 = this.fullPath(dataPath, `${this.extension}.backup`)
@@ -72,7 +92,7 @@ exports.write = async function (dataPath, data) {
 
   const rand = `${Math.round(Math.random() * 0xFFFFFF)}-${Math.round(Math.random() * 0xFFFFFF)}`
   const tempPath = path.join(os.tmpdir(), `pigeon-optics-writing-${rand}${this.extension}`)
-  await fs.writeFile(tempPath, data)
+  await event(stream.pipe(fs.createWriteStream(tempPath)), 'end')
 
   // update backup with a copy of what was here previously if something old exists
   if (await fs.pathExists(path1)) {

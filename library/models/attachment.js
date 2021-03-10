@@ -85,7 +85,10 @@ class Attachment extends AttachmentReference {
   }
 }
 
-// crawls a structure of arrays and objects to find all attachments referenced
+/** crawls a structure of arrays and objects to find all attachments referenced
+ * @param {any} input
+ * @returns {AttachmentReference[]}
+ */
 function listReferences (input) {
   if (Array.isArray(input)) {
     return input.flatMap(x => listReferences(x))

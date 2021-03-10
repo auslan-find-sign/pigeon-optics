@@ -28,7 +28,7 @@ exports.getPath = function (hash) {
 }
 
 /** read something from the hash
- * @param {Buffer[32]} hash - hash of object to read
+ * @param {Buffer} hash - hash of object to read
  * @returns {*}
  * @async
  */
@@ -37,9 +37,9 @@ exports.read = async function (hash) {
   return await this.codec.decode(data)
 }
 
-/** Create or update a cbor data file, creating a .backup file of the previous version in the process
+/** Add a blob to the blob store, based on it's sha256 hash
  * @param {object} data - cbor encodable object to store
- * @returns {Buffer[32]} hash
+ * @returns {Buffer} hash
  * @async
  */
 exports.write = async function (data) {
@@ -53,6 +53,24 @@ exports.write = async function (data) {
   return hash
 }
 
+/** Add a blob to the store, with a specified hash
+ * Warning: this doesn't use the codec stuff at all, data had better already be encoded
+ * @param {Buffer} hash
+ * @param {ReadableStream} stream
+ * @returns {Buffer} hash
+ * @async
+ */
+exports.writeHashedStream = async function (hash, stream) {
+  const dataPath = [hash.toString('hex')]
+
+  if (await this.raw.exists(dataPath)) {
+    stream.resume() // empty the stream, don't do anything with it
+  } else {
+    await this.raw.writeStream(dataPath, stream)
+  }
+  return hash
+}
+
 /** Remove a cbor data file
  * @param {string|string[]} path - relative path inside data directory the data is located at
  * @async
@@ -62,7 +80,7 @@ exports.delete = async function (hash) {
 }
 
 /** Checks a given data path for an existing record, and returns true or false async
- * @param {Buffer[32]} hash - hash of content to check if it's in the store
+ * @param {Buffer} hash - hash of content to check if it's in the store
  * @returns {boolean}
  * @async
  */
@@ -71,7 +89,7 @@ exports.exists = async function (hash) {
 }
 
 /** Async Iterator of all the stored blob's hashes as buffers
- * @yields {Buffer[32]}
+ * @yields {Buffer}
  * @async
  */
 exports.iterate = async function * () {

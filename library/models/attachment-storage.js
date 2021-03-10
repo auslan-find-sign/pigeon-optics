@@ -4,6 +4,7 @@
 const { Attachment, AttachmentReference, listReferences } = require('./attachment')
 const readPath = require('./read-path')
 const crypto = require('crypto')
+const codec = require('./codec')
 const { default: PQueue } = require('p-queue')
 const metaQueue = new PQueue({ concurrency: 1 })
 
@@ -73,6 +74,34 @@ exports.readMetadata = async function (input) {
   return await metaStore.read(['attachments', 'meta', name])
 }
 
+// callback will be given metadata object to manipulate and mutate, any changes will be written back
+async function metaEdit (hash, callback) {
+  const metaPath = ['attachments', 'meta', hash.toString('hex')]
+  const metadata = {
+    created: Date.now(),
+    updated: Date.now(),
+    hash,
+    linkers: []
+  }
+
+  await metaQueue.add(async () => {
+    // try to load existing metadata
+    if (await metaStore.exists(metaPath)) {
+      Object.assign(metadata, await metaStore.read(metaPath))
+    }
+
+    const prevMetaHash = codec.objectHash(metadata)
+    await callback(metadata)
+
+    if (!codec.objectHash(metadata).equals(prevMetaHash)) {
+      metadata.updated = Date.now()
+      await metaStore.write(metaPath, metadata)
+    }
+  })
+
+  return metadata
+}
+
 /** Create or update a cbor data file, creating a .backup file of the previous version in the process
  * @param {string} dataPath - dataPath to entry which is storing this attachment, to link up for pruning later
  * @param {Attachment|Buffer} data - Attachment object containing data, or a buffer of data
@@ -91,24 +120,8 @@ exports.write = async function (dataPath, data) {
   // write blob out (underlying blob storage only writes if it doesn't exist already)
   const hash = await blobStore.write(buffer)
 
-  await metaQueue.add(async () => {
-    const metaPath = ['attachments', 'meta', hash.toString('hex')]
-    const metadata = {
-      created: Date.now(),
-      hash,
-      linkers: []
-    }
-
-    // try to load existing metadata
-    if (await metaStore.exists(metaPath)) {
-      Object.assign(metadata, await metaStore.read(metaPath))
-    }
-
-    if (!metadata.linkers.includes(dataPath)) {
-      metadata.updated = Date.now()
-      metadata.linkers.push(dataPath)
-      await metaStore.write(metaPath, metadata)
-    }
+  await metaEdit(hash, (metadata) => {
+    if (metadata.linkers.includes(dataPath)) metadata.linkers.push(dataPath)
   })
 
   if (data instanceof Attachment) {
@@ -116,6 +129,18 @@ exports.write = async function (dataPath, data) {
   } else {
     return hash
   }
+}
+
+// write a stream with a known hash in to attachment storage, used for more efficient multipart/form-data uploads
+// where the data gets hashed in the multipart/form-data decoder in ./utility/multipart-attachments.js
+exports.writeHashedStream = async function (dataPath, hash, stream) {
+  // write the stream to disk, or drain it if it's already on disk
+  await blobStore.writeHashedStream(hash, stream)
+  await metaEdit(hash, (metadata) => {
+    if (metadata.linkers.includes(dataPath)) metadata.linkers.push(dataPath)
+  })
+
+  return hash
 }
 
 /** Remove a cbor data file
@@ -138,6 +163,16 @@ exports.delete = async (attachment) => {
 exports.exists = async (attachment) => {
   const hash = inputToHash(attachment)
   await metaStore.exists(['attachments', 'meta', hash.toString('hex')])
+}
+
+/**
+ * returns an array of hash's that are missing from the list
+ * @param {string[]|Buffer[]} list - list of string or buffer sha256 hashes
+ * @returns {string[]} - hex sha256 hashes
+ */
+exports.listMissing = async (list) => {
+  const existsList = await Promise.all(list.map(x => exports.exists(x)))
+  return list.filter((hash, index) => !existsList[index])
 }
 
 /**
