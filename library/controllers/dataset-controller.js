@@ -153,7 +153,7 @@ router.all('/datasets/:user\\::name/create-record', auth.ownerRequired, async (r
 // list records of dataset
 router.get('/datasets/:user\\::name/records/', async (req, res) => {
   const records = await dataset.listEntryMeta(req.params.user, req.params.name)
-  codec.respond(req, res, records)
+  codec.respond(req, res, records.map(({ id, version, hash }) => ({ id, version, hash })))
 })
 
 router.post('/datasets/:user\\::name/records/', auth.ownerRequired, multipartAttachments, async (req, res) => {
