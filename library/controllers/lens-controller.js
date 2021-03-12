@@ -182,7 +182,7 @@ router.get('/lenses/:user\\::name/', async (req, res) => {
 })
 
 // list records of lens
-router.get('/datasets/:user\\::name/records/', async (req, res) => {
+router.get('/lenses/:user\\::name/records/', async (req, res) => {
   const config = await lens.readConfig(req.params.user, req.params.name)
   const records = await lens.listEntryMeta(req.params.user, req.params.name)
   res.set('X-Version', config.version)
