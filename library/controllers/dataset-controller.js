@@ -152,7 +152,10 @@ router.all('/datasets/:user\\::name/create-record', auth.ownerRequired, async (r
 
 // list records of dataset
 router.get('/datasets/:user\\::name/records/', async (req, res) => {
+  const config = await dataset.readConfig(req.params.user, req.params.name)
   const records = await dataset.listEntryMeta(req.params.user, req.params.name)
+  res.set('X-Version', config.version)
+  res.set('ETag', `"${config.version}"`)
   codec.respond(req, res, Object.fromEntries(Object.entries(records).map(([id, { version, hash }]) => [id, { version, hash }])))
 })
 

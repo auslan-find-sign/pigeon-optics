@@ -181,15 +181,16 @@ router.get('/lenses/:user\\::name/', async (req, res) => {
   }
 })
 
-router.get('/lenses/:user\\::name/records/', async (req, res) => {
+// list records of lens
+router.get('/datasets/:user\\::name/records/', async (req, res) => {
   const config = await lens.readConfig(req.params.user, req.params.name)
   const records = await lens.listEntryMeta(req.params.user, req.params.name)
   res.set('X-Version', config.version)
   res.set('ETag', `"${config.version}"`)
-  codec.respond(req, res, records)
+  codec.respond(req, res, Object.fromEntries(Object.entries(records).map(([id, { version, hash }]) => [id, { version, hash }])))
 })
 
-// get a record from a user's dataset
+// get a record from a user's lens
 router.get('/lenses/:user\\::name/records/:recordID', async (req, res) => {
   const meta = await lens.readEntryMeta(req.params.user, req.params.name, req.params.recordID)
   const record = await meta.read()
