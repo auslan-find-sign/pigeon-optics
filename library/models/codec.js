@@ -193,7 +193,7 @@ module.exports.objectHash = (object) => {
  * @param {*} object - object to send back as JSON, CBOR, or a stylised webpage
  */
 module.exports.respond = async (req, res, object) => {
-  const bestMatch = req.accepts(['application/cbor', 'application/json', 'text/html'])
+  const bestMatch = req.accepts(['text/html', 'application/cbor', 'application/json'])
 
   if (object[Symbol.asyncIterator]) { // AsyncIterators will stream out
     if (bestMatch === 'application/cbor') {
