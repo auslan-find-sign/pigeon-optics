@@ -81,7 +81,7 @@ app.use((req, res, next) => {
 
 app.use((error, req, res, next) => {
   if (error.statusCode) {
-    res.status(error.httpCode)
+    res.status(error.statusCode)
   } else if (error.code === 'ENOENT') {
     res.status(404) // something tried to read a file that doesn't exist
   } else if (error.name === 'SyntaxError' || error.stack.includes('/borc/src/decoder.js')) {
