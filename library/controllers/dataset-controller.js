@@ -214,11 +214,11 @@ router.put('/datasets/:user\\::name/records/', auth.ownerRequired, multipartAtta
 })
 
 // get a record from a user's dataset
-router.all('/datasets/:user\\::name/records/:recordID', multipartAttachments, async (req, res) => {
+router.all('/datasets/:user\\::name/records/:recordID', multipartAttachments, async (req, res, next) => {
   let error
 
   if (req.method === 'PUT') {
-    if (!req.owner) throw new Error('You do not have write access to this dataset')
+    if (!req.owner) next(createError.Unauthorized('You do not have write access to this dataset'))
     try {
       if (req.is('urlencoded')) {
         req.body = codec.json.decode(req.body.recordData)
@@ -253,7 +253,7 @@ router.all('/datasets/:user\\::name/records/:recordID', multipartAttachments, as
       error = err.message
     }
   } else if (req.method === 'DELETE') {
-    if (!req.owner) throw new Error('You do not have write access to this dataset')
+    if (!req.owner) return next(createError.Unauthorized('You do not have write access to this dataset'))
     const { version } = await dataset.deleteEntry(req.params.user, req.params.name, req.params.recordID)
     if (req.accepts('html')) {
       return res.redirect(303, uri`/datasets/${req.params.user}:${req.params.name}/`)
@@ -263,7 +263,7 @@ router.all('/datasets/:user\\::name/records/:recordID', multipartAttachments, as
   }
 
   const record = await dataset.readEntry(req.params.user, req.params.name, req.params.recordID)
-  if (!record) throw createError.NotFound('Record Not Found')
+  if (!record) return next(createError.NotFound('Record Not Found'))
 
   if (req.accepts('html')) {
     const sidebar = {
