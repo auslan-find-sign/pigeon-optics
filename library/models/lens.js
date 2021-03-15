@@ -14,7 +14,6 @@ const fs = require('fs-extra')
 const codec = require('./codec')
 const ivm = require('isolated-vm')
 const settings = require('./settings')
-const queueify = require('../utility/queueify')
 const StackTracey = require('stacktracey')
 
 const auth = require('./auth')
@@ -28,16 +27,16 @@ const Isolate = new ivm.Isolate({ memoryLimit: 64 })
 const codecIvmCode = fs.readFileSync(require.resolve('./codec-lite.ivm.js')).toString()
 const codecScript = Isolate.compileScriptSync(codecIvmCode)
 
-const lens = Object.assign({}, require('./base-data-model'))
+Object.assign(exports, require('./base-data-model'))
 
-lens.source = 'lenses'
+exports.source = 'lenses'
 
 // resolve path inside this - override with viewports path in user folder
-lens.path = function (user, ...path) {
+exports.path = function (user, ...path) {
   return [...auth.userFolder(user), 'lenses', ...path]
 }
 
-lens.validateConfig = async function (user, name, config) {
+exports.validateConfig = async function (user, name, config) {
   const badChars = "!*'();:@&=+$,/?%#[]".split('')
   assert(!badChars.some(char => name.includes(char)), `Name must not contain any of ${badChars.join(' ')}`)
   assert(name.length >= 1, 'Name cannot be empty')
@@ -61,7 +60,7 @@ lens.validateConfig = async function (user, name, config) {
 }
 
 // validate a record is acceptable
-lens.validateRecord = async function (id, data) {
+exports.validateRecord = async function (id, data) {
   assert(typeof id === 'string', 'recordID must be a string')
   assert(id !== '', 'recordID must not be empty')
   assert(id.length <= 10000, 'recordID cannot be longer than 10 thousand characters')
@@ -69,12 +68,12 @@ lens.validateRecord = async function (id, data) {
 }
 
 // returns an object, with dataPath keys, and [user, name] values
-lens.getInputs = async function () {
+exports.getInputs = async function () {
   // TODO: consider optimising/caching this somehow? seems expensive to do frequently
   const inputMap = {}
   for await (const user of auth.iterateUsers()) {
-    for await (const name of lens.iterate(user)) {
-      const lensConfig = await lens.readConfig(user, name)
+    for await (const name of exports.iterate(user)) {
+      const lensConfig = await exports.readConfig(user, name)
       for (const path of lensConfig.inputs) {
         const normalized = codec.path.encode(codec.path.decode(path))
         if (!Array.isArray(inputMap[normalized])) inputMap[normalized] = []
@@ -86,7 +85,7 @@ lens.getInputs = async function () {
   return inputMap
 }
 
-lens.getMapOutputStore = function (user, name) {
+exports.getMapOutputStore = function (user, name) {
   const cborStore = require('./file/cbor').instance({
     rootPath: this.path(user, name, 'map-cache')
   })
@@ -97,7 +96,7 @@ lens.getMapOutputStore = function (user, name) {
  *  path, error if any, and logs
  * @yields {object}
  */
-lens.iterateLogs = async function * (user, name) {
+exports.iterateLogs = async function * (user, name) {
   const mapOutputStore = this.getMapOutputStore(user, name)
   for await (const filename of mapOutputStore.list()) {
     const { input, error, logs } = await mapOutputStore.read([filename])
@@ -106,7 +105,7 @@ lens.iterateLogs = async function * (user, name) {
 }
 
 // (re)build map outputs
-lens.buildMapOutputs = async function (user, name) {
+exports.buildMapOutputs = async function (user, name) {
   const readPath = require('./read-path') // break cyclic dependency
   const mapOutputStore = this.getMapOutputStore(user, name)
   const config = await this.readConfig(user, name)
@@ -135,7 +134,7 @@ lens.buildMapOutputs = async function (user, name) {
 }
 
 // async iterator which yields [recordID, recordData] format
-lens.reduceMapOutput = async function * (user, name) {
+exports.reduceMapOutput = async function * (user, name) {
   const mapOutputStore = this.getMapOutputStore(user, name)
   const config = await this.readConfig(user, name)
 
@@ -173,12 +172,12 @@ lens.reduceMapOutput = async function * (user, name) {
 }
 
 // (re)builds new version of lens dataset output by reducing map output cache
-lens.buildReducedVersion = async function (user, name) {
+exports.buildReducedVersion = async function (user, name) {
   await this.overwrite(user, name, this.reduceMapOutput(user, name))
 }
 
 // (re)build a specified lens
-lens.build = async function (user, name) {
+exports.build = async function (user, name) {
   await this.buildMapOutputs(user, name)
   await this.buildReducedVersion(user, name)
 }
@@ -200,7 +199,7 @@ lens.build = async function (user, name) {
  * @param {object} config - lens config object
  * @returns {LensMapFunction}
  */
-lens.loadMapFunction = function (config) {
+exports.loadMapFunction = function (config) {
   return async function userMapFunction (input, logger = null) {
     const { path, data } = input
     const context = await Isolate.createContext()
@@ -279,7 +278,7 @@ lens.loadMapFunction = function (config) {
  * @param {*} lens - name of javascript lens
  * @returns {async function} - function accepts two entries and returns one
  */
-lens.loadReduceFunction = async function (config) {
+exports.loadReduceFunction = async function (config) {
   return async function userReduceFunction (left, right) {
     const context = await Isolate.createContext()
     // load embedded codec library
@@ -305,16 +304,14 @@ lens.loadReduceFunction = async function (config) {
   }
 }
 
-Object.assign(exports, queueify.object(lens))
-
 // setup listening for changes to inputs
 updateEvents.events.on('change', async ({ path, source, user, name, recordID }) => {
   const matcher = codec.path.encode({ source, user, name })
-  const inputs = await lens.getInputs()
+  const inputs = await exports.getInputs()
   for (const [path, receivers] of Object.entries(inputs)) {
     if (path === matcher) {
       for (const { user: lensUser, name: lensName } of receivers) {
-        await lens.build(lensUser, lensName)
+        await exports.build(lensUser, lensName)
       }
     }
   }

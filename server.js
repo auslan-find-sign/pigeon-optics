@@ -101,7 +101,7 @@ app.use((error, req, res, next) => {
 })
 
 if (settings.garbageCollectAttachmentsInterval) {
-  const attachmentStore = require('./library/models/attachment-storage')
+  const attachmentStore = require('./library/models/attachment-storage-old')
   function attachmentsGC () {
     attachmentStore.pruneRandom()
   }
