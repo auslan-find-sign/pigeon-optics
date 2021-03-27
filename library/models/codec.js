@@ -4,13 +4,11 @@
 const cbor = require('cbor')
 const json5 = require('json5')
 const objectHash = require('object-hash')
-const { Attachment, AttachmentReference } = require('./attachment')
 const Vibe = require('../vibe/rich-builder')
 const layout = require('../views/layout')
 
 module.exports.cbor = {
   decoderOpts: {},
-
   encoderOpts: { highWaterMark: 25000000 },
 
   /**
@@ -112,17 +110,7 @@ module.exports.path = {
  * @returns {Buffer} - sha256 hash (32 bytes) in a nodejs Buffer
  * */
 module.exports.objectHash = (object) => {
-  return objectHash(object, {
-    algorithm: 'sha256',
-    encoding: 'buffer',
-    replacer: value => {
-      if (value instanceof AttachmentReference) {
-        // don't bother trying to hash data, and treat Attachment and AttachmentReference as equivilent since the real data hasn't changed
-        return ['datasets/Attachment', value.mimeType, value.hash]
-      }
-      return value
-    }
-  })
+  return objectHash(object, { algorithm: 'sha256', encoding: 'buffer' })
 }
 
 /**
