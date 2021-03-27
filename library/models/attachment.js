@@ -1,4 +1,4 @@
-const cbor = require('borc')
+const cbor = require('cbor')
 const crypto = require('crypto')
 const settings = require('./settings')
 

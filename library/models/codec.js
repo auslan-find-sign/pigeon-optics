@@ -1,7 +1,7 @@
 /**
  * CBOR codec, implementing custom tagged type for attachments
  */
-const cbor = require('borc')
+const cbor = require('cbor')
 const json5 = require('json5')
 const objectHash = require('object-hash')
 const { Attachment, AttachmentReference } = require('./attachment')
@@ -9,26 +9,35 @@ const Vibe = require('../vibe/rich-builder')
 const layout = require('../views/layout')
 
 module.exports.cbor = {
+  decoderOpts: {
+    tags: {
+      27: ([type, ...args]) => {
+        if (type === 'pigeon-optics/Attachment') {
+          return new Attachment(...args)
+        } else if (type === 'pigeon-optics/AttachmentReference') {
+          return new AttachmentReference(...args)
+        }
+      }
+    }
+  },
+
+  encoderOpts: { highWaterMark: 25000000 },
+
   /**
    * Decodes first item in buffer using CBOR, unpacking any attachments included in the cbor too
    * @param {Buffer} buffer - buffer containing cbor which optionally uses tag 27 object representation to include Attachment and AttachmentReference objects
    * @returns {any} - returns decoded object
    */
   decode (inputBuffer) {
-    const decoder = new cbor.Decoder({
-      size: inputBuffer.length,
-      tags: {
-        27: ([type, ...args]) => {
-          if (type === 'pigeon-optics/Attachment') {
-            return new Attachment(...args)
-          } else if (type === 'pigeon-optics/AttachmentReference') {
-            return new AttachmentReference(...args)
-          }
-        }
-      }
-    })
+    return cbor.decodeFirstSync(inputBuffer, exports.cbor.decoderOpts)
+  },
 
-    return decoder.decodeFirst(inputBuffer)
+  getDecodeStream () {
+    return new cbor.Decoder(exports.cbor.decoderOpts)
+  },
+
+  getEncoderStream () {
+    return new cbor.Encoder(exports.cbor.encoderOpts)
   },
 
   /**
@@ -37,7 +46,7 @@ module.exports.cbor = {
    * @returns {Buffer} - cbor buffer
    */
   encode (data) {
-    return cbor.encode(data)
+    return cbor.encodeOne(data, exports.cbor.encoderOpts)
   }
 }
 
