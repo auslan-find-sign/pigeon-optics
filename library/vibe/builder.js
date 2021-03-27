@@ -237,7 +237,7 @@ class VibeBuilder {
 
 // make convenience html tag methods available
 for (const tagName of Tags) {
-  VibeBuilder.prototype[tagName] ||= function (...args) {
+  VibeBuilder.prototype[tagName] = VibeBuilder.prototype[tagName] || function (...args) {
     return this.tag(tagName, ...args)
   }
 }
