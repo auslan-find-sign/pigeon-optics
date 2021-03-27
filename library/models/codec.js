@@ -92,14 +92,17 @@ const recordCompile = ptr.compile(recordPath)
 module.exports.path = {
   decode (string) {
     const out = datasetMatch(string) || recordMatch(string)
-    return out ? out.params : out
+    return out ? { ...out.params } : out
   },
-  encode (...args) {
-    if (args.length === 1) {
-      return args.recordID ? recordCompile(args[0]) : datasetCompile(args[0])
+  encode (source, user, name, recordID = undefined) {
+    if (typeof source === 'object') {
+      return this.encode(source.source, source.user, source.name, source.recordID)
+    }
+
+    if (typeof recordID === 'string') {
+      return recordCompile({ source, user, name, recordID })
     } else {
-      const [source, user, name, recordID] = args
-      return recordID ? recordCompile({ source, user, name, recordID }) : datasetCompile({ source, user, name })
+      return datasetCompile({ source, user, name })
     }
   }
 }
