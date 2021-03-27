@@ -1,6 +1,6 @@
 ## GET /datasets/
 
-returns a Map/Hash/Object keyed with string usernames, and each value is an array of dataset names that user has
+returns a Map/Hash/Object keyed with string usernames, and each value is an array of dataset names that user has created.
 
 ## GET /datasets/username:
 
@@ -17,15 +17,15 @@ returns an array of dataset names this user owns
 
 returns an object with dataset configuration, and a list of records in the dataset and their versions.
 
-```json
+```js
 {
   "user": "username",
   "name": "dataset-name",
-  "version": "overall-dataset-version-string",
+  "version": 8,
   "config": { "memo": "Free text describing the dataset" },
   "records": {
-    "name-of-record": { "version": "version-string" },
-    "name-of-record-2": { "version": "version-string 2" },
+    "name-of-record": { "version": 1, "hash": Buffer, "links": [] },
+    "name-of-record-2": { "version": 8, "hash": Buffer, "links": [] },
   }
 }
 ```
@@ -36,8 +36,8 @@ returns a Map/Hash/Object with string keys (recordIDs) and object values `{ vers
 
 ```json
 {
-  "recordA": { "version": "6" },
-  "recordB": { "version": "7" }
+  "recordA": { "version": 6, "hash": Buffer, "links": []  },
+  "recordB": { "version": 7, "hash": Buffer, "links": []  }
 }
 ```
 

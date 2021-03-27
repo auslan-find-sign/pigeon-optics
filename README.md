@@ -2,7 +2,7 @@
 
 <img src="public/design/commissioned-art/lens-inspector.png?raw=true" align=right height=200 style=height:16rem;float:right;shape-outside:circle(6.5rem)>
 
-Pigeon Optics is a little webapp for having fun with data and collaborating on community data projects. If you need something big and Enterprise, look at Mongo or CouchDB. Pigeon Optics aims to be like a a little friend who helps you and your pals take object-style data and do map-reduce things to it, without needing to spend heaps on a server with lots of ram and disk. It can also keep track of attachment files, so you can store your video clips and gifs in here too.
+Pigeon Optics is a little webapp for having fun with data and collaborating on community data projects. If you need something big and Enterprise, look at Mongo or CouchDB. Pigeon Optics aims to be like a little friend who helps you and your pals take object-style data and do map-reduce things to it, without needing to spend heaps on a server with lots of ram and disk. It can also keep track of attachment files, so you can store your video clips and gifs in here too.
 
 With Pigeon Optics, anyone can make an account, create datasets, upload records to those datasets, create lenses to transform datasets in to new formats.
 

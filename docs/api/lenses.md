@@ -21,7 +21,7 @@ returns an object with lens configuration, and a list of records in the dataset 
 {
   "user": "username",
   "name": "lens-name",
-  "version": "overall-dataset-version-string",
+  "version": 39,
   "config": {
     "memo": "Free text describing the dataset",
     "mapCode": "js source code",
@@ -29,8 +29,8 @@ returns an object with lens configuration, and a list of records in the dataset 
     "inputs": ["/datasets/user:name/", "/lenses/user:name/"],
   },
   "records": {
-    "name-of-record": { "version": "version-string", "hash": Buffer[32] },
-    "name-of-record-2": { "version": "version-string 2", "hash": Buffer[32] },
+    "name-of-record": { "version": 14, "hash": Buffer[32], "links": [] },
+    "name-of-record-2": { "version": 19, "hash": Buffer[32], "links": [] },
   }
 }
 ```
