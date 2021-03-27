@@ -3,6 +3,7 @@
 const settings = require('./library/models/settings')
 const timestring = require('timestring')
 const express = require('express')
+require('express-async-errors')
 const cookieSession = require('cookie-session')
 const methodOverride = require('method-override')
 const crypto = require('crypto')
@@ -19,24 +20,34 @@ Vibe.viewsPath = './library/views'
 Vibe.iconPath = '/design/icomoon/symbol-defs.svg'
 
 // enable response compression
-app.use(require('compression')())
+app.use(require('compression')({}))
 
 // If forms are submitted, parse the data in to request.query and request.body
 app.use(express.urlencoded({ extended: true }))
 
 // handle decoding json and cbor
 app.use(express.raw({ limit: settings.maxRecordSize, type: ['application/json', 'application/cbor'] }))
+
+// log requests
 app.use((req, res, next) => {
-  try {
-    if (req.is('application/json')) {
-      req.body = codec.json.decode(req.body.toString())
-    } else if (req.is('application/cbor')) {
-      req.body = codec.cbor.decode(req.body)
+  console.info(`req ${req.method} ${req.path}`)
+  if (req.method !== 'GET') {
+    for (const [name, value] of Object.entries(req.headers)) console.info(`  - ${name}: ${value}`)
+    if (req.body) {
+      console.info('Body:')
+      console.info(req.body)
     }
-    next()
-  } catch (err) {
-    codec.respond(req, res.status(415), { err: `Problem parsing request body: ${err.message}` })
   }
+  next()
+})
+
+app.use((req, res, next) => {
+  if (req.is('application/json')) {
+    req.body = codec.json.decode(req.body.toString())
+  } else if (req.is('application/cbor')) {
+    req.body = codec.cbor.decode(req.body)
+  }
+  next()
 })
 
 // allow forms to override method using Rails ?_method= format
@@ -59,6 +70,7 @@ app.use(require('./library/models/auth').basicAuthMiddleware)
 // make all the files in 'public' available
 // https://expressjs.com/en/starter/static-files.html
 app.use(express.static('public'))
+app.use('/npm', express.static('node_modules'))
 
 app.use(require('./library/controllers/auth-controller'))
 app.use(require('./library/controllers/attachment-controller'))
@@ -66,7 +78,6 @@ app.use(require('./library/controllers/dataset-controller'))
 app.use(require('./library/controllers/lens-controller'))
 app.use(require('./library/controllers/export-controller'))
 app.use(require('./library/controllers/meta-controller'))
-app.use('/npm', express.static('node_modules'))
 
 app.get('/', (req, res) => {
   res.sendVibe('homepage', settings.title)
@@ -90,18 +101,24 @@ app.use((error, req, res, next) => {
     res.status(500)
   }
 
-  console.error(error.name + ' Error: ' + error.message)
-  console.error(error.stack)
+  if (req.path !== '/favicon.ico') {
+    console.error(`For ${req.method} ${req.path}`)
+    console.error(error.name + ' Error: ' + error.message)
+    console.error(error.stack)
+  }
 
   if (req.accepts('html')) {
     res.sendVibe('error-handler', 'Request Error', error)
   } else {
-    codec.respond(req, res, { error: error.message })
+    codec.respond(req, res, {
+      error: error.message,
+      stack: req.auth === 'admin' && error.stack
+    })
   }
 })
 
 if (settings.garbageCollectAttachmentsInterval) {
-  const attachmentStore = require('./library/models/attachment-storage-old')
+  const attachmentStore = require('./library/models/attachment-storage')
   function attachmentsGC () {
     attachmentStore.pruneRandom()
   }

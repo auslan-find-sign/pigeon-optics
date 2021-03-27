@@ -22,7 +22,7 @@ exports.basicAuthMiddleware = async (req, res, next) => {
       try {
         req.session.auth = await exports.login(user, pass)
       } catch (err) {
-        return res.type('json').send(JSON.stringify({ err: 'Invalid credentials supplied with Basic HTTP authentication' }))
+        return codec.respond(req, res.status(400), { error: 'Invalid credentials supplied with Basic HTTP authentication' })
       }
     }
   }
@@ -37,7 +37,7 @@ exports.basicAuthMiddleware = async (req, res, next) => {
 
 /** app.param handler to populate req.owner with a boolean for if this resource should be editable */
 exports.ownerParam = (req, res, next, value, id) => {
-  req.owner = req.session.auth && (req.session.auth.user === req.params[id] || req.session.auth.auth === 'admin')
+  req.owner = req.auth && (req.user === req.params[id] || req.auth === 'admin')
   next()
 }
 
@@ -49,8 +49,9 @@ exports.required = (req, res, next) => {
     if (req.accepts('html')) {
       return res.redirect(303, uri`/auth?return=${req.originalUrl}`)
     } else {
-      return res.status(401).set('WWW-Authenticate', 'Basic realm="Datasets", charset="UTF-8"]').sendJSON({
-        err: 'This request requires you be logged in with basic auth or a cookie'
+      res.status(401).set('WWW-Authenticate', 'Basic realm="PigeonOptics", charset="UTF-8"]')
+      return codec.respond(req, res, {
+        error: 'This request requires you be logged in with basic auth or a cookie'
       })
     }
   } else {
@@ -65,7 +66,7 @@ exports.ownerRequired = (req, res, next) => {
   if (req.owner) {
     return next()
   } else {
-    const msg = { err: 'You need to login as someone with permission to edit this' }
+    const msg = { error: 'You need to login as someone with permission to edit this' }
     if (req.accepts('html')) {
       return res.redirect(303, uri`/auth?err=${msg.err}&return=${req.originalUrl}`)
     } else {
@@ -199,7 +200,7 @@ exports.exists = async (user) => {
  * @returns {AsyncIterable} - yields string account names
  */
 exports.iterateUsers = async function * () {
-  for await (const user of file.listFolders(['users'])) {
+  for await (const user of file.iterateFolders(['users'])) {
     if (!settings.forbiddenUsernames.includes(user)) {
       yield user
     }
