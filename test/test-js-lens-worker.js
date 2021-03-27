@@ -16,8 +16,8 @@ if (left === 'log') console.log('hey', 'whats up', 5)
 if (right === 'error') throw new Error('oops')
 return left + right`
 
-describe('/library/workers/interface.js > LensWorker.startup', async () => {
-  it('catches map syntax errors', async () => {
+describe('/library/workers/interface.js > LensWorker.startup', async function () {
+  it('catches map syntax errors', async function () {
     const worker = new LensWorker()
     const startup = await worker.startup({
       mapType: 'javascript',
@@ -30,7 +30,7 @@ describe('/library/workers/interface.js > LensWorker.startup', async () => {
     assert(startup.map.errors.length > 0, 'startup should return at least one error about the map code syntax')
   })
 
-  it('catches reduce syntax errors', async () => {
+  it('catches reduce syntax errors', async function () {
     const worker = new LensWorker()
     const startup = await worker.startup({
       mapType: 'javascript',
@@ -43,7 +43,7 @@ describe('/library/workers/interface.js > LensWorker.startup', async () => {
     assert(startup.reduce.errors.length > 0, 'startup should return at least one error about the map code syntax')
   })
 
-  it('catches map and reduce syntax errors in the same run', async () => {
+  it('catches map and reduce syntax errors in the same run', async function () {
     const worker = new LensWorker()
     const startup = await worker.startup({
       mapType: 'javascript',
@@ -57,7 +57,7 @@ describe('/library/workers/interface.js > LensWorker.startup', async () => {
     assert(startup.reduce.errors.length > 0, 'startup should return at least one error about the map code syntax')
   })
 
-  it('starts up correctly with good code', async () => {
+  it('starts up correctly with good code', async function () {
     const worker = new LensWorker()
     const startup = await worker.startup({
       mapType: 'javascript',
@@ -72,21 +72,23 @@ describe('/library/workers/interface.js > LensWorker.startup', async () => {
   })
 })
 
-describe('/library/workers/interface.js > LensWorker.map', async () => {
-  it('maps correctly', async () => {
-    const worker = new LensWorker()
+describe('/library/workers/interface.js > LensWorker.map', async function () {
+  let worker
+
+  before('startup worker', async function () {
+    worker = new LensWorker()
     await worker.startup({
       mapType: 'javascript',
       mapCode: mapCode,
       reduceCode: reduceCode
     })
+  })
 
+  it('maps correctly', async function () {
     const result = await worker.map({
       path: '/datasets/user:name/records/recordID',
       data: { foo: 'bar', v: 'yehaw' }
     })
-
-    await worker.shutdown()
 
     const expected = [
       { id: 'a', data: 1 },
@@ -101,20 +103,11 @@ describe('/library/workers/interface.js > LensWorker.map', async () => {
     assert.deepStrictEqual(result.errors, [], 'there shouldn\'t be any errors')
   })
 
-  it('logs from maps and catches throws', async () => {
-    const worker = new LensWorker()
-    await worker.startup({
-      mapType: 'javascript',
-      mapCode: mapCode,
-      reduceCode: reduceCode
-    })
-
+  it('logs from maps and catches throws', async function () {
     const result = await worker.map({
       path: '/datasets/user:name/records/recordID',
       data: { foo: 'bar', v: 'yehaw', plzthrow: 'nice', plzlog: 'hey' }
     })
-
-    await worker.shutdown()
 
     assert.deepStrictEqual(result.logs.length, 1, 'there should be one log output')
     assert.deepStrictEqual(result.logs[0].args, ['hey'], 'the log should have the right message')
@@ -122,37 +115,34 @@ describe('/library/workers/interface.js > LensWorker.map', async () => {
     assert.deepStrictEqual(result.errors[0].message, 'nice', 'error message should be correct')
     assert.deepStrictEqual(result.errors[0].type, 'Error', 'error message should be of the Error type')
   })
+
+  after('shutdown worker', async function () {
+    await worker.shutdown()
+  })
 })
 
-describe('/library/workers/interface.js > LensWorker.reduce', async () => {
-  it('reduces correctly', async () => {
-    const worker = new LensWorker()
+describe('/library/workers/interface.js > LensWorker.reduce', async function () {
+  let worker
+
+  before('startup worker', async function () {
+    worker = new LensWorker()
     await worker.startup({
       mapType: 'javascript',
       mapCode: mapCode,
       reduceCode: reduceCode
     })
+  })
 
+  it('reduces correctly', async function () {
     const result = await worker.reduce(10, 20)
-
-    await worker.shutdown()
 
     assert.deepStrictEqual(result.value, 30, 'value should be as expected')
     assert.deepStrictEqual(result.logs, [], 'there shouldn\'t be any log messages')
     assert.deepStrictEqual(result.errors, [], 'there shouldn\'t be any errors')
   })
 
-  it('reduces captures log messages', async () => {
-    const worker = new LensWorker()
-    await worker.startup({
-      mapType: 'javascript',
-      mapCode: mapCode,
-      reduceCode: reduceCode
-    })
-
+  it('reduces captures log messages', async function () {
     const result = await worker.reduce('log', 'foo')
-
-    await worker.shutdown()
 
     assert.deepStrictEqual(result.value, 'logfoo', 'value should be as expected')
     assert.deepStrictEqual(result.logs.length, 1, 'there should be one log message')
@@ -160,17 +150,8 @@ describe('/library/workers/interface.js > LensWorker.reduce', async () => {
     assert.deepStrictEqual(result.errors, [], 'there shouldn\'t be any errors')
   })
 
-  it('reduces captures thrown errors', async () => {
-    const worker = new LensWorker()
-    await worker.startup({
-      mapType: 'javascript',
-      mapCode: mapCode,
-      reduceCode: reduceCode
-    })
-
+  it('reduces captures thrown errors', async function () {
     const result = await worker.reduce('we gonna ', 'error')
-
-    await worker.shutdown()
 
     assert.deepStrictEqual(result.value, undefined, 'value should be undefined')
     assert.deepStrictEqual(result.logs, [], 'there should be no logs')
@@ -179,20 +160,15 @@ describe('/library/workers/interface.js > LensWorker.reduce', async () => {
     assert.deepStrictEqual(result.errors[0].type, 'Error', 'error message should be of the Error type')
   })
 
-  it('reduces preserves logs when it catches thrown errors', async () => {
-    const worker = new LensWorker()
-    await worker.startup({
-      mapType: 'javascript',
-      mapCode: mapCode,
-      reduceCode: reduceCode
-    })
-
+  it('reduces preserves logs when it catches thrown errors', async function () {
     const result = await worker.reduce('log', 'error')
-
-    await worker.shutdown()
 
     assert.deepStrictEqual(result.value, undefined, 'value should be undefined')
     assert.deepStrictEqual(result.logs.length, 1, 'there should be a log message')
     assert.deepStrictEqual(result.errors.length, 1, 'there should be an error')
+  })
+
+  after('shutdown worker', async function () {
+    await worker.shutdown()
   })
 })

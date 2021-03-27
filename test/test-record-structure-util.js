@@ -10,50 +10,50 @@ function fakehash (list) {
   return string
 }
 
-describe('record-structure.listHashURLs', () => {
-  it('finds hashes in arrays', () => {
+describe('record-structure.listHashURLs', function () {
+  it('finds hashes in arrays', function () {
     const expected = []
     const input = ['foo', 5, Symbol('yeahnah'), fakehash(expected), -6000, fakehash(expected)]
     const result = recStruc.listHashURLs(input).map(x => `${x}`)
     assert.deepStrictEqual(result.sort(), expected.sort(), 'should find both fake hashes')
   })
 
-  it('finds hashes in object values', () => {
+  it('finds hashes in object values', function () {
     const expected = []
     const input = { foo: 'bar', yes: fakehash(expected) }
     const result = recStruc.listHashURLs(input).map(x => `${x}`)
     assert.deepStrictEqual(result.sort(), expected.sort(), 'should find the hash')
   })
 
-  it('finds hashes in object keys', () => {
+  it('finds hashes in object keys', function () {
     const expected = []
     const input = { foo: 'bar', [fakehash(expected)]: 15 }
     const result = recStruc.listHashURLs(input).map(x => `${x}`)
     assert.deepStrictEqual(result.sort(), expected.sort(), 'should find the hash')
   })
 
-  it('finds hashes in sets', () => {
+  it('finds hashes in sets', function () {
     const expected = []
     const input = new Set(['foo', 'bar', fakehash(expected), 15])
     const result = recStruc.listHashURLs(input).map(x => `${x}`)
     assert.deepStrictEqual(result.sort(), expected.sort(), 'should find the hash')
   })
 
-  it('finds hashes in map values', () => {
+  it('finds hashes in map values', function () {
     const expected = []
     const input = new Map([['foo', 'bar'], ['yeah please', fakehash(expected)]])
     const result = recStruc.listHashURLs(input).map(x => `${x}`)
     assert.deepStrictEqual(result.sort(), expected.sort(), 'should find the hash')
   })
 
-  it('finds hashes in map keys', () => {
+  it('finds hashes in map keys', function () {
     const expected = []
     const input = new Map([['foo', 'bar'], [fakehash(expected), 'alright then']])
     const result = recStruc.listHashURLs(input).map(x => `${x}`)
     assert.deepStrictEqual(result.sort(), expected.sort(), 'should find the hash')
   })
 
-  it('builds a correct list', () => {
+  it('builds a correct list', function () {
     const expected = []
     const input = {
       foo: [
@@ -78,8 +78,8 @@ describe('record-structure.listHashURLs', () => {
   })
 })
 
-describe('record-structure.cidToHash', () => {
-  it('converts the document', () => {
+describe('record-structure.cidToHash', function () {
+  it('converts the document', function () {
     const fh1 = fakehash()
     const fh2 = fakehash()
     const cidMap = { foo: fh1, bar: fh2 }
