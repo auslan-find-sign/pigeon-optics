@@ -1,31 +1,6 @@
 ## Attachments
 
-Datasets and Lenses might contain files as values inside their records. Those files are represented as either Attachment or AttachmentReference objects. Attachment objects contain a mime type, the data of the file, and a sha256 hash of the file's contents. AttachmentReference objects omit the data, but their data can be fetched via the `/attachments/` path.
-
-### JSON encoding
-
-AttachmentReference objects are encoded as:
-
-```json
-{
-  "class": "AttachmentReference",
-  "hash": "string sha265 hex hash of attachment's contents",
-  "mimeType": "string mime type of attachment's contents",
-}
-```
-
-### CBOR encoding
-
-CBOR can represent Attachments and AttachmentReferences as CBOR [tag 27 object encoding](http://cbor.schmorp.de/generic-object).
-
-AttachmentReference:
-
-```
-27(["pigeon-optics/AttachmentReference", hash, mimeType])
-```
-
-Where `hash` is a binary buffer containing the sha256 hash of the file's contents, and `mimeType` is a string which must be a valid mime type.
-
+Records in Datasets or Lenses may contain strings with hash url schemes, which reference attachments that you can fetch using this interface.
 
 ## GET /attachments/attachment-hash?type=mime-type
 
