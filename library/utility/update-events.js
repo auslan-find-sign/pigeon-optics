@@ -4,11 +4,12 @@ const codec = require('../models/codec')
 exports.events = new EventEmitter()
 
 // call this whenever a dataPath's contents change
-exports.pathUpdated = function (dataPath) {
+exports.pathUpdated = function (dataPath, version) {
   const parsed = codec.path.decode(dataPath)
   exports.events.emit('change', {
     path: dataPath,
-    ...parsed
+    ...parsed,
+    version
   })
 }
 
@@ -18,13 +19,13 @@ exports.bootBroadcast = async function () {
   const datasets = require('../models/dataset')
   const lenses = require('../models/lens')
 
-  for await (const username of auth.iterateUsers()) {
-    for await (const dataset of datasets.iterate()) {
-      exports.pathUpdated(codec.path.encode('datasets', username, dataset))
+  for await (const user of auth.iterateUsers()) {
+    for await (const dataset of datasets.iterate(user)) {
+      exports.pathUpdated(codec.path.encode('datasets', user, dataset))
     }
 
-    for await (const lens of lenses.iterate()) {
-      exports.pathUpdated(codec.path.encode('lenses', username, lens))
+    for await (const lens of lenses.iterate(user)) {
+      exports.pathUpdated(codec.path.encode('lenses', user, lens))
     }
   }
 
