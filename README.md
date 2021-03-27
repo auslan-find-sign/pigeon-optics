@@ -1,6 +1,6 @@
-## <img src="public/design/icon.svg?raw=true" alt=Logo style=height:2em> Pigeon Optics
+## <img src="public/design/icon.svg?raw=true" alt=Logo height=42 style=height:2em> Pigeon Optics
 
-<img src="public/design/commissioned-art/lens-inspector.png?raw=true" style=height:16rem;float:right;shape-outside:circle(6.5rem)>
+<img src="public/design/commissioned-art/lens-inspector.png?raw=true" align=right height=200 style=height:16rem;float:right;shape-outside:circle(6.5rem)>
 
 Pigeon Optics is a little webapp for having fun with data and collaborating on community data projects. If you need something big and Enterprise, look at Mongo or CouchDB. Pigeon Optics aims to be like a a little friend who helps you and your pals take object-style data and do map-reduce things to it, without needing to spend heaps on a server with lots of ram and disk. It can also keep track of attachment files, so you can store your video clips and gifs in here too.
 
@@ -28,7 +28,7 @@ No, not really. It's still being worked on, lots of features don't work yet. The
 
 ### How can I help?
 
-<img src="public/design/commissioned-art/security-officer.png?raw=true" style=height:15rem;float:left;shape-outside:circle(7rem)>
+<img src="public/design/commissioned-art/security-officer.png?raw=true" height=200 align=left style=height:16rem;float:left;shape-outside:circle(7rem)>
 
 Get in touch with me, playtest the test instance, maybe write some restful client libraries or helpful tooling, or if you really want to get to work on code, maybe try implement some more languages so lenses can be written with other languages!
 
