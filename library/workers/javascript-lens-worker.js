@@ -39,19 +39,19 @@ exports.startup = async function (config) {
   // Precompile the codec-lite.ivm init code
   context = await isolate.createContext()
   // load the codec library
-  const codecIvmCode = await fs.promises.readFile(require.resolve('../models/codec-lite.ivm.js'))
+  const codecIvmCode = await fs.promises.readFile(require.resolve('./environment.ivm.js'))
   await context.eval(codecIvmCode.toString())
 
   // setup safe logger console object
   const logger = ({ type, args, stack }) => {
     const trace = new StackTracey(stack)
     const source = trace.items.find(x => (x.file === 'map.js' || x.file === 'reduce.js') && x.line >= 1)
-    const logEntry = { type, args: codec.cloneable.decode(args), line: source ? source.line : undefined }
+    const logEntry = { type, args, line: source ? source.line : undefined }
     logs.push(logEntry)
   }
 
   // setup safe output function
-  const output = (id, data) => outputs.push({ id, data: codec.cloneable.decode(data) })
+  const output = (id, data) => outputs.push({ id, data: data })
 
   // api made available to the vm
   function ioFunction (cmd, ...args) {
@@ -67,10 +67,10 @@ exports.startup = async function (config) {
   context.evalClosure(`
   // make console api available globally
   $0.console = Object.freeze(Object.fromEntries('log info warn error'.split(' ').map(type =>
-    [type, (...args) => $1.applyIgnored(undefined, ['log', { type, args: codec.cloneable.encode(args), stack: (new Error('trace')).stack.toString() }], { arguments: { copy: true } })]
+    [type, (...args) => $1.applyIgnored(undefined, ['log', { type, args, stack: (new Error('trace')).stack.toString() }], { arguments: { copy: true } })]
   )))
   // make output function available globally
-  $0.output = (id, data) => { $1.applySync(undefined, ['output', id, codec.cloneable.encode(data)], { arguments: { copy: true } }) }
+  $0.output = (id, data) => { $1.applySync(undefined, ['output', id, data], { arguments: { copy: true } }) }
   `, [context.global.derefInto(), ioFunctionRef], { filename: 'pigeon-optics-lens-api.js' })
 
   // keep the code around for debugging
@@ -78,35 +78,28 @@ exports.startup = async function (config) {
 
   // build precompiled map function
   try {
-    mapFnReference = (await context.evalClosure(
-      `return function map (path, data) { data = codec.cloneable.decode(data); {
-        ${code.map}
-      } }`, [], {
-        timeout,
-        lineOffset: -1,
-        columnOffset: -6,
-        filename: 'map.js',
-        result: { reference: true }
-      }
-    )).result
+    const snippet = `return function map (path, data) {\n${code.map}\n}`
+    const opts = {
+      timeout,
+      lineOffset: -1,
+      columnOffset: -6,
+      filename: 'map.js',
+      result: { reference: true }
+    }
+    mapFnReference = (await context.evalClosure(snippet, [], opts)).result
   } catch (err) {
     returnVal.map.errors.push(transformVMError(err, 'map.js', code.map))
   }
 
   try {
-    reduceFnReference = (await context.evalClosure(
-      `function reduce (left, right) {\n${code.reduce}\n}
-      return function reduceCodecWrap (left, right) {
-        left = codec.cloneable.decode(left)
-        right = codec.cloneable.decode(right)
-        return codec.cloneable.encode(reduce(left, right))
-      }`, [], {
-        timeout,
-        lineOffset: -1,
-        filename: 'reduce.js',
-        result: { reference: true }
-      }
-    )).result
+    const snippet = `return function reduce (left, right) {\n${code.reduce}\n}`
+    const opts = {
+      timeout,
+      lineOffset: -1,
+      filename: 'reduce.js',
+      result: { reference: true }
+    }
+    reduceFnReference = (await context.evalClosure(snippet, [], opts)).result
   } catch (err) {
     returnVal.reduce.errors.push(transformVMError(err, 'reduce.js', code.reduce))
   }
@@ -154,11 +147,11 @@ exports.reduce = async function (left, right) {
   outputs = []
 
   try {
-    const result = codec.cloneable.decode(await reduceFnReference.apply(undefined, [left, right].map(x => codec.cloneable.encode(x)), {
+    const result = await reduceFnReference.apply(undefined, [left, right], {
       timeout,
       arguments: { copy: true },
       result: { copy: true }
-    }))
+    })
 
     return { logs, errors: [], value: result }
   } catch (err) {

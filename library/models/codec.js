@@ -9,17 +9,7 @@ const Vibe = require('../vibe/rich-builder')
 const layout = require('../views/layout')
 
 module.exports.cbor = {
-  decoderOpts: {
-    tags: {
-      27: ([type, ...args]) => {
-        if (type === 'pigeon-optics/Attachment') {
-          return new Attachment(...args)
-        } else if (type === 'pigeon-optics/AttachmentReference') {
-          return new AttachmentReference(...args)
-        }
-      }
-    }
-  },
+  decoderOpts: {},
 
   encoderOpts: { highWaterMark: 25000000 },
 
@@ -53,19 +43,13 @@ module.exports.cbor = {
 module.exports.json = {
   /**
    * Decodes first item in buffer using JSON, unpacking any attachments included in the cbor too
-   * @param {string} jsonString - string containing json which optionally includes files as Attachments or AttachmentReferences using duck encoding
+   * @param {string} jsonString - string containing json which optionally includes NodeJS stringified Buffers
    * @returns {any} - returns decoded object
    */
   decode (jsonString) {
     const reviver = (key, value) => {
-      if (typeof value === 'object' && value !== null /* I hate you */) {
-        if (value.class === 'Attachment') {
-          return new Attachment(Buffer.from(value.data, 'base64'), value.mimeType)
-        } else if (value.class === 'AttachmentReference') {
-          return new AttachmentReference(value.hash, value.mimeType)
-        } else if (value.type === 'Buffer' && Array.isArray(value.data)) {
-          return Buffer.from(value)
-        }
+      if (value && typeof value === 'object' && value.type === 'Buffer' && Array.isArray(value.data)) {
+        return Buffer.from(value)
       }
       return value
     }
@@ -96,60 +80,6 @@ module.exports.json = {
    */
   print (object, spaces = 2) {
     return json5.stringify(object, null, spaces)
-  }
-}
-
-// cloneable/transferrable encoding, inputs and outputs objects, but encodes
-// Attachments and Buffers in to something cloneable. Unlike the JSON codec this
-// doesn't depend on having a base64 codec available, and doesn't aim to have compact
-// or efficient or compressable output when serialized to JSON
-// It's just used internally for passing data between virtual machine boundaries
-module.exports.cloneable = {
-  decode (object) {
-    if (Array.isArray(object)) {
-      return object.map(entry => this.decode(entry))
-    } else if (typeof object === 'object' && object !== null /* I hate you */) {
-      if ('_bufferArrayBytes' in object) {
-        return Buffer.from(object._bufferArrayBytes)
-      } else if (object._class === 'Attachment') {
-        return new Attachment(Buffer.from(object._bytes), object._mimeType)
-      } else if (object._class === 'AttachmentReference') {
-        return new AttachmentReference(Buffer.from(object._hashBytes), object._mimeType)
-      }
-
-      return Object.fromEntries(Object.entries(object).map(([key, value]) => {
-        return [key, this.decode(value)]
-      }))
-    } else {
-      return object
-    }
-  },
-
-  encode (object) {
-    if (Array.isArray(object)) {
-      return object.map(entry => this.encode(entry))
-    } else if (Buffer.isBuffer(object)) {
-      return { _bufferArrayBytes: [...object] }
-    } else if (object instanceof Attachment) {
-      return {
-        _class: 'Attachment',
-        _bytes: [...object.data],
-        _mimeType: object.mimeType,
-        _hash: [...object.hash]
-      }
-    } else if (object instanceof AttachmentReference) {
-      return {
-        _class: 'AttachmentReference',
-        _mimeType: object.mimeType,
-        _hash: [...object.hash]
-      }
-    } else if (typeof object === 'object' && object !== null /* I hate you */) {
-      return Object.fromEntries(Object.entries(object).map(([key, value]) => {
-        return [key, this.decode(value)]
-      }))
-    }
-
-    return object
   }
 }
 
