@@ -1,5 +1,6 @@
 // utility to discover hash:// uri's inside structured data (records)
 // implements https://github.com/hash-uri/hash-uri and optional cid discovery
+const createHttpError = require('http-errors')
 
 /** iterates through a complex data structure (like a record value) and yields strings of hash uri's
  * @param {*} input
@@ -35,34 +36,35 @@ exports.listHashURLs = function listHashURLs (input) {
   return [...this.iterateHashURLs(input)]
 }
 
-/** transform an object which might contain cid: uri's to use hash:// urls instead
+/** transform an object which might contain file:/// URLs to use hash:// URLs instead
  * @param {*} input - input document, could be any kind of object that is cbor serialisable
- * @param {object} [cidMap] - object with Content-ID keys and hash string maps
- * @returns {*} - input object, deep cloned, with cid: strings swapped for hash:// strings
+ * @param {object} [attachedFilesByName] - the req.attachedFilesByName property that ./multipart-attachments makes
+ * @returns {*} - input object, deep cloned, with file:/// strings swapped for hash:// strings
  */
-exports.cidToHash = function cidToHash (input, cidMap = {}) {
-  if (typeof input === 'string' && input.match(/^cid:/i)) {
-    const contentID = decodeURI(input.slice(4))
-    if (cidMap[contentID]) {
-      return `${cidMap[contentID]}`
+exports.resolveFileURLs = function resolveFileURLs (input, attachedFilesByName = {}) {
+  if (typeof input === 'string' && input.match(/^file:\/\/\//im)) {
+    const filename = decodeURI(input.slice('file:///'.length))
+    const file = attachedFilesByName[filename]
+    if (file) {
+      return `hash://sha256/${file.hash.toString('hex')}?type=${encodeURIComponent(file.type)}`
     } else {
-      return input
+      throw createHttpError.BadRequest('File URLs reference missing attachments')
     }
   } else if (input && typeof input === 'object') {
     if (input instanceof Map) {
       return new Map((function * () {
         for (const entry of input.entries()) {
-          yield entry.map(x => exports.cidToHash(x, cidMap))
+          yield entry.map(x => exports.resolveFileURLs(x, attachedFilesByName))
         }
       })())
     } else if (input instanceof Set) {
       return new Set((function * () {
-        for (const value of input.values()) yield exports.cidToHash(value, cidMap)
+        for (const value of input.values()) yield exports.resolveFileURLs(value, attachedFilesByName)
       })())
     } else if (Array.isArray(input)) {
-      return input.map(x => exports.cidToHash(x, cidMap))
+      return input.map(x => exports.resolveFileURLs(x, attachedFilesByName))
     } else {
-      return Object.fromEntries(Object.entries(input).map(e => e.map(x => exports.cidToHash(x, cidMap))))
+      return Object.fromEntries(Object.entries(input).map(e => e.map(x => exports.resolveFileURLs(x, attachedFilesByName))))
     }
   } else {
     return input

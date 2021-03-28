@@ -2,10 +2,14 @@ const recStruc = require('../library/utility/record-structure')
 const assert = require('assert')
 const crypto = require('crypto')
 
+function makehash (hash, type) {
+  return `hash://sha256/${hash.toString('hex')}?type=${encodeURIComponent(`${type}`)}`
+}
+
 function fakehash (list) {
-  const hash = crypto.randomBytes(32).toString('hex')
+  const hash = crypto.randomBytes(32)
   const type = 'text/plain'
-  const string = `hash://sha256/${hash}?type=${encodeURIComponent(type)}`
+  const string = makehash(hash, type)
   if (list) list.push(string)
   return string
 }
@@ -78,23 +82,24 @@ describe('record-structure.listHashURLs', function () {
   })
 })
 
-describe('record-structure.cidToHash', function () {
+describe('record-structure.resolveFileURLs', function () {
   it('converts the document', function () {
-    const fh1 = fakehash()
-    const fh2 = fakehash()
-    const cidMap = { foo: fh1, bar: fh2 }
+    const attachedFilesByName = {
+      'foo.txt': { path: '/tmp/foo-123.txt', hash: crypto.randomBytes(32), type: 'text/plain' },
+      'bar.bin': { path: '/tmp/bar-xyz.bin', hash: crypto.randomBytes(32), type: 'application/octet-stream' }
+    }
 
     const input = {
-      hey: 'cid:foo',
-      cool: ['yes', 'CID:bar', 'no'],
-      'cid:foo': 6
+      hey: 'file:///foo.txt',
+      cool: ['yes', 'file:///bar.bin', 'no'],
+      'file:///foo.txt': 6
     }
     const expected = {
-      hey: fh1,
-      cool: ['yes', fh2, 'no'],
-      [fh1]: 6
+      hey: makehash(attachedFilesByName['foo.txt'].hash, attachedFilesByName['foo.txt'].type),
+      cool: ['yes', makehash(attachedFilesByName['bar.bin'].hash, attachedFilesByName['bar.bin'].type), 'no'],
+      [makehash(attachedFilesByName['foo.txt'].hash, attachedFilesByName['foo.txt'].type)]: 6
     }
-    const output = recStruc.cidToHash(input, cidMap)
-    assert.deepStrictEqual(output, expected, 'should swap all the cids for hash urls')
+    const output = recStruc.resolveFileURLs(input, attachedFilesByName)
+    assert.deepStrictEqual(output, expected, 'should swap all the file:/// URLs for hash:// URLs')
   })
 })
