@@ -20,7 +20,6 @@
   "dependencies": {
     "@toverux/expresse": "^2.4.0",
     "ace-builds": "^1.4.12",
-    "busboy": "^0.3.1",
     "cbor": "^7.0.4",
     "compression": "^1.7.4",
     "cookie-session": "^1.4.0",
@@ -37,10 +36,12 @@
     "isolated-vm": "^3.3.10",
     "json5": "^2.2.0",
     "method-override": "^3.0.0",
+    "multer": "^1.4.2",
     "object-hash": "^2.1.1",
     "on-finished": "^2.3.0",
     "path-to-regexp": "^6.2.0",
     "stacktracey": "^2.0.18",
+    "superagent": "^6.1.0",
     "timestring": "^6.0.0",
     "tiny-function-queue": "^1.0.0",
     "tweetnacl": "^1.0.3",
@@ -77,6 +78,8 @@
     ]
   },
   "devDependencies": {
+    "chai": "^4.3.4",
+    "chai-http": "^4.3.0",
     "mocha": "^8.3.2",
     "standard": "^16.0.3"
   },

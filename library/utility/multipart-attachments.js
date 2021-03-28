@@ -1,84 +1,82 @@
 // given an express request, if the body is multipart/form-data, streams attachments in to the attachment store
 // and copies the cbor/json data in to req.body
-const Busboy = require('busboy')
-const HttpError = require('http-errors')
+const multer = require('multer')
 const settings = require('../models/settings')
+const createHttpError = require('http-errors')
 const crypto = require('crypto')
 const codec = require('../models/codec')
 const xbytes = require('xbytes')
-const destroy = require('destroy')
 const finished = require('on-finished')
 const os = require('os')
 const fs = require('fs')
 const path = require('path')
 
 function getTempFilePath () {
-  const rand = `${Math.round(Math.random() * 0xFFFFFF)}-${Math.round(Math.random() * 0xFFFFFF)}-${Math.round(Math.random() * 0xFFFFFF)}`
+  const rand = crypto.randomBytes(20).toString('hex')
   return path.join(os.tmpdir(), `pigeon-optics-${rand}`)
 }
 
-// express middleware, modifies req to have an attachments object, with sha256 hex keys, and values that are file paths
-// temp files will be automatically removed after the request is finished
-module.exports = async function (req, res, next) {
-  if (req.is('multipart/form-data') && req.user) {
-    const bus = new Busboy({
-      headers: req.headers,
-      limits: { fileSize: xbytes.parse(settings.maxAttachmentSize).bytes }
-    })
-
-    const gcFileList = []
-    bus.on('file', (fieldname, stream, filename, encoding, mimetype) => {
-      if (fieldname === 'attachment' || fieldname === 'attachment[]') {
-        const tempFile = getTempFilePath()
-        const file = fs.createWriteStream(tempFile)
-        const hash = crypto.createHash('sha256')
-        stream.pause()
-        stream.on('data', chunk => { hash.update(chunk) })
-        stream.on('end', () => {
-          req.attachments = req.attachments || {}
-          req.attachments[hash.digest('hex')] = tempFile
-          gcFileList.push(tempFile)
-        })
-        stream.pipe(file)
-      } else if (fieldname === 'body') {
-        const chunks = []
-        let length = 0
-        stream.on('data', (chunk) => {
-          length += chunk.length
-          if (length <= xbytes.parse(settings.maxRecordSize).bytes) {
-            chunks.push(chunk)
-          } else {
-            destroy(bus)
-            next(new HttpError(400, `body data too large, limit is ${settings.maxRecordSize}`))
-          }
-        })
-        stream.on('end', () => {
-          if (mimetype === 'application/cbor') {
-            req.body = codec.cbor.decode(Buffer.concat(chunks))
-          } else if (mimetype === 'application/json') {
-            req.body = codec.json.decode(Buffer.concat(chunks).toString('utf-8'))
-          } else {
-            throw new HttpError(400, 'body file in multipart/form-data must be either application/cbor or application/json')
-          }
-        })
+const uploadEngine = {
+  _handleFile: async function (req, file, cb) {
+    if (file.fieldname === 'body') {
+      const chunks = []
+      for await (const chunk of file.stream) chunks.push(chunk)
+      if (file.mimetype === 'application/cbor') {
+        req.body = codec.cbor.decode(Buffer.concat(chunks))
+      } else if (file.mimetype === 'application/json') {
+        req.body = codec.json.decode(Buffer.concat(chunks).toString('utf-8'))
       } else {
-        stream.resume()
+        throw createHttpError.BadRequest('Unsupported mime type on body file')
       }
-    })
+      cb()
+    } else if (file.fieldname === 'attachment') {
+      const path = getTempFilePath()
+      const writeStream = file.stream.pipe(fs.createWriteStream(path))
+      writeStream.on('finished', () => {
+        const hash = fs.createReadStream(path).pipe(crypto.createHash('sha256'))
+        hash.setEncoding('hex')
+        hash.on('data', hex => {
+          cb(null, { path, size: writeStream.bytesWritten, hash: hex })
+        })
+      })
+    }
+  },
+  _removeFile: function (req, file, cb) {
+    fs.unlink(file.path, cb)
+  }
+}
 
-    finished(bus, () => next())
-    req.pipe(bus)
-    // remove any files that are left in place
+const multerInstance = multer({
+  limits: { fileSize: xbytes.parse(settings.maxAttachmentSize).bytes },
+  storage: uploadEngine
+}).fields([
+  { name: 'body', maxCount: 1 },
+  { name: 'attachment' }
+])
+
+const postProcess = function (req, res, next) {
+  req.attachedFilesByHash = {}
+  req.attachedFilesByName = {}
+
+  if (req.files) {
+    for (const file of req.files) {
+      if (file.hash) req.attachedFilesByHash[file.hash] = file
+      if (file.originalname) req.attachedFilesByName[file.originalname] = file
+    }
+  }
+
+  if (req.files && req.files.length) {
+    // clean up after request finishes
     finished(res, async () => {
-      for (const filepath of gcFileList) {
-        try {
-          await fs.promises.unlink(filepath)
-        } catch (err) {
-          // nothing
+      for (const file of req.files) {
+        try { await fs.promises.unlink(file.path) } catch (err) {
+          // ...
         }
       }
     })
-  } else {
-    next()
   }
+
+  next()
 }
+
+module.exports = [multerInstance, postProcess]
