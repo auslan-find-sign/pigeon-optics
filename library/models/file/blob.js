@@ -93,7 +93,7 @@ exports.exists = async function (hash) {
  * @async
  */
 exports.iterate = async function * () {
-  for await (const name of this.raw.list()) {
+  for await (const name of this.raw.iterate()) {
     yield Buffer.from(name, 'hex')
   }
 }
@@ -104,6 +104,21 @@ exports.iterate = async function * () {
  */
 exports.list = async function () {
   return await asyncIterableToArray(this.iterate())
+}
+
+/** delete any blobs that aren't in the provided list, list can be any iterable of buffers
+ * @param {string[]} list
+ * @async
+ */
+exports.retain = async function (list) {
+  const jobs = []
+  const stringKeys = new Set([...list].map(x => x.toString('hex')))
+  for await (const hash of this.iterate()) {
+    if (!stringKeys.has(hash.toString('hex'))) {
+      jobs.push(this.delete(hash))
+    }
+  }
+  return await Promise.all(jobs)
 }
 
 /** create an instance of blob store with settings configured

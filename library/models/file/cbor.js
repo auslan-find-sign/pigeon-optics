@@ -24,6 +24,25 @@ exports.write = async function (dataPath, data) {
   return await this.raw.write(dataPath, codec.cbor.encode(data))
 }
 
+/** for a dataPath, run a given [async] function, and if it returns something other than undefined,
+ * rewrite the file with the new value. This call is queued nicely, so parallel updates to the same
+ * file wont clobber each other, they'll happen sequentially.
+ * If file doesn't exist, data argument to block function will be undefined, but you can create a
+ * file by returning something!
+ * @param {string[]} path - path to data that is to be read and maybe rewritten
+ * @param {function|async function} block - is given one argument, data, and may return something
+ *                                          other than undefined to change the file's contents
+ */
+exports.update = async function (dataPath, block) {
+  await this.raw.update(dataPath, async (buf) => {
+    const input = buf ? codec.cbor.decode(buf) : undefined
+    const output = await block(input)
+    if (output !== undefined) {
+      return codec.cbor.encode(output)
+    }
+  })
+}
+
 /** Remove a cbor data file
  * @param {string|string[]} [path] - relative path inside data directory the data is located at
  * @async
@@ -46,8 +65,8 @@ exports.exists = async function (dataPath = []) {
  * @returns {string[]}
  * @async
  */
-exports.list = async function * list (dataPath = []) {
-  yield * this.raw.list(dataPath)
+exports.iterate = async function * iterate (dataPath = []) {
+  yield * this.raw.iterate(dataPath)
 }
 
 /** List all the folders in a data path
@@ -55,8 +74,8 @@ exports.list = async function * list (dataPath = []) {
  * @returns {string[]}
  * @async
  */
-exports.listFolders = async function * list (dataPath = []) {
-  yield * this.raw.listFolders(dataPath)
+exports.iterateFolders = async function * iterateFolders (dataPath = []) {
+  yield * this.raw.iterateFolders(dataPath)
 }
 
 // create an instance scoped in to a rootPath

@@ -4,6 +4,7 @@ const os = require('os')
 const settings = require('../settings')
 const assert = require('assert')
 const { Readable } = require('stream')
+const tq = require('tiny-function-queue')
 
 // encodes a string to be a valid filename but not use meaningful characters like . or /
 function encodePathSegment (string) {
@@ -92,7 +93,7 @@ exports.writeStream = async function (dataPath, stream) {
 
   const rand = `${Math.round(Math.random() * 0xFFFFFF)}-${Math.round(Math.random() * 0xFFFFFF)}`
   const tempPath = path.join(os.tmpdir(), `pigeon-optics-writing-${rand}${this.extension}`)
-  await event(stream.pipe(fs.createWriteStream(tempPath)), 'end')
+  await event(stream.pipe(fs.createWriteStream(tempPath)), 'finish')
 
   // update backup with a copy of what was here previously if something old exists
   if (await fs.pathExists(path1)) {
@@ -102,6 +103,21 @@ exports.writeStream = async function (dataPath, stream) {
 
   await fs.move(tempPath, path1)
   await fs.remove(path2) // everything succeeded, we can erase the backup
+}
+
+/** update a file at a given path, using tiny-function-queue to provide file locking to prevent clobbering
+ * if file doesn't exist, data argument to block function will be undefined. You can create the file by returning something!
+ * @param {string[]} path - data path
+ * @param {function|async function} block - block(data) is given a Buffer, and if it returns a Buffer, the file is rewritten with the new data
+ */
+exports.update = async function (dataPath, block) {
+  await tq.lockWhile(['file/raw', this.fullPath(dataPath, '')], async () => {
+    const data = await this.read(dataPath)
+    const update = await block(data)
+    if (update && Buffer.isBuffer(update)) {
+      await this.write(dataPath, update)
+    }
+  })
 }
 
 /** Remove a raw file or directory
@@ -118,7 +134,7 @@ exports.delete = async function (dataPath = []) {
  * @returns {boolean}
  * @async
  */
-module.exports.exists = async function (dataPath = []) {
+exports.exists = async function (dataPath = []) {
   const results = await Promise.all([
     fs.pathExists(this.fullPath(dataPath, '')),
     fs.pathExists(this.fullPath(dataPath, this.extension)),
@@ -133,7 +149,7 @@ module.exports.exists = async function (dataPath = []) {
  * @returns {string[]}
  * @async
  */
-module.exports.list = async function * list (dataPath = []) {
+exports.iterate = async function * iterate (dataPath = []) {
   try {
     const dir = await fs.opendir(this.fullPath(dataPath))
     for await (const dirent of dir) {
@@ -154,7 +170,7 @@ module.exports.list = async function * list (dataPath = []) {
  * @returns {string[]}
  * @async
  */
-module.exports.listFolders = async function * list (dataPath = []) {
+exports.iterateFolders = async function * iterateFolders (dataPath = []) {
   try {
     const dir = await fs.opendir(this.fullPath(dataPath))
     for await (const dirent of dir) {
