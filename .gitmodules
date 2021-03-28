@@ -1,3 +1,0 @@
-[submodule "library/workers/mruby-3.0.0/json"]
-	path = library/workers/mruby-3.0.0/json
-	url = https://github.com/flori/json.git
