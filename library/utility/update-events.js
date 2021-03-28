@@ -21,11 +21,13 @@ exports.bootBroadcast = async function () {
 
   for await (const user of auth.iterateUsers()) {
     for await (const dataset of datasets.iterate(user)) {
-      exports.pathUpdated(codec.path.encode('datasets', user, dataset))
+      const meta = await datasets.readMeta(user, dataset)
+      exports.pathUpdated(codec.path.encode('datasets', user, dataset), meta.version)
     }
 
     for await (const lens of lenses.iterate(user)) {
-      exports.pathUpdated(codec.path.encode('lenses', user, lens))
+      const meta = await lenses.readMeta(user, lens)
+      exports.pathUpdated(codec.path.encode('lenses', user, lens), meta.version)
     }
   }
 
