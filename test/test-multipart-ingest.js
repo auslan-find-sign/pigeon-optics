@@ -1,4 +1,3 @@
-const assert = require('assert')
 const multipart = require('../library/utility/multipart-attachments')
 const express = require('express')
 const crypto = require('crypto')
@@ -24,23 +23,28 @@ const app = express()
 app.use(multipart)
 
 app.post('/test', async (req, res) => {
-  console.log('server side body', req.body)
-  const body = req.body
-  const attachments = Object.fromEntries(await Promise.all(Object.entries(req.attachedFilesByHash).map(async ([key, val]) =>
-    [key, await fs.promises.readFile(val.path).toString()]
-  )))
-  const filenames = Object.fromEntries(await Promise.all(Object.entries(req.attachedFilesByName).map(async ([key, val]) =>
-    [key, await fs.promises.readFile(val.path).toString()]
-  )))
+  const response = {
+    body: req.body,
+    attachments: {},
+    filenames: {}
+  }
 
-  res.send({ body, attachments, filenames })
+  for (const [hash, file] of Object.entries(req.attachedFilesByHash)) {
+    response.attachments[hash] = fs.readFileSync(file.path).toString('utf-8')
+  }
+
+  for (const [name, file] of Object.entries(req.attachedFilesByName)) {
+    response.filenames[name] = fs.readFileSync(file.path).toString('utf-8')
+  }
+
+  res.send(response)
 })
 
 describe('library/utility/multipart-attachments', function () {
   it('decodes body as part of form-data', function (done) {
     chai.request(app)
       .post('/test')
-      .attach('body', Buffer.from(JSON.stringify(testBody)), { contentType: 'application/json' })
+      .attach('body', Buffer.from(JSON.stringify(testBody)), { contentType: 'application/json', filename: 'woo.json' })
       .end((err, res) => {
         if (err) return done(err)
 
@@ -55,14 +59,14 @@ describe('library/utility/multipart-attachments', function () {
       .post('/test')
       .attach('body', Buffer.from(JSON.stringify(testBody)), { contentType: 'application/json', filename: 'woo.json' })
       .attach('attachment', Buffer.from(attach1), { contentType: 'video/mp4', filename: 'clip.mp4' })
-      .attach('attachment', Buffer.from(attach2), { contentType: 'application/zip', filename: 'resources.zip' })
+      .attach('attachment', Buffer.from(attach2), { contentType: 'application/zip', filename: 'lovely-dinner-set.zip' })
       .end((err, res) => {
         if (err) return done(err)
-        console.log('body:', res.body)
+
         chai.assert.deepEqual(res.body.body, testBody, 'body should roundtrip correctly')
 
         chai.assert.deepEqual(res.body.filenames, {
-          'thingo.mp4': attach1,
+          'clip.mp4': attach1,
           'lovely-dinner-set.zip': attach2
         }, 'filenames should be read correctly')
 
