@@ -6,7 +6,7 @@
   "repo": "https://github.com/auslan-find-sign/pigeon-optics.git",
   "homepage": "https://github.com/auslan-find-sign/pigeon-optics/",
   "scripts": {
-    "test": "mocha --exit"
+    "test": "mocha"
   },
   "keywords": [
     "auslan",
