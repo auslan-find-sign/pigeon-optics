@@ -43,7 +43,6 @@ exports.read = async function (dataPath) {
   try {
     return await tryRead(dataPath, this.extension)
   } catch (err) {
-    console.error(`Data at path ${dataPath} unavailable: ${err}, trying .backup`)
     try {
       return await tryRead(dataPath, `${this.extension}.backup`)
     } catch (err2) {
@@ -108,7 +107,7 @@ exports.writeStream = async function (dataPath, stream) {
 /** update a file at a given path, using tiny-function-queue to provide file locking to prevent clobbering
  * if file doesn't exist, data argument to block function will be undefined. You can create the file by returning something!
  * @param {string[]} path - data path
- * @param {function|async function} block - block(data) is given a Buffer, and if it returns a Buffer, the file is rewritten with the new data
+ * @param {function(Buffer)} block - block(data) is given a Buffer, and if it returns a Buffer, the file is rewritten with the new data
  */
 exports.update = async function (dataPath, block) {
   await tq.lockWhile(['file/raw', this.fullPath(dataPath, '')], async () => {
@@ -125,6 +124,7 @@ exports.update = async function (dataPath, block) {
  * @async
  */
 exports.delete = async function (dataPath = []) {
+  await fs.remove(this.fullPath(dataPath, ''))
   await fs.remove(this.fullPath(dataPath, this.extension))
   await fs.remove(this.fullPath(dataPath, `${this.extension}.backup`))
 }
