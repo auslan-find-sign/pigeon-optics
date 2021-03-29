@@ -34,4 +34,6 @@ Get in touch with me, playtest the test instance, maybe write some restful clien
 
 Or, you know, if you have money burning a hole in your pockets, DM me, because I am so dirt poor (I'm a pensioner!). I can definitely get more stuff done quicker if I have a bit more resources.
 
-<div align=right style=text-align:right>-=- Made with love by Phoenix -=-</div>
+<p align=center> —{ 🤟 Made with love by Phoenix 🍃 }—</p>
+
+<p align=center><img alt="GitHub Actions Continuous Integration Status" src=https://github.com/auslan-find-sign/pigeon-optics/actions/workflows/node.js.yml/badge.svg></p>
