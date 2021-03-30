@@ -1,5 +1,10 @@
-// blob store is a thing for storing blobs or objects by hash
-// used to store objects in datasets and lens outputs
+/**
+ * blob store, stores buffers (or optionally encodeable objects) by their content hash
+ * blob store is mainly used to store dataset objects, and attachments
+ * @module module:models/file/blob
+ * @see module:models/file/raw
+ */
+
 const asyncIterableToArray = require('../../utility/async-iterable-to-array')
 
 // used to store attachments in attachment store
@@ -121,8 +126,14 @@ exports.retain = async function (list) {
   return await Promise.all(jobs)
 }
 
-/** create an instance of blob store with settings configured
- * @returns {object} - blob store instance, configured
+/**
+ * create an instance of blob store with settings configured
+ * @param {object} config - config information to set defaults
+ * @param {string} [config.extension] - set an extension, like '.data' or '.cbor'
+ * @param {string[]} [config.rootPath] - set a dataPath to the folder which will contain the objects
+ * @param {object} [config.codec] - set a codec like codec.json or codec.cbor, an object which has encode and decode methods
+ * @param {function} [config.hash] - set a hash function, given a Buffer input returns a hash Buffer, can be async/promise returning
+ * @returns {module:models/file/blob} - blob store instance, configured
  */
 exports.instance = function ({
   extension = exports.extension,

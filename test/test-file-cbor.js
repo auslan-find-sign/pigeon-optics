@@ -8,7 +8,6 @@ const cbor = require('../library/models/file/cbor')
 const tests = [
   true,
   false,
-  null,
   5,
   9274,
   0.0001,

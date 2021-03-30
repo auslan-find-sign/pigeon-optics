@@ -1,4 +1,10 @@
+/**
+ * Provides filesystem IO, with a bunch of safety. This is an abstraction on top of module:models/file/raw providing cbor encoding and decoding
+ * @module module:models/file/cbor
+ */
+const assert = require('assert')
 const codec = require('../codec')
+const { Readable } = require('stream')
 exports.raw = require('./raw').instance({
   extension: '.cbor'
 })
@@ -11,8 +17,11 @@ exports.raw = require('./raw').instance({
  * @async
  */
 exports.read = async function (dataPath) {
-  const data = await this.raw.read(dataPath)
-  return codec.cbor.decode(data)
+  const stream = await this.readStream(dataPath)
+  return new Promise((resolve, reject) => {
+    stream.once('data', data => resolve(data))
+    stream.once('error', err => reject(err))
+  })
 }
 
 /** Create or update a cbor data file, creating a .backup file of the previous version in the process
@@ -21,8 +30,36 @@ exports.read = async function (dataPath) {
  * @async
  */
 exports.write = async function (dataPath, data) {
-  return await this.raw.write(dataPath, codec.cbor.encode(data))
+  assert(data !== null, 'data cannot be null')
+  return await this.writeStream(dataPath, Readable.from([data]))
 }
+
+/**
+ * Open a readable object stream to the underlying file
+ * @param {string[]} path data path to file
+ */
+exports.readStream = async function (dataPath) {
+  const rawStream = await this.raw.readStream(dataPath)
+  return rawStream.pipe(codec.cbor.getDecodeStream())
+}
+
+/**
+ * Write an object stream to the file
+ * @param {string[]} path data path to file
+ * @param {ReadableStream} data
+ */
+exports.writeStream = async function (dataPath, data) {
+  const encoder = codec.cbor.getEncoderStream()
+  return await this.raw.writeStream(dataPath, data.pipe(encoder))
+}
+
+/**
+ * Callback required by most find methods.
+ * @callback module:models/file/cbor.updateBlock
+ * @async
+ * @param {*} data Current value of the file, or undefined if the file doesn't exist
+ * @returns {*} if return value isn't undefined, the file is updated with the new content
+ */
 
 /** for a dataPath, run a given [async] function, and if it returns something other than undefined,
  * rewrite the file with the new value. This call is queued nicely, so parallel updates to the same
@@ -30,8 +67,7 @@ exports.write = async function (dataPath, data) {
  * If file doesn't exist, data argument to block function will be undefined, but you can create a
  * file by returning something!
  * @param {string[]} path - path to data that is to be read and maybe rewritten
- * @param {function|async function} block - is given one argument, data, and may return something
- *                                          other than undefined to change the file's contents
+ * @param {module:models/file/cbor.updateBlock} block
  */
 exports.update = async function (dataPath, block) {
   await this.raw.update(dataPath, async (buf) => {

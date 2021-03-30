@@ -1,3 +1,7 @@
+/**
+ * Raw file IO abstraction. Provides raw files, with injection safe paths, and file anti-clobbering queue functionality
+ * @module module:models/file/raw
+ */
 const fs = require('fs-extra')
 const path = require('path')
 const os = require('os')
@@ -28,7 +32,17 @@ exports.fullPath = function (dataPath, suffix = '') {
 exports.extension = '.data'
 exports.rootPath = []
 
-/** Read raw buffer of a file path path inside the data directory configured in package.json/defaults/data
+/**
+ * Transform a PO dataPath to a local filesystem path
+ * @param {string[]} path array of path segments
+ * @returns {string} local filesystem path
+ */
+exports.getPath = function (dataPath) {
+  return this.fullPath(dataPath, this.extension)
+}
+
+/**
+ * Read raw buffer of a file path path inside the data directory configured in package.json/defaults/data
  * If the data is unreadable or corrupt, attempts to read backup instead, printing an error in the process, if that's missing
  * or broken too, you can expect an error to throw, otherwise the older version will be returned with the error printed
  * @param {string|string[]} path - relative path inside data directory the data is located at
@@ -38,22 +52,12 @@ exports.rootPath = []
 exports.read = async function (dataPath) {
   assert(Array.isArray(dataPath), 'dataPath must be an array of path segments')
 
-  const tryRead = (dataPath, ext) => fs.readFile(this.fullPath(dataPath, ext))
-
-  try {
-    return await tryRead(dataPath, this.extension)
-  } catch (err) {
-    try {
-      return await tryRead(dataPath, `${this.extension}.backup`)
-    } catch (err2) {
-      throw err
-    }
-  }
+  const chunks = []
+  const stream = await this.readStream(dataPath)
+  for await (const chunk of stream) chunks.push(chunk)
+  return Buffer.concat(chunks)
 }
 
-exports.getPath = function (dataPath) {
-  return this.fullPath(dataPath, this.extension)
-}
 
 /** Create or update a raw file, creating a .backup file of the previous version in the process
  * @param {string[]} path - relative path inside data directory the data is located at
@@ -65,6 +69,26 @@ exports.write = async function (dataPath, data) {
   assert(Buffer.isBuffer(data), 'data must be a Buffer instance')
 
   return await this.writeStream(dataPath, Readable.from(data))
+}
+
+/**
+ * Open a readable stream of the specified file
+ * @param {string[]} path
+ * @returns {fs.ReadStream}
+ * @async
+ */
+exports.readStream = function (dataPath) {
+  assert(Array.isArray(dataPath), 'dataPath must be an array of path segments')
+
+  return new Promise((resolve, reject) => {
+    const read1 = fs.createReadStream(this.fullPath(dataPath, `${this.extension}`))
+    read1.once('open', () => resolve(read1))
+    read1.once('error', () => {
+      const read2 = fs.createReadStream(this.fullPath(dataPath, `${this.extension}.backup`))
+      read2.once('open', () => resolve(read2))
+      read2.once('error', (err) => reject(err))
+    })
+  })
 }
 
 /** Create or update a raw file, creating a .backup file of the previous version in the process
@@ -104,16 +128,25 @@ exports.writeStream = async function (dataPath, stream) {
   await fs.remove(path2) // everything succeeded, we can erase the backup
 }
 
+/**
+ * Callback required by most find methods.
+ * @callback module:models/file/raw.updateBlock
+ * @async
+ * @param {Buffer} data Current value of the file, or undefined if the file doesn't exist
+ * @returns {Buffer} Buffer of data to write to the file, or undefined if no update should be written
+ */
+
 /** update a file at a given path, using tiny-function-queue to provide file locking to prevent clobbering
  * if file doesn't exist, data argument to block function will be undefined. You can create the file by returning something!
  * @param {string[]} path - data path
- * @param {function(Buffer)} block - block(data) is given a Buffer, and if it returns a Buffer, the file is rewritten with the new data
+ * @param {module:models/file/raw.updateBlock} block - block(data) is given a Buffer, and if it returns a Buffer, the file is rewritten with the new data
  */
 exports.update = async function (dataPath, block) {
   await tq.lockWhile(['file/raw', this.fullPath(dataPath, '')], async () => {
     const data = await this.read(dataPath)
     const update = await block(data)
-    if (update && Buffer.isBuffer(update)) {
+    if (update !== undefined) {
+      if (!Buffer.isBuffer(update)) throw new Error('return value must be undefined or a Buffer')
       await this.write(dataPath, update)
     }
   })
