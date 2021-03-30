@@ -58,7 +58,6 @@ exports.read = async function (dataPath) {
   return Buffer.concat(chunks)
 }
 
-
 /** Create or update a raw file, creating a .backup file of the previous version in the process
  * @param {string[]} path - relative path inside data directory the data is located at
  * @param {Buffer} data - cbor encodable object to store

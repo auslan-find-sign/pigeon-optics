@@ -17,11 +17,8 @@ exports.raw = require('./raw').instance({
  * @async
  */
 exports.read = async function (dataPath) {
-  const stream = await this.readStream(dataPath)
-  return new Promise((resolve, reject) => {
-    stream.once('data', data => resolve(data))
-    stream.once('error', err => reject(err))
-  })
+  const buffer = await this.raw.read(dataPath)
+  return codec.cbor.decode(buffer)
 }
 
 /** Create or update a cbor data file, creating a .backup file of the previous version in the process
