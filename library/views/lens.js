@@ -1,5 +1,6 @@
 const layout = require('./layout')
 const uri = require('encodeuricomponent-tag')
+const naturalCompare = require('string-natural-compare')
 
 /**
  * block to build a login/register form page
@@ -46,7 +47,7 @@ module.exports = (req, config) => {
       v.sourceCode(config.reduceCode)
 
       v.heading('Records:', { level: 3 })
-      v.linkList(Object.keys(config.records), name => uri`/lenses/${req.params.user}:${req.params.name}/records/${name}`)
+      v.linkList(Object.keys(config.records).sort(naturalCompare), name => uri`/lenses/${req.params.user}:${req.params.name}/records/${name}`)
 
       if (req.session.auth) {
         v.footer(v => {

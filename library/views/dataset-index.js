@@ -1,5 +1,6 @@
 const layout = require('./layout')
 const uri = require('encodeuricomponent-tag')
+const naturalCompare = require('string-natural-compare')
 
 /**
  * block to build a dataset manual record editor
@@ -28,7 +29,7 @@ module.exports = (req, { config }) => {
       v.heading(`Dataset: ${req.params.name}`)
       if (config.memo) v.p(config.memo)
       v.heading('Records:', { level: 3 })
-      const recordIDs = Object.keys(config.records)
+      const recordIDs = Object.keys(config.records).sort(naturalCompare)
       v.linkList(recordIDs, id => uri`/datasets/${req.params.user}:${req.params.name}/records/${id}`)
 
       if (req.owner) {

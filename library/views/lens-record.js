@@ -1,6 +1,7 @@
 const layout = require('./layout')
 const codec = require('../models/codec')
 const uri = require('encodeuricomponent-tag')
+const naturalCompare = require('string-natural-compare')
 
 module.exports = (req, { record, sidebar }) => {
   return layout(req, v => {
@@ -8,7 +9,7 @@ module.exports = (req, { record, sidebar }) => {
       v.heading('Records')
 
       v.ul(v => {
-        for (const recordID of sidebar.recordIDs) {
+        for (const recordID of sidebar.recordIDs.sort(naturalCompare)) {
           const attribs = recordID === req.params.recordID ? { class: 'selected' } : {}
           v.li(attribs, v => v.a(recordID, { href: uri`/lenses/${req.params.user}:${req.params.name}/records/${recordID}` }))
         }
