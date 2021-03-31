@@ -291,30 +291,21 @@ class RichVibeBuilder extends VibeBuilder {
   }
 
   // {
-  //   file: 'https://localhost:3000/lenses/system:ephemeral-1614727363645-b9b42251/configuration/map.js',
   //   line: 4,
-  //   index: false,
-  //   callee: '',
   //   column: 9,
-  //   native: false,
-  //   fileName: 'map.js',
-  //   fileShort: 'localhost:3000/lenses/system:ephemeral-1614727363645-b9b42251/configuration/map.js',
-  //   thirdParty: false,
-  //   beforeParse: 'at https://localhost:3000/lenses/system:ephemeral-1614727363645-b9b42251/configuration/map.js:4:9',
-  //   calleeShort: '',
-  //   fileRelative: 'localhost:3000/lenses/system:ephemeral-1614727363645-b9b42251/configuration/map.js',
-  //   codeAtLine: '  throw new Error('whatever')'
+  //   filename: 'map.js',
+  //   code: '  throw new Error('whatever')'
   // },
   stacktrace (error) {
     return this.div({ class: 'stacktrace' }, v => {
       v.heading(v => { v.icon('notice-in-circle'); v.text(` ${error.type}: ${error.message}`) })
       v.ul(v => {
-        for (const item of error.stacktrace) {
+        for (const item of error.stack) {
           v.li(v => {
-            v.span(`${item.fileName}`, { class: 'filename' })
+            v.span(`${item.filename}`, { class: 'filename' })
             v.span(`${item.line}`, { class: 'line' })
             v.span(`${item.column}`, { class: 'column' })
-            v.code({ class: 'inline-source-code', innerHTML: highlight(`${item.codeAtLine}`) })
+            v.code({ class: 'inline-source-code', innerHTML: highlight(`${item.code}`) })
           })
         }
       })

@@ -27,7 +27,12 @@ function transformVMError (error, file, source) {
   return {
     type: error.constructor.name,
     message: error.message,
-    stack: filteredTrace.items.map(x => ({ ...x, codeAtLine: sourceLines[x.line - 1] }))
+    stack: filteredTrace.items.map(x => ({
+      line: x.line,
+      column: x.column,
+      filename: x.fileName,
+      code: sourceLines[x.line - 1]
+    }))
   }
 }
 
@@ -128,15 +133,9 @@ exports.map = async function (input) {
 
     return { logs, errors: [], outputs }
   } catch (err) {
-    const trace = new StackTracey(err)
-    const filteredTrace = trace.filter(x => x.file === 'map.js' && x.line >= 1)
     return {
       logs,
-      errors: [{
-        type: err.constructor.name,
-        message: err.message,
-        stack: filteredTrace.items.map(x => ({ ...x, codeAtLine: code.map.split('\n')[x.line - 1].trim() }))
-      }],
+      errors: [transformVMError(err, 'map.js', code.map)],
       outputs
     }
   }
@@ -155,16 +154,9 @@ exports.reduce = async function (left, right) {
 
     return { logs, errors: [], value: result }
   } catch (err) {
-    const trace = new StackTracey(err)
-    const codeLines = code.reduce.split(/\r?\n/g)
-    const filteredTrace = trace.filter(x => x.file === 'reduce.js' && x.line >= 1 && x.line <= codeLines.length)
     return {
       logs,
-      errors: [{
-        type: err.constructor.name,
-        message: err.message,
-        stack: filteredTrace.items.map(x => ({ ...x, codeAtLine: codeLines[x.line - 1] }))
-      }],
+      errors: [transformVMError(err, 'reduce.js', code.reduce)],
       value: undefined
     }
   }

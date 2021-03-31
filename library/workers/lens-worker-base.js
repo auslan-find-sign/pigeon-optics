@@ -21,7 +21,7 @@ exports.startup = async function (configuration) {
 
 /** Represents a stack trace entry in a thrown error
  * @typedef {object} StackEntry
- * @property {string} codeAtLine - source code on the line that emitted the error
+ * @property {string} code - source code on the line that emitted the error
  * @property {number} line - line number 1 indexed
  * @property {number} column - column number 0 indexed
  * @property {string} filename - path to file that caused the error, maybe a url, local path, just human readable info

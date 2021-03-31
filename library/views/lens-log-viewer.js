@@ -1,7 +1,5 @@
 const layout = require('./layout')
 const uri = require('encodeuricomponent-tag')
-const codec = require('../models/codec')
-const highlight = require('h.js')
 
 module.exports = (req, { mapOutputs }) => {
   return layout(req, v => {
@@ -22,10 +20,12 @@ module.exports = (req, { mapOutputs }) => {
         )
       })
 
-      for (const { input, error, logs } of mapOutputs) {
+      for (const { input, errors, logs } of mapOutputs) {
         v.heading({ level: 3 }, v => v.a(input, { href: input }))
 
-        if (error) v.stacktrace(error)
+        for (const error of errors) {
+          v.stacktrace(error)
+        }
 
         if (logs && logs.length > 0) {
           v.heading('console.log/warn/info/error:')
