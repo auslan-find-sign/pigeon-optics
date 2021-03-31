@@ -32,7 +32,7 @@ function randomName () {
   return crypto.randomBytes(32).toString('hex')
 }
 
-describe('file/cbor', function () {
+describe('models/file/cbor', function () {
   it('cbor.read() and cbor.write()', async function () {
     for (const test of tests) {
       const path = ['file-tests', randomName()]

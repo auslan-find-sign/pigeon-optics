@@ -16,7 +16,7 @@ if (left === 'log') console.log('hey', 'whats up', 5)
 if (right === 'error') throw new Error('oops')
 return left + right`
 
-describe('/library/workers/interface.js > LensWorker.startup', async function () {
+describe('workers/interface.LensWorker#startup', async function () {
   it('catches map syntax errors', async function () {
     const worker = new LensWorker()
     const startup = await worker.startup({
@@ -72,7 +72,7 @@ describe('/library/workers/interface.js > LensWorker.startup', async function ()
   })
 })
 
-describe('/library/workers/interface.js > LensWorker.map', async function () {
+describe('workers/interface.LensWorker#map', async function () {
   let worker
 
   before('startup worker', async function () {
@@ -121,7 +121,7 @@ describe('/library/workers/interface.js > LensWorker.map', async function () {
   })
 })
 
-describe('/library/workers/interface.js > LensWorker.reduce', async function () {
+describe('workers/interface.LensWorker#reduce', async function () {
   let worker
 
   before('startup worker', async function () {

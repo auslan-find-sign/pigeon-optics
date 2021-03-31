@@ -18,7 +18,7 @@ function randomName () {
   return crypto.randomBytes(32).toString('hex')
 }
 
-describe('file/raw', function () {
+describe('models/file/raw', function () {
   it('raw.read() and raw.write()', async function () {
     for (const test of tests) {
       const path = ['file-tests', randomName()]

@@ -14,7 +14,7 @@ function fakehash (list) {
   return string
 }
 
-describe('record-structure.listHashURLs', function () {
+describe('utility/record-structure.listHashURLs', function () {
   it('finds hashes in arrays', function () {
     const expected = []
     const input = ['foo', 5, Symbol('yeahnah'), fakehash(expected), -6000, fakehash(expected)]
@@ -82,7 +82,7 @@ describe('record-structure.listHashURLs', function () {
   })
 })
 
-describe('record-structure.resolveFileURLs', function () {
+describe('utility/record-structure.resolveFileURLs', function () {
   it('converts the document', function () {
     const attachedFilesByName = {
       'foo.txt': { path: '/tmp/foo-123.txt', hash: crypto.randomBytes(32), type: 'text/plain' },

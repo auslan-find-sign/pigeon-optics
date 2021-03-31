@@ -14,7 +14,7 @@ const tests = [
   crypto.randomBytes(7 * 1024 * 1024) // 7mb
 ]
 
-describe('file/blob', function () {
+describe('models/file/blob', function () {
   it('blob.read() and blob.write()', async function () {
     for (const test of tests) {
       const hash = await blob.write(test)

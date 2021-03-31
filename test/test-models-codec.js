@@ -25,7 +25,7 @@ const tests = [
   }
 ]
 
-describe('codec.json', function () {
+describe('models/codec.json', function () {
   for (const obj of tests) {
     it(`encodes type ${typeof obj} reversably`, function () {
       const roundtripped = codec.json.decode(codec.json.encode(obj))
@@ -39,7 +39,7 @@ describe('codec.json', function () {
   }
 })
 
-describe('codec.cbor', function () {
+describe('models/codec.cbor', function () {
   for (const obj of tests) {
     it(`encodes type ${typeof obj} reversably`, function () {
       const roundtripped = codec.cbor.decode(codec.cbor.encode(obj))
@@ -48,7 +48,7 @@ describe('codec.cbor', function () {
   }
 })
 
-describe('codec.path', function () {
+describe('models/codec.path', function () {
   it('encodes without a record ID', function () {
     const opts = { source: 'datasets', user: 'user', name: 'name' }
     assert.strictEqual(codec.path.encode(opts), '/datasets/user:name')
@@ -84,7 +84,7 @@ describe('codec.path', function () {
   })
 })
 
-describe('codec.objectHash', function () {
+describe('models/codec.objectHash', function () {
   it('all the different things hash differently', function () {
     const existing = []
     for (const obj of tests) {

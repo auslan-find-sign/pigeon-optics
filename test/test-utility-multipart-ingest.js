@@ -40,7 +40,7 @@ app.post('/test', async (req, res) => {
   res.send(response)
 })
 
-describe('library/utility/multipart-attachments', function () {
+describe('utility/multipart-attachments', function () {
   it('decodes body as part of form-data', function (done) {
     chai.request(app)
       .post('/test')

@@ -27,7 +27,7 @@ const tests = {
 }
 /* eslint-enable */
 
-describe('library/utility/object-to-ruby', function () {
+describe('utility/object-to-ruby', function () {
   for (const [expects, obj] of Object.entries(tests)) {
     it(`encode to ${expects}`, function () {
       const output = objectToRuby(obj)
