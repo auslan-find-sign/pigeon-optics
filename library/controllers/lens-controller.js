@@ -63,7 +63,7 @@ router.all('/lenses/create', auth.required, async (req, res) => {
 })
 
 router.get('/lenses/:user\\::name/configuration', async (req, res) => {
-  const config = await lens.readConfig(req.params.user, req.params.name)
+  const config = await lens.readMeta(req.params.user, req.params.name)
   const state = {
     ...config,
     create: false,
@@ -78,16 +78,16 @@ router.get('/lenses/:user\\::name/configuration', async (req, res) => {
 })
 
 router.put('/lenses/:user\\::name/configuration', auth.ownerRequired, async (req, res) => {
-  const config = await lens.readConfig(req.params.user, req.params.name)
-
   try {
-    await lens.writeConfig(req.params.user, req.params.name, {
-      ...config,
-      memo: req.body.memo,
-      inputs: req.body.inputs.split('\n').map(x => x.trim()).filter(x => !!x),
-      mapType: req.body.mapType,
-      mapCode: req.body.mapCode,
-      reduceCode: req.body.reduceCode
+    await lens.updateMeta(req.params.user, req.params.name, meta => {
+      return {
+        ...meta,
+        memo: req.body.memo,
+        inputs: req.body.inputs.split('\n').map(x => x.trim()).filter(x => !!x),
+        mapType: req.body.mapType,
+        mapCode: req.body.mapCode,
+        reduceCode: req.body.reduceCode
+      }
     })
     // rebuild since settings may have changed
     await lens.build(req.session.auth.user, req.body.name)
@@ -163,13 +163,12 @@ router.get('/lenses/:user\\:', async (req, res) => {
 
 // list contents of dataset
 router.get('/lenses/:user\\::name/', async (req, res) => {
-  const config = await lens.readConfig(req.params.user, req.params.name)
+  const config = await lens.readMeta(req.params.user, req.params.name)
   res.set('X-Version', config.version)
 
   if (req.accepts('html')) {
-    const recordIDs = await lens.listEntries(req.params.user, req.params.name)
     const title = `${req.params.user}’s “${req.params.name}” Datasets`
-    res.sendVibe('lens', title, config, recordIDs)
+    res.sendVibe('lens', title, config)
   } else {
     const records = await lens.listEntryHashes(req.params.user, req.params.name)
     codec.respond(req, res, {
@@ -183,17 +182,16 @@ router.get('/lenses/:user\\::name/', async (req, res) => {
 
 // list records of lens
 router.get('/lenses/:user\\::name/records/', async (req, res) => {
-  const config = await lens.readConfig(req.params.user, req.params.name)
-  const records = await lens.listEntryMeta(req.params.user, req.params.name)
+  const config = await lens.readMeta(req.params.user, req.params.name)
   res.set('X-Version', config.version)
   res.set('ETag', `"${config.version}"`)
-  codec.respond(req, res, Object.fromEntries(Object.entries(records).map(([id, { version, hash }]) => [id, { version, hash }])))
+  codec.respond(req, res, config.records)
 })
 
 // get a record from a user's lens
 router.get('/lenses/:user\\::name/records/:recordID', async (req, res) => {
-  const meta = await lens.readEntryMeta(req.params.user, req.params.name, req.params.recordID)
-  const record = await meta.read()
+  const meta = await lens.readMeta(req.params.user, req.params.name)
+  const record = await lens.read(req.params.user, req.params.name, req.params.recordID)
   res.set('X-Version', meta.version)
 
   if (req.accepts('html')) {

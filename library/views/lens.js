@@ -7,7 +7,7 @@ const uri = require('encodeuricomponent-tag')
  * @param {string} mode - either 'login' or 'register'
  * @param {null|string} error - null or a string with an error message
  */
-module.exports = (req, config, records) => {
+module.exports = (req, config) => {
   return layout(req, v => {
     v.panel(v => {
       v.header(v => {
@@ -46,7 +46,7 @@ module.exports = (req, config, records) => {
       v.sourceCode(config.reduceCode)
 
       v.heading('Records:', { level: 3 })
-      v.linkList(records, name => uri`/lenses/${req.params.user}:${req.params.name}/records/${name}`)
+      v.linkList(Object.keys(config.records), name => uri`/lenses/${req.params.user}:${req.params.name}/records/${name}`)
 
       if (req.session.auth) {
         v.footer(v => {
