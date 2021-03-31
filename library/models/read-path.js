@@ -51,18 +51,15 @@ readPath.meta = async function * readPathMeta (path) {
     if (source !== undefined) {
       if (params.recordID !== undefined) {
         // just yield the specific entry
-        const meta = await source.readEntryMeta(params.user, params.name, params.recordID)
         yield {
           path: codec.path.encode(params.source, params.user, params.name, params.recordID),
-          read: async function readEntry () { return await source.readEntryByHash(params.user, params.name, meta.hash) },
-          ...meta
+          ...await source.read(params.user, params.name, params.recordID)
         }
       } else {
         // do the whole dataset
-        for (const [recordID, meta] of Object.entries(await source.listEntryMeta(params.user, params.name))) {
+        for await (const meta of source.iterate(params.user, params.name)) {
           yield {
-            path: codec.path.encode(params.source, params.user, params.name, recordID),
-            read: async function readEntry () { return await source.readEntryByHash(params.user, params.name, meta.hash) },
+            path: codec.path.encode(params.source, params.user, params.name, meta.id),
             ...meta
           }
         }

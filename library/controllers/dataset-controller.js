@@ -1,5 +1,5 @@
 const express = require('express')
-const router = express.Router()
+const router = module.exports = express.Router()
 
 const auth = require('../models/auth')
 const codec = require('../models/codec')
@@ -63,18 +63,15 @@ router.all('/datasets/create', auth.required, async (req, res) => {
 
 // list dataset info and records
 router.get('/datasets/:user\\::name/', async (req, res) => {
-  const config = await dataset.readConfig(req.params.user, req.params.name)
+  const config = await dataset.readMeta(req.params.user, req.params.name)
 
   if (req.accepts('html')) {
-    const recordIDs = await dataset.listEntries(req.params.user, req.params.name)
-    res.sendVibe('dataset-index', `${req.params.user}’s “${req.params.name}” Dataset`, { config, recordIDs })
+    res.sendVibe('dataset-index', `${req.params.user}’s “${req.params.name}” Dataset`, { config })
   } else {
-    const records = await dataset.listEntryMeta(req.params.user, req.params.name)
     codec.respond(req, res, {
-      owner: req.params.user,
+      user: req.params.user,
       name: req.params.name,
-      config,
-      records
+      ...config
     })
   }
 })
@@ -91,14 +88,14 @@ router.delete('/datasets/:user\\::name/', auth.ownerRequired, async (req, res) =
 })
 
 router.all('/datasets/:user\\::name/configuration', auth.ownerRequired, async (req, res) => {
-  const config = await dataset.readConfig(req.params.user, req.params.name)
+  const config = await dataset.readMeta(req.params.user, req.params.name)
   let error = false
 
   if (req.method === 'PUT') {
     try {
-      await dataset.writeConfig(req.params.user, req.params.name, {
-        ...config,
-        memo: req.body.memo
+      await dataset.updateMeta(req.params.user, req.params.name, meta => {
+        meta.memo = req.body.memo
+        return meta
       })
       if (req.accepts('html')) return res.redirect(303, uri`/datasets/${req.params.user}:${req.params.name}/`)
       else return res.sendStatus(204)
@@ -141,7 +138,7 @@ router.all('/datasets/:user\\::name/create-record', auth.ownerRequired, async (r
   if (req.method === 'PUT') {
     try {
       const data = codec.json.decode(req.body.recordData)
-      await dataset.writeEntry(req.params.user, req.params.name, req.body.recordID, data)
+      await dataset.write(req.params.user, req.params.name, req.body.recordID, data)
       return res.redirect(303, uri`/datasets/${req.params.user}:${req.params.name}/records/${req.body.recordID}`)
     } catch (err) {
       error = err.message
@@ -152,11 +149,11 @@ router.all('/datasets/:user\\::name/create-record', auth.ownerRequired, async (r
 
 // list records of dataset
 router.get('/datasets/:user\\::name/records/', async (req, res) => {
-  const config = await dataset.readConfig(req.params.user, req.params.name)
-  const records = await dataset.listEntryMeta(req.params.user, req.params.name)
+  const config = await dataset.readMeta(req.params.user, req.params.name)
+  const records = await dataset.list(req.params.user, req.params.name)
   res.set('X-Version', config.version)
   res.set('ETag', `"${config.version}"`)
-  codec.respond(req, res, Object.fromEntries(Object.entries(records).map(([id, { version, hash }]) => [id, { version, hash }])))
+  codec.respond(req, res, Object.fromEntries(records.map(({ id, version, hash }) => [id, { version, hash }])))
 })
 
 router.post('/datasets/:user\\::name/records/', auth.ownerRequired, multipartAttachments, async (req, res) => {
@@ -242,32 +239,32 @@ router.all('/datasets/:user\\::name/records/:recordID', multipartAttachments, as
       }
 
       // write record
-      const { version } = await dataset.writeEntry(req.params.user, req.params.name, req.params.recordID, req.body)
+      await dataset.write(req.params.user, req.params.name, req.params.recordID, req.body)
 
       if (req.accepts('html')) {
         return res.redirect(303, uri`/datasets/${req.params.user}:${req.params.name}/records/${req.params.recordID}`)
       } else {
-        return req.set('X-Version', version).sendStatus(204)
+        return req.sendStatus(204)
       }
     } catch (err) {
       error = err.message
     }
   } else if (req.method === 'DELETE') {
     if (!req.owner) return next(createError.Unauthorized('You do not have write access to this dataset'))
-    const { version } = await dataset.deleteEntry(req.params.user, req.params.name, req.params.recordID)
+    await dataset.delete(req.params.user, req.params.name, req.params.recordID)
     if (req.accepts('html')) {
       return res.redirect(303, uri`/datasets/${req.params.user}:${req.params.name}/`)
     } else {
-      return res.set('X-Version', version).sendStatus(204)
+      return res.sendStatus(204)
     }
   }
 
-  const record = await dataset.readEntry(req.params.user, req.params.name, req.params.recordID)
+  const record = await dataset.read(req.params.user, req.params.name, req.params.recordID)
   if (!record) return next(createError.NotFound('Record Not Found'))
 
   if (req.accepts('html')) {
     const sidebar = {
-      recordIDs: await dataset.listEntries(req.params.user, req.params.name)
+      recordIDs: Object.keys((await dataset.readMeta(req.params.user, req.params.name)).records)
     }
 
     const title = `${req.params.user}:${req.params.name}/${req.params.recordID}`
@@ -284,5 +281,3 @@ router.all('/datasets/:user\\::name/records/:recordID', multipartAttachments, as
     codec.respond(req, res, record)
   }
 })
-
-module.exports = router

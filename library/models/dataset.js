@@ -1,5 +1,7 @@
 /**
  * Dataset Model - provides access to a dataset stored on the service
+ * @module
+ * @augments modules:models/base-data-model
  */
 const auth = require('./auth')
 const assert = require('assert')

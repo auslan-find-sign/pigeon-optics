@@ -7,7 +7,7 @@ const uri = require('encodeuricomponent-tag')
  * @param {string} data - object with state info for the form
  * @param {null|string} error - null or a string with an error message
  */
-module.exports = (req, { config, recordIDs }) => {
+module.exports = (req, { config }) => {
   return layout(req, v => {
     v.panel(v => {
       v.header(v => {
@@ -28,6 +28,7 @@ module.exports = (req, { config, recordIDs }) => {
       v.heading(`Dataset: ${req.params.name}`)
       if (config.memo) v.p(config.memo)
       v.heading('Records:', { level: 3 })
+      const recordIDs = Object.keys(config.records)
       v.linkList(recordIDs, id => uri`/datasets/${req.params.user}:${req.params.name}/records/${id}`)
 
       if (req.owner) {

@@ -23,7 +23,7 @@ module.exports = (req, { list }) => {
       }
 
       if (req.session.auth) {
-        v.footer(v => v.button('Create', { href: '/lenses/create' }))
+        v.footer(v => v.button('Create', { href: '/datasets/create' }))
       }
     })
   })
