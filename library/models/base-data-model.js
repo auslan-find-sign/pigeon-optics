@@ -8,6 +8,7 @@ const codec = require('./codec')
 const itToArray = require('../utility/async-iterable-to-array')
 const assert = require('assert')
 const updateEvents = require('../utility/update-events')
+const stringNaturalCompare = require('string-natural-compare')
 
 /* read meta info about dataset */
 exports.readMeta = async function (user, name) {
@@ -33,18 +34,24 @@ exports.updateMeta = async function (user, name, block) {
       if (!('version' in meta)) meta.version = config.version
       assert(typeof meta.version === 'number', 'record object value must have a numeric version number')
       assert(meta.version > 0, 'record object must contain version number above 0')
+      assert(Buffer.isBuffer(meta.hash), 'record object\'s hash property must be a Buffer')
+      assert.strictEqual(meta.hash.length, 32, 'record object\'s hash property must be 32 bytes long')
       retainObjectList.push(meta.hash)
     }
 
+    // sort records object
+    result.records = Object.fromEntries(Object.entries(result.records).sort((a, b) => stringNaturalCompare(a[0], b[0])))
+
+    // validate that updated version is good
     await this.validateConfig(user, name, result)
 
     // garbage collect objects that aren't used in this or the previous version
     await this.getObjectStore(user, name).retain(retainObjectList)
 
     // update notifyVersion number so downstream lenses don't process repeatedly
-    notifyVersion = config.version
+    notifyVersion = result.version
 
-    return config
+    return result
   })
 
   // notify downstream lenses of the change
