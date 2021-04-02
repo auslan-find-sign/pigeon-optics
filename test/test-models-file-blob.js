@@ -5,6 +5,7 @@ chai.use(require('chai-as-promised'))
 const assert = chai.assert
 const blob = require('../library/models/file/blob').instance({ rootPath: ['blob-tests'] })
 const raw = require('../library/models/file/raw')
+const { Readable } = require('stream')
 
 const tests = [
   crypto.randomBytes(32),
@@ -24,6 +25,24 @@ describe('models/file/blob', function () {
 
       await blob.delete(hash)
     }
+  })
+
+  it('blob.writeStream and blob.readStream() work', async function () {
+    function * pseudorandom (seed, iterations = 100) {
+      for (let i = 0; i < iterations; i++) {
+        const hash = crypto.createHash('sha256')
+        hash.update(seed)
+        seed = hash.digest()
+        yield seed
+      }
+    }
+
+    const hash = await blob.writeStream(Readable.from(pseudorandom('beans')))
+    const readback = Buffer.concat(await asyncIterableToArray(await blob.readStream(hash)))
+    const expected = Buffer.concat([...pseudorandom('beans')])
+    assert(expected.equals(readback), 'blob.readStream provides the same data as went in')
+    assert(expected.equals(await blob.read(hash)), 'blob.read() reads back the same value')
+    await blob.delete(hash)
   })
 
   it('blob.delete() works', async function () {

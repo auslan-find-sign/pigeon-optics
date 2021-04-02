@@ -6,6 +6,9 @@
  */
 
 const asyncIterableToArray = require('../../utility/async-iterable-to-array')
+const HashThrough = require('hash-through')
+const { PassThrough } = require('stream')
+const crypto = require('crypto')
 
 // used to store attachments in attachment store
 exports.raw = require('./raw').instance({
@@ -13,18 +16,17 @@ exports.raw = require('./raw').instance({
 })
 
 // default codec just passes through buffers
-// but this could be set to codec.cbor, codec.json, etc
+// but this could be set to codec.cbor, codec.jsonLines, etc
 exports.codec = {
+  encode: (buffer) => Buffer.from(buffer),
   decode: (buffer) => Buffer.from(buffer),
-  encode: (buffer) => Buffer.from(buffer)
+  encoder: () => new PassThrough(),
+  decoder: () => new PassThrough()
 }
 
 // hash function that takes an input and makes a hash of it
-exports.hash = async (input) => {
-  const crypto = require('crypto')
-  const digester = crypto.createHash('sha256')
-  digester.update(input)
-  return digester.digest()
+exports.getHashObject = function () {
+  return crypto.createHash('sha256')
 }
 
 // get path to hash file in real filesystem (for web server streaming or whatever)
@@ -49,7 +51,9 @@ exports.read = async function (hash) {
  */
 exports.write = async function (data) {
   const encoded = await this.codec.encode(data)
-  const hash = await this.hash(encoded)
+  const hasher = await this.getHashObject()
+  hasher.update(encoded)
+  const hash = hasher.digest()
   const dataPath = [hash.toString('hex')]
 
   if (!await this.raw.exists(dataPath)) {
@@ -58,20 +62,26 @@ exports.write = async function (data) {
   return hash
 }
 
-/** Add a blob to the store, with a specified hash
- * Warning: this doesn't use the codec stuff at all, data had better already be encoded
- * @param {Buffer} hash
- * @param {ReadableStream} stream
+exports.readStream = async function (hash) {
+  return (await this.raw.readStream([hash.toString('hex')])).pipe(this.codec.decoder())
+}
+
+/**
+ * Add a blob to the store, and returns a hash of it's contents when it's finished
+ * @param {Readable} stream
  * @returns {Buffer} hash
  * @async
  */
-exports.writeHashedStream = async function (hash, stream) {
+exports.writeStream = async function (stream) {
+  const tempPath = [`blob-write-stream-temporary-${crypto.randomBytes(20).toString('hex')}`]
+  const hasher = new HashThrough(this.getHashObject)
+  await this.raw.writeStream(tempPath, stream.pipe(hasher))
+  const hash = hasher.digest()
   const dataPath = [hash.toString('hex')]
-
   if (await this.raw.exists(dataPath)) {
-    stream.resume() // empty the stream, don't do anything with it
+    await this.raw.delete(tempPath)
   } else {
-    await this.raw.writeStream(dataPath, stream)
+    await this.raw.rename(tempPath, dataPath)
   }
   return hash
 }
