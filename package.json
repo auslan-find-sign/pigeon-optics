@@ -36,6 +36,7 @@
     "isolated-vm": "^3.3.10",
     "json5": "^2.2.0",
     "method-override": "^3.0.0",
+    "msgpack5": "^5.3.2",
     "multer": "^1.4.2",
     "object-hash": "^2.1.1",
     "on-finished": "^2.3.0",
@@ -48,6 +49,7 @@
     "tweetnacl": "^1.0.3",
     "unicode": "^13.0.0",
     "xbytes": "^1.7.0",
+    "yaml": "^2.0.0-4",
     "zip-stream": "^4.0.4"
   },
   "defaults": {

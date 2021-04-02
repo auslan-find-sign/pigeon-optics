@@ -37,7 +37,7 @@ exports.write = async function (dataPath, data) {
  */
 exports.readStream = async function (dataPath) {
   const rawStream = await this.raw.readStream(dataPath)
-  return rawStream.pipe(codec.cbor.getDecodeStream())
+  return rawStream.pipe(codec.cbor.decoder())
 }
 
 /**
@@ -46,7 +46,7 @@ exports.readStream = async function (dataPath) {
  * @param {ReadableStream} data
  */
 exports.writeStream = async function (dataPath, data) {
-  const encoder = codec.cbor.getEncoderStream()
+  const encoder = codec.cbor.encoder()
   return await this.raw.writeStream(dataPath, data.pipe(encoder))
 }
 

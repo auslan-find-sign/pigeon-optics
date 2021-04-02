@@ -1,10 +1,11 @@
 const codec = require('../library/models/codec')
 const assert = require('assert')
+const { Readable } = require('stream')
+const asyncIterableToArray = require('../library/utility/async-iterable-to-array')
 
 const tests = [
   true,
   false,
-  null,
   5,
   9274,
   0.0001,
@@ -44,6 +45,52 @@ describe('models/codec.cbor', function () {
     it(`encodes type ${typeof obj} reversably`, function () {
       const roundtripped = codec.cbor.decode(codec.cbor.encode(obj))
       assert.deepStrictEqual(roundtripped, obj, 'roundtripped version should match deeply')
+    })
+  }
+})
+
+describe('models/codec.yaml', function () {
+  for (const obj of tests) {
+    it(`encodes type ${typeof obj} reversably`, function () {
+      const roundtripped = codec.yaml.decode(codec.yaml.encode(obj))
+      assert.deepStrictEqual(roundtripped, obj, 'roundtripped version should match deeply')
+    })
+  }
+})
+
+describe('models/codec.msgpack', function () {
+  for (const obj of tests) {
+    it(`encodes type ${typeof obj} reversably`, function () {
+      const roundtripped = codec.msgpack.decode(codec.msgpack.encode(obj))
+      assert.deepStrictEqual(roundtripped, obj, 'roundtripped version should match deeply')
+    })
+  }
+})
+
+describe('models/codec.jsonLines', function () {
+  it('encodes list reversably', function () {
+    const roundtripped = codec.jsonLines.decode(codec.jsonLines.encode(tests))
+    assert.deepStrictEqual(roundtripped, tests, 'roundtripped version should match deeply')
+  })
+})
+
+describe('models/codec streaming mode', function () {
+  // json doesn't have a decoder currently, special case
+  it('codec.json.encoder() works', async function () {
+    const input = Readable.from(tests, { objectMode: true })
+    const encoder = input.pipe(codec.json.encoder())
+    const output = Buffer.concat(await asyncIterableToArray(encoder)).toString('utf-8')
+    assert.deepStrictEqual(codec.json.decode(output), tests, 'json streaming encoder should output a valid single json document array')
+  })
+
+  // check all the other's roundtrip the requests well
+  for (const encoder of [codec.jsonLines, codec.yaml, codec.cbor, codec.msgpack]) {
+    it(`codec.${Object.entries(codec).find(x => x[1] === encoder)[0]}.encoder() and .decoder() transform streams roundtrip data well`, async function () {
+      const encodeStream = encoder.encoder()
+      const decodeStream = encoder.decoder()
+      const input = Readable.from(tests, { objectMode: true })
+      const output = await asyncIterableToArray(input.pipe(encodeStream).pipe(decodeStream))
+      assert.deepStrictEqual(output, tests, 'should stream the tests correctly')
     })
   }
 })

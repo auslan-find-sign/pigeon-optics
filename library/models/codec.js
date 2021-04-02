@@ -3,11 +3,14 @@
  */
 const cbor = require('cbor')
 const json5 = require('json5')
+const yaml = require('yaml')
+const msgpack = require('msgpack5')
 const objectHash = require('object-hash')
 const Vibe = require('../vibe/rich-builder')
 const layout = require('../views/layout')
+const streams = require('stream')
 
-module.exports.cbor = {
+exports.cbor = {
   decoderOpts: {},
   encoderOpts: { highWaterMark: 25000000 },
 
@@ -20,11 +23,11 @@ module.exports.cbor = {
     return cbor.decodeFirstSync(inputBuffer, exports.cbor.decoderOpts)
   },
 
-  getDecodeStream () {
+  decoder () {
     return new cbor.Decoder(exports.cbor.decoderOpts)
   },
 
-  getEncoderStream () {
+  encoder () {
     return new cbor.Encoder(exports.cbor.encoderOpts)
   },
 
@@ -38,25 +41,25 @@ module.exports.cbor = {
   }
 }
 
-module.exports.json = {
+exports.json = {
+  reviver (key, value) {
+    if (value && typeof value === 'object' && value.type === 'Buffer' && Array.isArray(value.data)) {
+      return Buffer.from(value)
+    }
+    return value
+  },
+
   /**
    * Decodes first item in buffer using JSON, unpacking any attachments included in the cbor too
    * @param {string} jsonString - string containing json which optionally includes NodeJS stringified Buffers
    * @returns {any} - returns decoded object
    */
   decode (jsonString) {
-    const reviver = (key, value) => {
-      if (value && typeof value === 'object' && value.type === 'Buffer' && Array.isArray(value.data)) {
-        return Buffer.from(value)
-      }
-      return value
-    }
-
     try {
       if (Buffer.isBuffer(jsonString)) jsonString = jsonString.toString('utf-8')
-      return JSON.parse(jsonString, reviver)
+      return JSON.parse(jsonString, this.reviver)
     } catch (err) {
-      return json5.parse(jsonString, reviver)
+      return json5.parse(jsonString, this.reviver)
     }
   },
 
@@ -78,8 +81,140 @@ module.exports.json = {
    */
   print (object, spaces = 2) {
     return json5.stringify(object, null, spaces)
+  },
+
+  /**
+   * Create a transform stream, which takes objects, and encodes them in to a streaming json array
+   * @returns {streams.Transform}
+   */
+  encoder () {
+    let first = true
+    return new streams.Transform({
+      writableObjectMode: true,
+      transform (chunk, encoding, callback) {
+        try {
+          const json = exports.json.encode(chunk)
+          if (first) callback(null, Buffer.from(`[\n  ${json}`, 'utf-8'))
+          else callback(null, Buffer.from(`,\n  ${json}`, 'utf-8'))
+          first = false
+        } catch (err) {
+          callback(err)
+        }
+      },
+      flush (callback) {
+        this.push('\n]\n')
+        callback(null)
+      }
+    })
   }
 }
+
+exports.jsonLines = {
+  encode (array) {
+    if (array && typeof array === 'object' && array[Symbol.iterator]) {
+      const out = []
+      for (const item of array) {
+        out.push(exports.json.encode(item) + '\n')
+      }
+      return out.join('')
+    } else {
+      throw new Error('input must be an array or an iterable')
+    }
+  },
+
+  decode (input) {
+    return input.split('\n').map(x => x.trim()).filter(x => x.length > 0).map(x => exports.json.decode(x))
+  },
+
+  // decodes a readable stream of json-lines data in to an object-mode stream
+  decoder () {
+    /** @type {Buffer} */
+    let buff = Buffer.from([])
+    return new streams.Transform({
+      readableObjectMode: true,
+      transform (chunk, encoding, callback) {
+        buff = Buffer.concat([buff, chunk])
+
+        while (true) {
+          const nlIndex = buff.indexOf('\n')
+          if (nlIndex >= 0) {
+            const jsonString = buff.slice(0, nlIndex).toString('utf-8')
+            buff = buff.slice(nlIndex + 1)
+            try {
+              this.push(exports.json.decode(jsonString))
+            } catch (err) {
+              callback(err)
+            }
+          } else {
+            return callback(null)
+          }
+        }
+      }
+    })
+  },
+
+  // encodes a readable object stream in to json-lines format
+  encoder () {
+    return new streams.Transform({
+      writableObjectMode: true,
+      transform (chunk, encoding, callback) {
+        try {
+          callback(null, Buffer.from(`${exports.json.encode(chunk)}\n`, 'utf-8'))
+        } catch (err) {
+          callback(err)
+        }
+      }
+    })
+  }
+}
+
+exports.yaml = {
+  decode (yamlString) {
+    if (Buffer.isBuffer(yamlString)) yamlString = yamlString.toString('utf-8')
+    return yaml.parse(yamlString, exports.json.reviver)
+  },
+
+  encode (object) {
+    return yaml.stringify(object)
+  },
+
+  // a decoder stream which outputs objects for each document
+  decoder () {
+    let buffer = Buffer.from([])
+    return new streams.Transform({
+      readableObjectMode: true,
+      transform (chunk, encoding, callback) {
+        buffer = Buffer.concat([buffer, chunk])
+        while (true) {
+          const offset = buffer.indexOf('\n...\n')
+          if (offset === -1) {
+            return callback(null)
+          } else {
+            // slice off the first document from the buffer
+            const docText = buffer.slice(0, offset + 1).toString('utf-8')
+            buffer = buffer.slice(offset + 5)
+            try {
+              this.push(exports.yaml.decode(docText))
+            } catch (err) {
+              return callback(err)
+            }
+          }
+        }
+      }
+    })
+  },
+
+  encoder () {
+    return new streams.Transform({
+      writableObjectMode: true,
+      transform (chunk, encoding, callback) {
+        try { callback(null, `${exports.yaml.encode(chunk)}...\n`) } catch (err) { callback(err) }
+      }
+    })
+  }
+}
+
+exports.msgpack = msgpack()
 
 const ptr = require('path-to-regexp')
 const datasetPath = '/:source(lenses|datasets|meta)/:user\\::name'
@@ -89,7 +224,7 @@ const recordPath = `${datasetPath}/records/:recordID`
 const recordMatch = ptr.match(recordPath)
 const recordCompile = ptr.compile(recordPath)
 
-module.exports.path = {
+exports.path = {
   decode (string) {
     const out = datasetMatch(string) || recordMatch(string)
     return out ? { ...out.params } : out
@@ -112,7 +247,7 @@ module.exports.path = {
  * @param {any} object - input object to hash, maybe containing attachments
  * @returns {Buffer} - sha256 hash (32 bytes) in a nodejs Buffer
  * */
-module.exports.objectHash = (object) => {
+exports.objectHash = (object) => {
   return objectHash(object, { algorithm: 'sha256', encoding: 'buffer' })
 }
 
@@ -122,29 +257,23 @@ module.exports.objectHash = (object) => {
  * @param {Response} res - expressjs http response object
  * @param {*} object - object to send back as JSON, CBOR, or a stylised webpage
  */
-module.exports.respond = async (req, res, object) => {
-  const bestMatch = req.accepts(['text/html', 'application/cbor', 'application/json'])
+exports.respond = async function respond (req, res, object) {
+  const supportedTypes = ['text/html', ...Object.values(respond.handlers).flat()]
+  const bestMatch = req.accepts(supportedTypes)
+  const encoderName = Object.entries(respond.handlers).find(([name, list]) => list.includes(bestMatch))[0]
+  const handler = exports[encoderName]
 
-  if (object[Symbol.asyncIterator]) { // AsyncIterators will stream out
-    if (bestMatch === 'application/cbor') {
+  if (object[Symbol.asyncIterator]) { // AsyncIterators will stream out as an array or some kind of list
+    if (handler) {
       res.type(bestMatch)
-      res.write(Buffer.from('9F', 'hex')) // CBOR indefinite length array start
-      for await (const entry of object) {
-        res.write(module.exports.cbor.encode(entry))
-      }
-      res.write(Buffer.from('FF', 'hex')) // CBOR break code
-      res.write(null)
-    } else if (bestMatch === 'application/json') {
-      res.type(bestMatch)
-      if (req.query.encoding !== 'json-lines') res.write('[\n')
-      let first = true
-      for await (const entry of object) {
-        if (!first && req.query.encoding !== 'json-lines') res.write(',\n')
-        res.write('\t' + module.exports.json.encode(entry))
-        first = false
-      }
-      if (req.query.encoding !== 'json-lines') res.write('\n]\n')
-      res.write(null)
+
+      const inputStream = object instanceof streams.Readable ? object : streams.Readable.from(object)
+      const encoder = inputStream.pipe(handler.encoder())
+      encoder.pipe(res)
+      return new Promise((resolve, reject) => {
+        encoder.on('end', resolve)
+        encoder.on('error', reject)
+      })
     } else {
       await new Promise((resolve, reject) => {
         Vibe.docStream('API Object Response Stream', layout(req, async v => {
@@ -152,26 +281,32 @@ module.exports.respond = async (req, res, object) => {
             v.heading('API Object Response Stream:')
 
             for await (const entry of object) {
-              v.sourceCode(module.exports.json.encode(entry, 2))
+              v.sourceCode(module.exports.json.print(entry, 2))
             }
           })
         })).pipe(res).on('close', () => resolve()).on('error', e => reject(e))
       })
     }
   } else {
-    if (bestMatch === 'application/cbor') {
-      res.type(bestMatch).send(module.exports.cbor.encode(object))
-    } else if (bestMatch === 'application/json') {
-      res.type(bestMatch).send(module.exports.json.encode(object))
+    if (handler) {
+      res.type(bestMatch).send(handler.encode(object))
     } else {
-      await new Promise((resolve, reject) => {
+      return new Promise((resolve, reject) => {
         Vibe.docStream('API Object Response', layout(req, v => {
           v.panel(v => {
             v.heading('API Object Response:')
-            v.sourceCode(module.exports.json.encode(object, 2))
+            v.sourceCode(exports.json.print(object, 2))
           })
         })).pipe(res).on('close', () => resolve()).on('error', e => reject(e))
       })
     }
   }
+}
+
+exports.respond.handlers = {
+  json: ['application/json'],
+  yaml: ['application/yaml', 'application/x-yaml', 'text/yaml', 'text/x-yaml'],
+  jsonLines: ['ndjson', 'jsonlines'].flatMap(x => [`text/${x}`, `text/x-${x}`, `application/${x}`, `application/x-${x}`]),
+  msgpack: ['application/msgpack', 'application/x-msgpack'],
+  cbor: ['application/cbor']
 }
