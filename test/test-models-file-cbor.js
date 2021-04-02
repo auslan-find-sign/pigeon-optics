@@ -80,7 +80,7 @@ describe('models/file/cbor', function () {
     await cbor.delete(path)
   })
 
-  it('raw.iterate()', async function () {
+  it('cbor.iterate()', async function () {
     const files = ['foo', 'bar', 'yes', '💾', 'no']
     const folders = ['groupA', 'groupB', '🍃']
 
@@ -96,7 +96,7 @@ describe('models/file/cbor', function () {
     await cbor.delete(['file-tests'])
   })
 
-  it('raw.iterateFolders()', async function () {
+  it('cbor.iterateFolders()', async function () {
     const files = ['foo', 'bar', 'yes', '💾', 'no']
     const folders = ['groupA', 'groupB', '🍃']
 

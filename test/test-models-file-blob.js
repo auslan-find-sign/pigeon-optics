@@ -32,21 +32,21 @@ describe('models/file/blob', function () {
     await assert.isRejected(blob.read(hash))
   })
 
-  it('raw.delete() silently does nothing when the specified path already doesn\'t exist', async function () {
+  it('blob.delete() silently does nothing when the specified path already doesn\'t exist', async function () {
     const hash = await blob.write(Buffer.from('Spagetti squash is surprisingly delicious. Much better than regular squash.'))
     await blob.delete(hash)
     await blob.delete(hash)
     await assert.isRejected(blob.read(hash))
   })
 
-  it('raw.exists() works', async function () {
+  it('blob.exists() works', async function () {
     const hash = await blob.write(Buffer.from('hello friend'))
     await assert.becomes(blob.exists(hash), true, 'thing that exists should return true')
     await assert.becomes(blob.exists(crypto.randomBytes(hash.length)), false, 'made up fake thing shouldn\'t exist')
     await blob.delete(hash)
   })
 
-  it('raw.iterate()', async function () {
+  it('blob.iterate()', async function () {
     // empty the file tests, and create a whole structure
     const files = [
       await blob.write(Buffer.from('test1')),

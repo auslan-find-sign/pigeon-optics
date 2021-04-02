@@ -6,6 +6,10 @@ const user = 'system'
 const name = 'test'
 
 describe('models/dataset', function () {
+  before(async function () {
+    await dataset.delete(user, name)
+  })
+
   it('dataset.create(user, name) sets up a dataset with a memo', async function () {
     await dataset.create(user, name, {
       memo: 'Automated Unit Testing created this dataset to verify internal models are working correctly'
