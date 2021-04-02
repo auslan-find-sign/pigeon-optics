@@ -69,6 +69,19 @@ describe('models/file/raw', function () {
     assert.strictEqual(buf.readUInt16LE(0), 100, 'number should be exactly 100')
   })
 
+  it('raw.rename() works', async function () {
+    const path1 = ['file-tests', randomName()]
+    const path2 = ['file-tests', randomName()]
+    const testData = crypto.randomBytes(64)
+    await raw.write(path1, testData)
+    assert(testData.equals(await raw.read(path1)), 'data should read back correctly from the first location')
+    await raw.rename(path1, path2)
+    assert(testData.equals(await raw.read(path2)), 'data should read back correctly from the new location')
+    assert.isFalse(await raw.exists(path1), 'data shouldn\'t be available at first path')
+    assert.isTrue(await raw.exists(path2), 'data should be available at first path')
+    await raw.delete(path2)
+  })
+
   it('raw.exists() works', async function () {
     const path = ['file-tests', randomName()]
     await raw.write(path, Buffer.from('hello friend'))

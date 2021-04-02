@@ -161,6 +161,21 @@ exports.delete = async function (dataPath = []) {
   await fs.remove(this.fullPath(dataPath, `${this.extension}.backup`))
 }
 
+/**
+ * Rename a piece of data to a new location
+ * @param {string[]} from - current dataPath
+ * @param {string[]} to - new dataPath
+ * @returns {boolean} was it able to rename data?
+ */
+exports.rename = async function (from, to) {
+  const results = await Promise.all(['', `${this.extension}`, `${this.extension}.backup`].map(ext => {
+    return new Promise((resolve, reject) => {
+      fs.move(this.fullPath(from, ext), this.fullPath(to, ext), { overwrite: true }, (err) => resolve(err))
+    })
+  }))
+  return results.some(x => !x)
+}
+
 /** Checks a given data path for an existing record, and returns true or false async
  * @param {string|string[]} [path] - relative path inside data directory
  * @returns {boolean}
@@ -169,7 +184,7 @@ exports.delete = async function (dataPath = []) {
 exports.exists = async function (dataPath = []) {
   const results = await Promise.all([
     fs.pathExists(this.fullPath(dataPath, '')),
-    fs.pathExists(this.fullPath(dataPath, this.extension)),
+    fs.pathExists(this.fullPath(dataPath, `${this.extension}`)),
     fs.pathExists(this.fullPath(dataPath, `${this.extension}.backup`))
   ])
 
