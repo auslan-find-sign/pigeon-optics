@@ -8,8 +8,7 @@ const uri = require('encodeuricomponent-tag')
 const createError = require('http-errors')
 const assert = require('assert')
 const multipartAttachments = require('../utility/multipart-attachments')
-const { listReferences } = require('../models/attachment')
-const attachmentStore = require('../models/attachment-storage')
+const attachmentStore = require('../models/attachments')
 const fs = require('fs-extra')
 
 // add req.owner boolean for any routes with a :user param

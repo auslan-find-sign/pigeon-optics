@@ -35,7 +35,7 @@ describe('models/dataset', function () {
     assert.equal(meta.version, 1, 'version number should be 1')
     assert.deepStrictEqual(Object.keys(meta.records), ['test-1'])
     assert.equal(meta.records['test-1'].version, 1)
-    assert.hasAllKeys(meta.records['test-1'], ['hash', 'version'])
+    assert.hasAllKeys(meta.records['test-1'], ['hash', 'version', 'links'])
   })
 
   it('dataset.merge(user, name, records) works as expected', async function () {

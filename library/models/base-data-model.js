@@ -9,6 +9,9 @@ const itToArray = require('../utility/async-iterable-to-array')
 const assert = require('assert')
 const updateEvents = require('../utility/update-events')
 const stringNaturalCompare = require('string-natural-compare')
+const recordStructure = require('../utility/record-structure')
+const createMissingAttachmentsError = require('../utility/missing-attachments-error')
+const attachments = require('./attachments')
 
 /* read meta info about dataset */
 exports.readMeta = async function (user, name) {
@@ -99,12 +102,31 @@ exports.write = async function (user, name, recordID, data) {
   assert(data !== undefined, 'Records cannot be set to undefined')
   assert(data !== null, 'Records cannot be set to null')
 
+  // apply source specific validation rules
   await this.validateRecord(recordID, data)
+
+  // calculate links
+  const links = await recordStructure.listHashURLs(data)
+
+  // validate attachment store has attachments referenced
+  const linkChecks = await Promise.all(links.map(async link => {
+    const present = await attachments.has(link.hash)
+    return { link, present }
+  }))
+
+  // if any linkChecks failed, throw back a missing attachments error
+  const missingLinks = linkChecks.filter(check => !check.present)
+  if (missingLinks.length > 0) throw createMissingAttachmentsError(missingLinks.map(x => x.link.toString()))
+
   await this.updateMeta(user, name, async (meta) => {
     const hash = await this.getObjectStore(user, name).write(data)
-    if (meta.records[recordID] && meta.records[recordID].hash.equals(hash)) return meta
-    meta.records[recordID] = { version: meta.version, hash }
-    return meta
+    if (meta.records[recordID] && meta.records[recordID].hash.equals(hash)) {
+      meta.records[recordID].links = links.map(x => x.toString())
+      return meta
+    } else {
+      meta.records[recordID] = { hash, links: links.map(x => x.toString()) }
+      return meta
+    }
   })
 }
 
@@ -113,14 +135,25 @@ exports.merge = async function (user, name, records) {
   const deletes = Object.entries(records).filter(([k, v]) => v === undefined || v === null).map(([k, v]) => k)
   const writes = Object.entries(records).filter(([k, v]) => v !== undefined && v !== null)
 
+  // validate server has all attachments mentioned in the merge, if not, throw back a 400 error with a list of what's needed
+  const links = recordStructure.listHashURLs(Object.values(records))
+  const linkChecks = await Promise.all(links.map(async link => ({ link, present: await attachments.has(link.hash) })))
+  const missingLinks = linkChecks.filter(x => !x.present).map(x => x.link.toString())
+  if (missingLinks.length > 0) throw createMissingAttachmentsError(missingLinks)
+
   await this.updateMeta(user, name, async meta => {
     const objectStore = this.getObjectStore(user, name)
-    const writen = Promise.all(writes.map(async ([k, v]) => [k, await objectStore.write(v)]))
+    const writen = Promise.all(writes.map(async ([id, value]) => ({
+      id,
+      hash: await objectStore.write(value),
+      links: recordStructure.listHashURLs(value)
+    })))
     for (const del of deletes) delete meta.records[del]
-    for (const [id, hash] of (await writen)) {
+    for (const { id, hash, links } of (await writen)) {
       if (!meta.records[id] || !meta.records[id].hash.equals(hash)) {
         meta.records[id] = { hash }
       }
+      meta.records[id].links = links.map(x => x.toString())
     }
     return meta
   })
@@ -130,12 +163,19 @@ exports.merge = async function (user, name, records) {
 exports.overwrite = async function (user, name, records) {
   assert(Object.values(records).every(x => x !== undefined && x !== null), 'Records cannot be set to undefined or null value')
 
+  // validate server has all attachments mentioned in the merge, if not, throw back a 400 error with a list of what's needed
+  const links = recordStructure.listHashURLs(Object.values(records))
+  const linkChecks = await Promise.all(links.map(async link => ({ link, present: await attachments.has(link.hash) })))
+  const missingLinks = linkChecks.filter(x => !x.present).map(x => x.link.toString())
+  if (missingLinks.length > 0) throw createMissingAttachmentsError(missingLinks)
+
   await this.updateMeta(user, name, async meta => {
     const objectStore = this.getObjectStore(user, name)
     meta.records = Object.fromEntries(await Promise.all(Object.entries(records).map(async ([k, v]) => {
       const hash = await objectStore.write(v)
-      if (meta.records[k] && meta.records[k].hash.equals(hash)) return [k, meta.records[k]]
-      return [k, { hash }]
+      const links = recordStructure.listHashURLs(v).map(x => x.toString())
+      if (meta.records[k] && meta.records[k].hash.equals(hash)) return [k, { ...meta.records[k], links }]
+      return [k, { hash, links }]
     })))
     return meta
   })
