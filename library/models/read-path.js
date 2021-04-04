@@ -40,35 +40,39 @@ async function * readPath (path) {
  * @yields {ReadPathMetaOutput}
  */
 readPath.meta = async function * readPathMeta (path) {
-  if (Array.isArray(path)) {
-    for (const entry of path) {
-      yield * readPath.meta(entry)
-    }
-  } else if (typeof path === 'string') {
+  if (typeof path === 'string') {
     const params = codec.path.decode(path)
     const source = sources[params.source]
 
     if (source !== undefined) {
       if (params.recordID !== undefined) {
         // just yield the specific entry
-        yield {
-          path: codec.path.encode(params.source, params.user, params.name, params.recordID),
-          ...await source.read(params.user, params.name, params.recordID)
+        if (await source.exists(params.user, params.name, params.recordID)) {
+          yield {
+            path: codec.path.encode(params.source, params.user, params.name, params.recordID),
+            ...await source.read(params.user, params.name, params.recordID)
+          }
         }
       } else {
         // do the whole dataset
-        for await (const meta of source.iterate(params.user, params.name)) {
-          yield {
-            path: codec.path.encode(params.source, params.user, params.name, meta.id),
-            ...meta
+        if (await source.exists(params.user, params.name)) {
+          for await (const meta of source.iterate(params.user, params.name)) {
+            yield {
+              path: codec.path.encode(params.source, params.user, params.name, meta.id),
+              ...meta
+            }
           }
         }
       }
     } else {
-      throw new Error(`Unknown dataset type "/${params.source}/"`)
+      throw new Error(`Unknown source "/${params.source}/..."`)
+    }
+  } else if (path && Symbol.iterator in path) {
+    for (const entry of path) {
+      yield * readPath.meta(entry)
     }
   } else {
-    throw new Error('path type must be Array or String')
+    throw new Error('path type must be an iterable list (like an Array) of strings or string')
   }
 }
 
