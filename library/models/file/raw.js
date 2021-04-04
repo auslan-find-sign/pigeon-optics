@@ -141,8 +141,13 @@ exports.writeStream = async function (dataPath, stream) {
  * @param {module:models/file/raw.updateBlock} block - block(data) is given a Buffer, and if it returns a Buffer, the file is rewritten with the new data
  */
 exports.update = async function (dataPath, block) {
-  await tq.lockWhile(['file/raw', this.fullPath(dataPath, '')], async () => {
-    const data = await this.read(dataPath)
+  await tq.lockWhile(['file/raw', this.fullPath(dataPath, `${this.extension}`)], async () => {
+    let data
+    try {
+      data = await this.read(dataPath)
+    } catch (err) {
+      // console.info(`attempted to update non-existing file at ${this.fullPath(dataPath, `${this.extension}`)}: ${err}`)
+    }
     const update = await block(data)
     if (update !== undefined) {
       if (!Buffer.isBuffer(update)) throw new Error('return value must be undefined or a Buffer')

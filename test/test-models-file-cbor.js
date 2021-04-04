@@ -72,6 +72,17 @@ describe('models/file/cbor', function () {
     assert.strictEqual(data.counter, 100, 'number should be exactly 100')
   })
 
+  it('cbor.update() works on non-existing files to create them', async function () {
+    const path = ['file-tests', randomName()]
+    await cbor.update(path, data => {
+      assert.isUndefined(data, 'cbor.update callback should receive undefined arg value')
+      return { hello: 'world' }
+    })
+
+    const data = await cbor.read(path)
+    assert.deepStrictEqual(data, { hello: 'world' }, 'update should have created the file with the returned value')
+  })
+
   it('cbor.exists() works', async function () {
     const path = ['file-tests', randomName()]
     await cbor.write(path, { msg: 'hello friend' })
