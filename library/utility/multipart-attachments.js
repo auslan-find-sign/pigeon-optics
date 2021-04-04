@@ -66,10 +66,9 @@ const postProcess = async function (req, res, next) {
 
     if (req.files.body && req.files.body[0]) {
       const bodyInfo = req.files.body[0]
-      if (bodyInfo.mimetype === 'application/json') {
-        Object.assign(req.body, codec.json.decode(bodyInfo.buffer.toString('utf-8')))
-      } else if (bodyInfo.mimetype === 'application/cbor') {
-        Object.assign(req.body, codec.cbor.decode(bodyInfo.buffer))
+      const specificCodec = codec.for(bodyInfo.mimetype)
+      if (specificCodec && typeof specificCodec.decode === 'function') {
+        Object.assign(req.body, specificCodec.decode(bodyInfo.buffer))
       } else {
         return next(new createHttpError.BadRequest('Unsupported body mime type'))
       }

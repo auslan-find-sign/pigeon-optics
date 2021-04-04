@@ -129,6 +129,7 @@ exports.jsonLines = {
   },
 
   decode (input) {
+    if (Buffer.isBuffer(input)) input = input.toString('utf-8')
     return input.split('\n').map(x => x.trim()).filter(x => x.length > 0).map(x => exports.json.decode(x))
   },
 
@@ -233,7 +234,8 @@ exports.xml = {
   },
 
   decode (input) {
-    return jxon.stringToJs(`${input}`)
+    if (Buffer.isBuffer(input)) input = input.toString('utf-8')
+    return jxon.stringToJs(input)
   },
 
   encoder () {
@@ -347,15 +349,19 @@ exports.respond = async function respond (req, res, object) {
   }
 }
 
+// build a mediaTypeHandlers list
+exports.mediaTypeHandlers = Object.fromEntries(Object.values(exports).flatMap(value => {
+  if (value && typeof value === 'object' && Array.isArray(value.handles)) {
+    return value.handles.map(mediaType => [mediaType, value])
+  }
+  return []
+}))
+
 /**
- * returns codec if a matching mime type is found, otherwise undefined
- * @param {string} mimeType
+ * returns codec if a matching media type is found, otherwise undefined
+ * @param {string} mediaType
  * @returns {object|undefined}
  */
-exports.for = function (mimeType) {
-  for (const id in exports) {
-    if (exports[id] && typeof exports[id] === 'object' && Array.isArray(exports[id].handles)) {
-      if (exports[id].handles.includes(mimeType)) return exports[id]
-    }
-  }
+exports.for = function (mediaType) {
+  return exports.mediaTypeHandlers[mediaType]
 }

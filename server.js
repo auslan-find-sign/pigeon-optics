@@ -26,7 +26,7 @@ app.use(require('compression')({}))
 app.use(express.urlencoded({ extended: true }))
 
 // handle decoding json and cbor
-app.use(express.raw({ limit: settings.maxRecordSize, type: ['application/json', 'application/cbor'] }))
+app.use(express.raw({ limit: settings.maxRecordSize, type: Object.keys(codec.mediaTypeHandlers) }))
 
 // log requests
 app.use((req, res, next) => {
@@ -42,11 +42,12 @@ app.use((req, res, next) => {
 })
 
 app.use((req, res, next) => {
-  if (req.is('application/json')) {
-    req.body = codec.json.decode(req.body.toString())
-  } else if (req.is('application/cbor')) {
-    req.body = codec.cbor.decode(req.body)
+  const reqType = req.is(...Object.keys(codec.mediaTypeHandlers))
+  if (reqType) {
+    const specificCodec = codec.for(reqType)
+    req.body = specificCodec.decode(req.body)
   }
+
   next()
 })
 
