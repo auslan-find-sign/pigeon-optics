@@ -1,23 +1,23 @@
 const express = require('express')
 const router = express.Router()
-const attachmentStore = require('../models/attachment-storage')
-const fs = require('fs-extra')
+const attachments = require('../models/attachments')
+const codec = require('../models/codec')
 
 // get a list of datasets owned by a specific user
-router.get('/attachments/:hash([0-9A-Fa-f]{32})', async (req, res, next) => {
-  const localPath = attachmentStore.getPath(req.params.hash)
-  if (await fs.pathExists(localPath)) {
-    res.sendFile(localPath, {
-      immutable: true,
-      maxAge: '1 year',
-      headers: {
-        'Content-Security-Policy': 'sandbox',
-        'Content-Type': req.query.type ? `${req.query.type}` : 'application/octet-stream'
-      }
-    })
-  } else {
-    next()
-  }
+router.get('/attachments/:hash([0-9A-Fa-f]{64})', async (req, res) => {
+  res.sendFile(attachments.getPath(req.params.hash), {
+    immutable: true,
+    maxAge: '1 year',
+    headers: {
+      'Content-Security-Policy': 'sandbox',
+      'Content-Type': req.query.type ? `${req.query.type}` : 'application/octet-stream'
+    }
+  })
+})
+
+router.get('/attachments/:hash([0-9A-Fa-f]{64})/meta', async (req, res) => {
+  const meta = await attachments.readMeta(req.params.hash)
+  await codec.respond(req, res, meta)
 })
 
 module.exports = router
