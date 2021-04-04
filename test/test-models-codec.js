@@ -74,6 +74,30 @@ describe('models/codec.jsonLines', function () {
   })
 })
 
+describe('models/codec.xml', function () {
+  it('encodes simple test reversably', function () {
+    const test = {
+      item: [
+        { _: 'dingo', $arg: 'yeah' },
+        { _: 'bingo', $arg: 'nah' }
+      ]
+    }
+    const roundtripped = codec.xml.decode(codec.xml.encode(test))
+    assert.deepStrictEqual(roundtripped, test, 'roundtripped version should match deeply')
+  })
+
+  it('can encode a stream', async function () {
+    const tests = [
+      { _: 'dingo', $arg: 'yeah' },
+      { _: 'bingo', $arg: 'nah' }
+    ]
+    const encoder = Readable.from(tests, { objectMode: true }).pipe(codec.xml.encoder())
+    const output = Buffer.concat(await asyncIterableToArray(encoder)).toString('utf-8')
+    const decode = codec.xml.decode(output)
+    assert.deepStrictEqual(decode.stream.item, tests, 'should match')
+  })
+})
+
 describe('models/codec streaming mode', function () {
   // json doesn't have a decoder currently, special case
   it('codec.json.encoder() works', async function () {

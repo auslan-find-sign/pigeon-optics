@@ -5,6 +5,7 @@ const cbor = require('cbor')
 const json5 = require('json5')
 const yaml = require('yaml')
 const msgpack = require('msgpack5')
+const jxon = require('jxon')
 const objectHash = require('object-hash')
 const Vibe = require('../vibe/rich-builder')
 const layout = require('../views/layout')
@@ -223,6 +224,42 @@ exports.yaml = {
 
 exports.msgpack = msgpack()
 exports.msgpack.handles = ['application/msgpack', 'application/x-msgpack']
+
+exports.xml = {
+  handles: ['application/xml', 'text/xml', 'application/rdf+xml', 'application/rss+xml', 'application/atom+xml', 'text/xml'],
+
+  encode (obj) {
+    return jxon.jsToString(obj)
+  },
+
+  decode (input) {
+    return jxon.stringToJs(`${input}`)
+  },
+
+  encoder () {
+    let first = true
+
+    return new streams.Transform({
+      writableObjectMode: true,
+      transform (chunk, encoding, callback) {
+        try {
+          const xmlString = exports.xml.encode({ item: chunk })
+          if (first) {
+            callback(null, Buffer.from(`<?xml version="1.0" charset="utf-8"?>\n<stream>\n${xmlString}\n`, 'utf-8'))
+            first = false
+          } else {
+            callback(null, Buffer.from(`${xmlString}\n`, 'utf-8'))
+          }
+        } catch (err) {
+          callback(err)
+        }
+      },
+      flush (callback) {
+        callback(null, Buffer.from('</stream>\n', 'utf-8'))
+      }
+    })
+  }
+}
 
 const ptr = require('path-to-regexp')
 const datasetPath = '/:source(lenses|datasets|meta)/:user\\::name'
