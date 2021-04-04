@@ -52,11 +52,11 @@ returns the config of this lens
 
 set the configuration of this lens, triggering a rebuild. On success returns HTTP 204.
 
-## GET /lenses/username:lens-name/configuration/map.js
+## GET /lenses/username:lens-name/configuration/map
 
 returns the map function as javascript
 
-## GET /lenses/username:lens-name/configuration/reduce.js
+## GET /lenses/username:lens-name/configuration/reduce
 
 returns the reduce function as javascript
 

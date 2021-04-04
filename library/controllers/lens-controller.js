@@ -67,6 +67,7 @@ router.get('/lenses/:user\\::name/configuration', async (req, res) => {
   const state = {
     ...config,
     create: false,
+    owner: req.params.user,
     name: req.params.name
   }
   res.set('X-Version', config.version)
@@ -80,17 +81,15 @@ router.get('/lenses/:user\\::name/configuration', async (req, res) => {
 router.put('/lenses/:user\\::name/configuration', auth.ownerRequired, async (req, res) => {
   try {
     await lens.updateMeta(req.params.user, req.params.name, meta => {
-      return {
-        ...meta,
-        memo: req.body.memo,
-        inputs: req.body.inputs.split('\n').map(x => x.trim()).filter(x => !!x),
-        mapType: req.body.mapType,
-        mapCode: req.body.mapCode,
-        reduceCode: req.body.reduceCode
-      }
+      meta.memo = req.body.memo
+      meta.inputs = req.body.inputs.split(/\r?\n/m).map(x => x.trim()).filter(x => !!x)
+      meta.mapType = req.body.mapType
+      meta.mapCode = req.body.mapCode
+      meta.reduceCode = req.body.reduceCode
+      return meta
     })
     // rebuild since settings may have changed
-    await lens.build(req.session.auth.user, req.body.name)
+    await lens.build(req.params.user, req.params.name)
 
     if (req.accepts('html')) {
       return res.redirect(303, uri`/lenses/${req.params.user}:${req.params.name}/`)
@@ -98,24 +97,20 @@ router.put('/lenses/:user\\::name/configuration', auth.ownerRequired, async (req
       return res.sendStatus(204)
     }
   } catch (err) {
-    const state = {
-      ...req.body,
-      name: req.params.name,
-      create: false
-    }
+    const state = { ...req.body, create: false }
     console.log(err.stack)
     res.sendVibe('lens-editor', 'Edit a Lens', state, err.message)
   }
 })
 
-router.get('/lenses/:user\\::name/configuration/map.js', async (req, res) => {
-  const config = await lens.readConfig(req.params.user, req.params.name)
-  res.type('js').set('X-Version', config.version).send(config.mapCode)
+router.get('/lenses/:user\\::name/configuration/map', async (req, res) => {
+  const meta = await lens.readMeta(req.params.user, req.params.name)
+  res.type(meta.mapType).set('X-Version', meta.version).send(meta.mapCode)
 })
 
-router.get('/lenses/:user\\::name/configuration/reduce.js', async (req, res) => {
-  const config = await lens.readConfig(req.params.user, req.params.name)
-  res.type('js').set('X-Version', config.version).send(config.reduceCode)
+router.get('/lenses/:user\\::name/configuration/reduce', async (req, res) => {
+  const meta = await lens.readMeta(req.params.user, req.params.name)
+  res.type(meta.mapType).set('X-Version', meta.version).send(meta.reduceCode)
 })
 
 router.get('/lenses/:user\\::name/logs', async (req, res) => {
@@ -196,11 +191,8 @@ router.get('/lenses/:user\\::name/records/:recordID', async (req, res) => {
 
   if (req.accepts('html')) {
     const title = `${req.params.user}:${req.params.name}/${req.params.recordID}`
-    const state = {
-      record,
-      sidebar: { recordIDs: await lens.listEntries(req.params.user, req.params.name) }
-    }
-    res.sendVibe('lens-record', title, state)
+    const sidebar = { recordIDs: Object.keys(meta.records) }
+    res.sendVibe('lens-record', title, { record, sidebar })
   } else {
     res.set('ETag', `"${meta.hash.toString('hex')}"`)
     codec.respond(req, res, record)
