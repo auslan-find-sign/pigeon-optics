@@ -3,24 +3,27 @@
 const multer = require('multer')
 const settings = require('../models/settings')
 const createHttpError = require('http-errors')
-const crypto = require('crypto')
+const attachments = require('../models/attachments')
 const codec = require('../models/codec')
 const xbytes = require('xbytes')
 const finished = require('on-finished')
-const fs = require('fs')
 
 const memStore = multer.memoryStorage()
-const diskStore = multer.diskStorage({})
 const uploadEngine = {
-  _handleFile: async function (req, file, cb) {
+  _handleFile: function (req, file, cb) {
     if (file.fieldname === 'body') {
       return memStore._handleFile(req, file, cb)
     } else if (file.fieldname === 'attachment') {
-      return diskStore._handleFile(req, file, cb)
+      attachments.writeStream(file.stream, { linkers: [] }).then(hash => {
+        cb(null, { path: attachments.getPath(hash), hash })
+      }).catch(err => cb(err))
     }
   },
-  _removeFile: function (req, file, cb) {
-    if (file.path) fs.unlink(file.path, cb)
+  _removeFile: async function (req, file, cb) {
+    if (file.hash) {
+      await attachments.validate(file.hash)
+    }
+    cb(null)
   }
 }
 
@@ -41,25 +44,13 @@ const postProcess = async function (req, res, next) {
     if (Array.isArray(req.files.attachment)) {
       for (const file of req.files.attachment) {
         if (file.originalname) req.attachedFilesByName[file.originalname] = file
-
-        tasks.push(new Promise((resolve, reject) => {
-          const hash = fs.createReadStream(file.path).pipe(crypto.createHash('sha256'))
-          hash.setEncoding('hex')
-          hash.on('data', hex => {
-            file.hash = hex
-            req.attachedFilesByHash[hex] = file
-            resolve()
-          })
-          hash.on('error', reject)
-        }))
+        if (file.hash) req.attachedFilesByHash[file.hash.toString('hex')] = file
       }
 
       // clean up after request finishes
       finished(res, async () => {
         for (const file of req.files.attachment) {
-          try { await fs.promises.unlink(file.path) } catch (err) {
-            // nothing
-          }
+          if (file.hash) await attachments.validate(file.hash)
         }
       })
     }
