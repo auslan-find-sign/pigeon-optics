@@ -11,6 +11,7 @@ const layout = require('../views/layout')
 const streams = require('stream')
 
 exports.cbor = {
+  handles: ['application/cbor', 'application/x-cbor'],
   decoderOpts: {},
   encoderOpts: { highWaterMark: 25000000 },
 
@@ -42,6 +43,8 @@ exports.cbor = {
 }
 
 exports.json = {
+  handles: ['application/json', 'text/json', 'application/feed+json'],
+
   reviver (key, value) {
     if (value && typeof value === 'object' && value.type === 'Buffer' && Array.isArray(value.data)) {
       return Buffer.from(value)
@@ -110,6 +113,8 @@ exports.json = {
 }
 
 exports.jsonLines = {
+  handles: ['ndjson', 'jsonlines'].flatMap(x => [`text/${x}`, `text/x-${x}`, `application/${x}`, `application/x-${x}`]),
+
   encode (array) {
     if (array && typeof array === 'object' && array[Symbol.iterator]) {
       const out = []
@@ -169,6 +174,8 @@ exports.jsonLines = {
 }
 
 exports.yaml = {
+  handles: ['application/yaml', 'application/x-yaml', 'text/yaml', 'text/x-yaml'],
+
   decode (yamlString) {
     if (Buffer.isBuffer(yamlString)) yamlString = yamlString.toString('utf-8')
     return yaml.parse(yamlString, exports.json.reviver)
@@ -215,6 +222,7 @@ exports.yaml = {
 }
 
 exports.msgpack = msgpack()
+exports.msgpack.handles = ['application/msgpack', 'application/x-msgpack']
 
 const ptr = require('path-to-regexp')
 const datasetPath = '/:source(lenses|datasets|meta)/:user\\::name'
@@ -260,8 +268,7 @@ exports.objectHash = (object) => {
 exports.respond = async function respond (req, res, object) {
   const supportedTypes = ['text/html', ...Object.values(respond.handlers).flat()]
   const bestMatch = req.accepts(supportedTypes)
-  const encoderName = Object.entries(respond.handlers).find(([name, list]) => list.includes(bestMatch))[0]
-  const handler = exports[encoderName]
+  const handler = exports.for(bestMatch)
 
   if (object[Symbol.asyncIterator]) { // AsyncIterators will stream out as an array or some kind of list
     if (handler) {
@@ -303,10 +310,15 @@ exports.respond = async function respond (req, res, object) {
   }
 }
 
-exports.respond.handlers = {
-  json: ['application/json'],
-  yaml: ['application/yaml', 'application/x-yaml', 'text/yaml', 'text/x-yaml'],
-  jsonLines: ['ndjson', 'jsonlines'].flatMap(x => [`text/${x}`, `text/x-${x}`, `application/${x}`, `application/x-${x}`]),
-  msgpack: ['application/msgpack', 'application/x-msgpack'],
-  cbor: ['application/cbor']
+/**
+ * returns codec if a matching mime type is found, otherwise undefined
+ * @param {string} mimeType
+ * @returns {object|undefined}
+ */
+exports.for = function (mimeType) {
+  for (const id in exports) {
+    if (exports[id] && typeof exports[id] === 'object' && Array.isArray(exports[id].handles)) {
+      if (exports[id].handles.includes(mimeType)) return exports[id]
+    }
+  }
 }
