@@ -1,6 +1,8 @@
 const chai = require('chai')
 chai.use(require('chai-as-promised'))
 const assert = chai.assert
+const crypto = require('crypto')
+const createHttpError = require('http-errors')
 const dataset = require('../library/models/dataset')
 const user = 'system'
 const name = 'test'
@@ -94,6 +96,24 @@ describe('models/dataset', function () {
     const meta = await dataset.readMeta(user, name)
     assert.hasAllKeys(meta.records, ['abc'])
     assert.equal(meta.version, 5)
+  })
+
+  it('dataset.write() with hashURLs to objects not in storage throws an error', async function () {
+    const testData = crypto.randomBytes(8000)
+    const digest = crypto.createHash('sha256')
+    digest.update(testData)
+    const hash = digest.digest()
+    const hashURL = `hash://sha256/${hash.toString('hex')}?type=${encodeURIComponent('application/octet-stream')}`
+
+    try {
+      await dataset.write(user, name, 'with-attachment', {
+        type: 'just a test',
+        file: hashURL
+      })
+      assert(false, 'shouldn\'t reach this point')
+    } catch (err) {
+      assert(err instanceof createHttpError.BadRequest, 'should throw a bad request error')
+    }
   })
 
   it('dataset.delete(user, name) works', async function () {
