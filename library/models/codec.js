@@ -1,16 +1,11 @@
 /**
- * CBOR codec, implementing custom tagged type for attachments
+ * Codecs library, implements all the different formats Pigeon Optics can work with
  */
-const cbor = require('cbor')
-const json5 = require('json5')
-const yaml = require('yaml')
-const msgpack = require('msgpack5')
-const jxon = require('jxon')
-const objectHash = require('object-hash')
 const Vibe = require('../vibe/rich-builder')
 const layout = require('../views/layout')
 const streams = require('stream')
 
+const cbor = require('cbor')
 exports.cbor = {
   handles: ['application/cbor', 'application/x-cbor'],
   decoderOpts: {},
@@ -43,6 +38,7 @@ exports.cbor = {
   }
 }
 
+const json5 = require('json5')
 exports.json = {
   handles: ['application/json', 'text/json', 'application/feed+json'],
 
@@ -175,6 +171,7 @@ exports.jsonLines = {
   }
 }
 
+const yaml = require('yaml')
 exports.yaml = {
   handles: ['application/yaml', 'application/x-yaml', 'text/yaml', 'text/x-yaml'],
 
@@ -223,19 +220,27 @@ exports.yaml = {
   }
 }
 
+const msgpack = require('msgpack5')
 exports.msgpack = msgpack()
 exports.msgpack.handles = ['application/msgpack', 'application/x-msgpack']
 
+const onml = require('onml')
+const jxon = require('jxon')
 exports.xml = {
   handles: ['application/xml', 'text/xml', 'application/rdf+xml', 'application/rss+xml', 'application/atom+xml', 'text/xml'],
 
   encode (obj) {
-    return jxon.jsToString(obj)
+    console.log(obj)
+    if (obj && typeof obj === 'object' && ('JsonML' in obj) && Object.keys(obj).length) {
+      return onml.stringify(obj.JsonML)
+    } else {
+      return jxon.jsToString(obj)
+    }
   },
 
   decode (input) {
     if (Buffer.isBuffer(input)) input = input.toString('utf-8')
-    return jxon.stringToJs(input)
+    return { JsonML: onml.parse(input) }
   },
 
   encoder () {
@@ -245,9 +250,9 @@ exports.xml = {
       writableObjectMode: true,
       transform (chunk, encoding, callback) {
         try {
-          const xmlString = exports.xml.encode({ item: chunk })
+          const xmlString = '<item>' + exports.xml.encode(chunk) + '</item>'
           if (first) {
-            callback(null, Buffer.from(`<?xml version="1.0" charset="utf-8"?>\n<stream>\n${xmlString}\n`, 'utf-8'))
+            callback(null, Buffer.from(`<stream>\n${xmlString}\n`, 'utf-8'))
             first = false
           } else {
             callback(null, Buffer.from(`${xmlString}\n`, 'utf-8'))
@@ -289,11 +294,12 @@ exports.path = {
   }
 }
 
+const objectHash = require('object-hash')
 /**
  * uses object-hash npm package to hash a complex object, like those stored in datasets or viewports
  * @param {any} object - input object to hash, maybe containing attachments
  * @returns {Buffer} - sha256 hash (32 bytes) in a nodejs Buffer
- * */
+ */
 exports.objectHash = (object) => {
   return objectHash(object, { algorithm: 'sha256', encoding: 'buffer' })
 }
@@ -310,17 +316,7 @@ exports.respond = async function respond (req, res, object) {
   const handler = exports.for(bestMatch)
 
   if (object[Symbol.asyncIterator]) { // AsyncIterators will stream out as an array or some kind of list
-    if (handler) {
-      res.type(bestMatch)
-
-      const inputStream = object instanceof streams.Readable ? object : streams.Readable.from(object)
-      const encoder = inputStream.pipe(handler.encoder())
-      encoder.pipe(res)
-      return new Promise((resolve, reject) => {
-        encoder.on('end', resolve)
-        encoder.on('error', reject)
-      })
-    } else {
+    if (!bestMatch || bestMatch === 'text/html' || !handler) {
       await new Promise((resolve, reject) => {
         Vibe.docStream('API Object Response Stream', layout(req, async v => {
           await v.panel(async v => {
@@ -332,11 +328,19 @@ exports.respond = async function respond (req, res, object) {
           })
         })).pipe(res).on('close', () => resolve()).on('error', e => reject(e))
       })
+    } else {
+      res.type(bestMatch)
+
+      const inputStream = object instanceof streams.Readable ? object : streams.Readable.from(object)
+      const encoder = inputStream.pipe(handler.encoder())
+      encoder.pipe(res)
+      return new Promise((resolve, reject) => {
+        encoder.on('end', resolve)
+        encoder.on('error', reject)
+      })
     }
   } else {
-    if (handler) {
-      res.type(bestMatch).send(handler.encode(object))
-    } else {
+    if (!bestMatch || bestMatch === 'text/html' || !handler) {
       return new Promise((resolve, reject) => {
         Vibe.docStream('API Object Response', layout(req, v => {
           v.panel(v => {
@@ -345,6 +349,8 @@ exports.respond = async function respond (req, res, object) {
           })
         })).pipe(res).on('close', () => resolve()).on('error', e => reject(e))
       })
+    } else {
+      res.type(bestMatch).send(handler.encode(object))
     }
   }
 }

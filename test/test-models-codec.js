@@ -75,26 +75,54 @@ describe('models/codec.jsonLines', function () {
 })
 
 describe('models/codec.xml', function () {
-  it('encodes simple test reversably', function () {
-    const test = {
-      item: [
-        { _: 'dingo', $arg: 'yeah' },
-        { _: 'bingo', $arg: 'nah' }
-      ]
+  it('JXON encodes random weirdo objects fine', function () {
+    const test = { item: [{ _: 'dingo', $arg: 'yeah' }, { _: 'bingo', $arg: 'nah' }] }
+    const expected = '<item arg="yeah">dingo</item><item arg="nah">bingo</item>'
+    const encoded = codec.xml.encode(test)
+    assert.deepStrictEqual(encoded, expected, 'encodes as expected')
+  })
+
+  it('JsonML decodes xml well', function () {
+    const tests = {
+      '<root><foo arg="1">msg</foo></root>': ['root', {}, ['foo', { arg: '1' }, 'msg']],
+      '<html><foo arg="twenty-three">msg</foo></html>': ['html', {}, ['foo', { arg: 'twenty-three' }, 'msg']],
+      '<football>\n  sport\n</football>\n': ['football', {}, '\n  sport\n']
     }
-    const roundtripped = codec.xml.decode(codec.xml.encode(test))
-    assert.deepStrictEqual(roundtripped, test, 'roundtripped version should match deeply')
+    for (const [xml, value] of Object.entries(tests)) {
+      const decode = codec.xml.decode(xml)
+      assert.deepStrictEqual(decode, { JsonML: value }, 'decodes as expected')
+    }
+  })
+
+  it('JsonML roundtrips simple xml well', function () {
+    const tests = [
+      '<root><foo arg="1">msg</foo></root>',
+      '<html><foo arg="twenty-three">msg</foo></html>',
+      '<football>sport</football>'
+    ]
+    for (const xml of tests) {
+      const decode = codec.xml.decode(xml)
+      const encode = codec.xml.encode(decode)
+      assert.strictEqual(encode, xml, 'roundtrips as expected')
+    }
   })
 
   it('can encode a stream', async function () {
     const tests = [
-      { _: 'dingo', $arg: 'yeah' },
-      { _: 'bingo', $arg: 'nah' }
+      { foo: 'dingo', bar: 'yeah' },
+      { catastrophe: { _: 'bingo', $arg: 'nah' } },
+      { JsonML: ['root', {}, ['foo', { arg: '1' }, 'msg']] }
     ]
     const encoder = Readable.from(tests, { objectMode: true }).pipe(codec.xml.encoder())
     const output = Buffer.concat(await asyncIterableToArray(encoder)).toString('utf-8')
-    const decode = codec.xml.decode(output)
-    assert.deepStrictEqual(decode.stream.item, tests, 'should match')
+    const expected = [
+      '<stream>\n',
+      '<item><foo>dingo</foo><bar>yeah</bar></item>\n',
+      '<item><catastrophe arg="nah">bingo</catastrophe></item>\n',
+      '<item><root><foo arg="1">msg</foo></root></item>\n',
+      '</stream>\n'
+    ]
+    assert.strictEqual(output.toString('utf-8'), expected.join(''), 'should match')
   })
 })
 
