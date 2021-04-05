@@ -7,6 +7,15 @@ const dataset = require('../library/models/dataset')
 const user = 'system'
 const name = 'test'
 
+function fakehash (size = 8000) {
+  const data = crypto.randomBytes(size)
+  const digest = crypto.createHash('sha256')
+  digest.update(data)
+  const hash = digest.digest()
+  const hashURL = `hash://sha256/${hash.toString('hex')}?type=${encodeURIComponent('application/octet-stream')}`
+  return { hash, hashURL, data }
+}
+
 describe('models/dataset', function () {
   before(async function () {
     await dataset.delete(user, name)
@@ -98,22 +107,46 @@ describe('models/dataset', function () {
     assert.equal(meta.version, 5)
   })
 
-  it('dataset.write() with hashURLs to objects not in storage throws an error', async function () {
-    const testData = crypto.randomBytes(8000)
-    const digest = crypto.createHash('sha256')
-    digest.update(testData)
-    const hash = digest.digest()
-    const hashURL = `hash://sha256/${hash.toString('hex')}?type=${encodeURIComponent('application/octet-stream')}`
+  it('dataset.write() throws for missing hashURLs', async function () {
+    const { hashURL } = fakehash()
 
     try {
       await dataset.write(user, name, 'with-attachment', {
         type: 'just a test',
         file: hashURL
       })
-      assert(false, 'shouldn\'t reach this point')
     } catch (err) {
-      assert(err instanceof createHttpError.BadRequest, 'should throw a bad request error')
+      return assert(err instanceof createHttpError.BadRequest, 'should throw a bad request error')
     }
+    assert(false, 'shouldn\'t reach this point')
+  })
+
+  it('dataset.merge() throws for missing hashURLs', async function () {
+    const { hashURL } = fakehash()
+
+    try {
+      await dataset.merge(user, name, {
+        record1: { msg: 'just a test' },
+        record2: { file: hashURL }
+      })
+    } catch (err) {
+      return assert(err instanceof createHttpError.BadRequest, 'should throw a bad request error')
+    }
+    assert(false, 'shouldn\'t reach this point')
+  })
+
+  it('dataset.overwrite() throws for missing hashURLs', async function () {
+    const { hashURL } = fakehash()
+
+    try {
+      await dataset.overwrite(user, name, {
+        recordA: { msg: 'just a test' },
+        recordB: { file: hashURL }
+      })
+    } catch (err) {
+      return assert(err instanceof createHttpError.BadRequest, 'should throw a bad request error')
+    }
+    assert(false, 'shouldn\'t reach this point')
   })
 
   it('dataset.delete(user, name) works', async function () {
