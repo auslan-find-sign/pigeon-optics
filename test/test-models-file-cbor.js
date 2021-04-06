@@ -3,6 +3,7 @@ const crypto = require('crypto')
 const chai = require('chai')
 chai.use(require('chai-as-promised'))
 const assert = chai.assert
+const { Readable } = require('stream')
 const cbor = require('../library/models/file/cbor')
 
 const tests = [
@@ -43,6 +44,25 @@ describe('models/file/cbor', function () {
 
       await cbor.delete(path)
     }
+  })
+
+  it('cbor.writeStream() and cbor.readStream()', async function () {
+    const path = ['file-tests', randomName()]
+    await cbor.writeStream(path, Readable.from(tests))
+    const output = await asyncIterableToArray(await cbor.readStream(path))
+    assert.deepStrictEqual(output, tests, 'series of tests should match exactly')
+  })
+
+  it('cbor.appendStream()', async function () {
+    const path = ['file-tests', randomName()]
+    // create the file implicitly with appendStream
+    await cbor.appendStream(path, Readable.from(tests))
+    const output = await asyncIterableToArray(await cbor.readStream(path))
+    assert.deepStrictEqual(output, tests, 'series of tests should match exactly')
+    // append the test data again, so it's there twice, checking that it does actually append and not truncate
+    await cbor.appendStream(path, Readable.from(tests))
+    const output2 = await asyncIterableToArray(await cbor.readStream(path))
+    assert.deepStrictEqual(output2, [tests, tests].flat(), 'series of tests should match exactly')
   })
 
   it('cbor.delete() works', async function () {

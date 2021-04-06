@@ -32,25 +32,6 @@ exports.write = async function (dataPath, data) {
 }
 
 /**
- * Open a readable object stream to the underlying file
- * @param {string[]} path data path to file
- */
-exports.readStream = async function (dataPath) {
-  const rawStream = await this.raw.readStream(dataPath)
-  return rawStream.pipe(codec.cbor.decoder())
-}
-
-/**
- * Write an object stream to the file
- * @param {string[]} path data path to file
- * @param {ReadableStream} data
- */
-exports.writeStream = async function (dataPath, data) {
-  const encoder = codec.cbor.encoder()
-  return await this.raw.writeStream(dataPath, data.pipe(encoder))
-}
-
-/**
  * Callback required by most find methods.
  * @callback module:models/file/cbor.updateBlock
  * @async
@@ -74,6 +55,45 @@ exports.update = async function (dataPath, block) {
       return codec.cbor.encode(output)
     }
   })
+}
+
+/**
+ * Append an object to an existing file
+ * @param {string[]} dataPath - data path to file
+ * @param {...*} data - one or more objects to append to the end of the file
+ */
+exports.append = async function (dataPath, ...datas) {
+  if (datas.length > 0) {
+    return await this.raw.appendStream(dataPath, Readable.from(datas, { objectMode: true }).pipe(codec.cbor.encoder()))
+  }
+}
+
+/**
+ * Open a readable object stream to the underlying file
+ * @param {string[]} path data path to file
+ */
+exports.readStream = async function (dataPath) {
+  const rawStream = await this.raw.readStream(dataPath)
+  return rawStream.pipe(codec.cbor.decoder())
+}
+
+/**
+ * Write an object stream to the file
+ * @param {string[]} path data path to file
+ * @param {ReadableStream} data
+ */
+exports.writeStream = async function (dataPath, data) {
+  return await this.raw.writeStream(dataPath, data.pipe(codec.cbor.encoder()))
+}
+
+/**
+ * Append an object stream of cbor objects to an existing file
+ * @param {string[]} dataPath
+ * @param {Readable} stream
+ * @returns
+ */
+exports.appendStream = async function (dataPath, stream) {
+  return await this.raw.appendStream(dataPath, stream.pipe(codec.cbor.encoder()))
 }
 
 /** Remove a cbor data file
