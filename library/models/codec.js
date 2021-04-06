@@ -227,19 +227,45 @@ exports.yaml = {
 const msgpack = require('msgpack5')
 exports.msgpack = msgpack()
 exports.msgpack.handles = ['application/msgpack', 'application/x-msgpack']
+exports.msgpack.extensions = ['msgpack']
 
 const onml = require('onml')
-const jxon = require('jxon')
 exports.xml = {
   handles: ['application/xml', 'text/xml', 'application/rdf+xml', 'application/rss+xml', 'application/atom+xml', 'text/xml'],
   extensions: ['xml', 'rss', 'atom'],
 
   encode (obj) {
-    console.log(obj)
     if (obj && typeof obj === 'object' && ('JsonML' in obj) && Object.keys(obj).length) {
       return onml.stringify(obj.JsonML)
     } else {
-      return jxon.jsToString(obj)
+      return this.encode({ JsonML: this.arbitraryObjectToJsonML(obj) })
+    }
+  },
+
+  // converts arbitrary objects in to something that can serialize as xml, to allow interop with other tools
+  arbitraryObjectToJsonML (obj) {
+    if (obj === null) {
+      return ['null', {}]
+    } else if (obj === undefined) {
+      return ['undefined', {}]
+    } else if (typeof obj === 'string') {
+      return ['string', {}, `${obj}`]
+    } else if (typeof obj === 'number') {
+      return ['number', {}, JSON.stringify(obj)]
+    } else if (obj === true || obj === false) {
+      return [JSON.stringify(obj), {}]
+    } else if (Buffer.isBuffer(obj)) {
+      return ['buffer', { encoding: 'base64' }, obj.toString('base64')]
+    } else if (obj && Symbol.iterator in obj) {
+      return ['array', {}, ...[...obj].map(this.arbitraryObjectToJsonML)]
+    } else if (typeof obj === 'object') {
+      return ['object', {}, ...Object.entries(obj).map(([prop, value]) => {
+        const encoded = this.arbitraryObjectToJsonML(value)
+        encoded[1].name = prop
+        return encoded
+      })]
+    } else {
+      throw new Error('Unsupported type: ' + JSON.stringify(obj))
     }
   },
 
@@ -255,9 +281,9 @@ exports.xml = {
       writableObjectMode: true,
       transform (chunk, encoding, callback) {
         try {
-          const xmlString = '<item>' + exports.xml.encode(chunk) + '</item>'
+          const xmlString = exports.xml.encode(chunk)
           if (first) {
-            callback(null, Buffer.from(`<stream>\n${xmlString}\n`, 'utf-8'))
+            callback(null, Buffer.from(`<array>\n${xmlString}\n`, 'utf-8'))
             first = false
           } else {
             callback(null, Buffer.from(`${xmlString}\n`, 'utf-8'))
@@ -267,7 +293,7 @@ exports.xml = {
         }
       },
       flush (callback) {
-        callback(null, Buffer.from('</stream>\n', 'utf-8'))
+        callback(null, Buffer.from('</array>\n', 'utf-8'))
       }
     })
   }

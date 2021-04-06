@@ -76,8 +76,13 @@ describe('models/codec.jsonLines', function () {
 
 describe('models/codec.xml', function () {
   it('JXON encodes random weirdo objects fine', function () {
-    const test = { item: [{ _: 'dingo', $arg: 'yeah' }, { _: 'bingo', $arg: 'nah' }] }
-    const expected = '<item arg="yeah">dingo</item><item arg="nah">bingo</item>'
+    const test = { foo: [5, '12', false, null, true], bar: 'no thanks' }
+    const expected = [
+      '<object>',
+      '<array name="foo"><number>5</number><string>12</string><false/><null/><true/></array>',
+      '<string name="bar">no thanks</string>',
+      '</object>'
+    ].join('')
     const encoded = codec.xml.encode(test)
     assert.deepStrictEqual(encoded, expected, 'encodes as expected')
   })
@@ -110,17 +115,17 @@ describe('models/codec.xml', function () {
   it('can encode a stream', async function () {
     const tests = [
       { foo: 'dingo', bar: 'yeah' },
-      { catastrophe: { _: 'bingo', $arg: 'nah' } },
+      { catastrophe: { ooo: 'bingo', argue: 5 } },
       { JsonML: ['root', {}, ['foo', { arg: '1' }, 'msg']] }
     ]
     const encoder = Readable.from(tests, { objectMode: true }).pipe(codec.xml.encoder())
     const output = Buffer.concat(await asyncIterableToArray(encoder)).toString('utf-8')
     const expected = [
-      '<stream>\n',
-      '<item><foo>dingo</foo><bar>yeah</bar></item>\n',
-      '<item><catastrophe arg="nah">bingo</catastrophe></item>\n',
-      '<item><root><foo arg="1">msg</foo></root></item>\n',
-      '</stream>\n'
+      '<array>\n',
+      '<object><string name="foo">dingo</string><string name="bar">yeah</string></object>\n',
+      '<object><object name="catastrophe"><string name="ooo">bingo</string><number name="argue">5</number></object></object>\n',
+      '<root><foo arg="1">msg</foo></root>\n',
+      '</array>\n'
     ]
     assert.strictEqual(output.toString('utf-8'), expected.join(''), 'should match')
   })
