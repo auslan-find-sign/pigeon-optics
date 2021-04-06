@@ -9,6 +9,7 @@ const settings = require('../settings')
 const assert = require('assert')
 const { Readable } = require('stream')
 const tq = require('tiny-function-queue')
+const MultiStream = require('multistream')
 
 // encodes a string to be a valid filename but not use meaningful characters like . or /
 function encodePathSegment (string) {
@@ -58,7 +59,7 @@ exports.read = async function (dataPath) {
   return Buffer.concat(chunks)
 }
 
-/** Create or update a raw file, creating a .backup file of the previous version in the process
+/** Create or update a raw file
  * @param {string[]} path - relative path inside data directory the data is located at
  * @param {Buffer} data - cbor encodable object to store
  * @async
@@ -68,6 +69,47 @@ exports.write = async function (dataPath, data) {
   assert(Buffer.isBuffer(data), 'data must be a Buffer instance')
 
   return await this.writeStream(dataPath, Readable.from(data))
+}
+
+/**
+ * Callback required by most find methods.
+ * @callback module:models/file/raw.updateBlock
+ * @async
+ * @param {Buffer} data Current value of the file, or undefined if the file doesn't exist
+ * @returns {Buffer} Buffer of data to write to the file, or undefined if no update should be written
+ */
+
+/** update a file at a given path, using tiny-function-queue to provide file locking to prevent clobbering
+ * if file doesn't exist, data argument to block function will be undefined. You can create the file by returning something!
+ * @param {string[]} path - data path
+ * @param {module:models/file/raw.updateBlock} block - block(data) is given a Buffer, and if it returns a Buffer, the file is rewritten with the new data
+ */
+exports.update = async function (dataPath, block) {
+  await tq.lockWhile(['file/raw', this.fullPath(dataPath, `${this.extension}`)], async () => {
+    let data
+    try {
+      data = await this.read(dataPath)
+    } catch (err) {
+      // console.info(`attempted to update non-existing file at ${this.fullPath(dataPath, `${this.extension}`)}: ${err}`)
+    }
+    const update = await block(data)
+    if (update !== undefined) {
+      if (!Buffer.isBuffer(update)) throw new Error('return value must be undefined or a Buffer')
+      await this.write(dataPath, update)
+    }
+  })
+}
+
+/** Create or append data to a raw file
+ * @param {string[]} path - relative path inside data directory the data is located at
+ * @param {Buffer} data - cbor encodable object to store
+ * @async
+ */
+exports.append = async function (dataPath, data) {
+  assert(Array.isArray(dataPath), 'dataPath must be an array of path segments')
+  assert(Buffer.isBuffer(data), 'data must be a Buffer instance')
+
+  return await this.appendStream(dataPath, Readable.from(data))
 }
 
 /**
@@ -128,31 +170,20 @@ exports.writeStream = async function (dataPath, stream) {
 }
 
 /**
- * Callback required by most find methods.
- * @callback module:models/file/raw.updateBlock
- * @async
- * @param {Buffer} data Current value of the file, or undefined if the file doesn't exist
- * @returns {Buffer} Buffer of data to write to the file, or undefined if no update should be written
+ * Append a buffer to the end of a raw file
+ * @param {string[]} dataPath
+ * @param {Buffer} data
  */
-
-/** update a file at a given path, using tiny-function-queue to provide file locking to prevent clobbering
- * if file doesn't exist, data argument to block function will be undefined. You can create the file by returning something!
- * @param {string[]} path - data path
- * @param {module:models/file/raw.updateBlock} block - block(data) is given a Buffer, and if it returns a Buffer, the file is rewritten with the new data
- */
-exports.update = async function (dataPath, block) {
+exports.appendStream = async function (dataPath, data) {
   await tq.lockWhile(['file/raw', this.fullPath(dataPath, `${this.extension}`)], async () => {
-    let data
-    try {
-      data = await this.read(dataPath)
-    } catch (err) {
-      // console.info(`attempted to update non-existing file at ${this.fullPath(dataPath, `${this.extension}`)}: ${err}`)
-    }
-    const update = await block(data)
-    if (update !== undefined) {
-      if (!Buffer.isBuffer(update)) throw new Error('return value must be undefined or a Buffer')
-      await this.write(dataPath, update)
-    }
+    // it feels like this could be more efficient somehow, but it's complicated with the risk of clobbering...
+    const sources = [data]
+    try { // attempt to read existing file and write that to new version first
+      sources.unshift(await this.readStream(dataPath))
+    } catch {}
+
+    const stream = new MultiStream(sources)
+    await this.writeStream(dataPath, stream)
   })
 }
 

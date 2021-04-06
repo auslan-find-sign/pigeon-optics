@@ -32,6 +32,12 @@ describe('models/file/raw', function () {
     }
   })
 
+  it('raw.append()', async function () {
+    const path = ['file-tests', randomName()]
+    for (const test of tests) await raw.append(path, test)
+    assert(Buffer.concat(tests).equals(await raw.read(path)), 'appends should happen in order and be correct')
+  })
+
   it('raw.writeStream()', async function () {
     for (const test of tests) {
       const path = ['file-tests', randomName()]
@@ -39,6 +45,20 @@ describe('models/file/raw', function () {
       const read = await raw.read(path)
       assert(read.equals(test))
     }
+  })
+
+  it('raw.appendStream()', async function () {
+    const path = ['file-tests', randomName()]
+    await raw.appendStream(path, Readable.from(tests))
+    assert(Buffer.concat(tests).equals(await raw.read(path)))
+  })
+
+  it('raw.appendStream() anticlobbering', async function () {
+    const path = ['file-tests', randomName()]
+    const writes = []
+    for (const test of tests) writes.push(raw.appendStream(path, Readable.from(test)))
+    await Promise.all(writes)
+    assert(Buffer.concat(tests).equals(await raw.read(path)))
   })
 
   it('raw.delete() works', async function () {
