@@ -112,7 +112,7 @@ exports.json = {
 }
 
 exports.jsonLines = {
-  handles: ['ndjson', 'jsonlines'].flatMap(x => [`text/${x}`, `text/x-${x}`, `application/${x}`, `application/x-${x}`]),
+  handles: ['ndjson', 'jsonlines'].flatMap(x => [`application/${x}`, `text/${x}`, `application/x-${x}`, `text/x-${x}`]),
   extensions: ['jsonl'],
 
   encode (array) {
@@ -176,7 +176,7 @@ exports.jsonLines = {
 
 const yaml = require('yaml')
 exports.yaml = {
-  handles: ['application/yaml', 'application/x-yaml', 'text/yaml', 'text/x-yaml'],
+  handles: ['application/yaml', 'text/yaml', 'application/x-yaml', 'text/x-yaml'],
   extensions: ['yaml'],
 
   decode (yamlString) {
