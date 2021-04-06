@@ -208,3 +208,24 @@ describe('models/codec.objectHash', function () {
     }
   })
 })
+
+describe('models/codec.for()', () => {
+  it('looks up by media types', function () {
+    assert.strictEqual(codec.for('application/json'), codec.json)
+    assert.strictEqual(codec.for('application/cbor'), codec.cbor)
+    assert.strictEqual(codec.for('application/msgpack'), codec.msgpack)
+    assert.strictEqual(codec.for('application/yaml'), codec.yaml)
+    assert.strictEqual(codec.for('application/ndjson'), codec.jsonLines)
+    assert.strictEqual(codec.for('application/jsonlines'), codec.jsonLines)
+    assert.strictEqual(codec.for('application/xml'), codec.xml)
+  })
+
+  it('looks up by extension', function () {
+    assert.strictEqual(codec.for('json'), codec.json)
+    assert.strictEqual(codec.for('cbor'), codec.cbor)
+    assert.strictEqual(codec.for('msgpack'), codec.msgpack)
+    assert.strictEqual(codec.for('yaml'), codec.yaml)
+    assert.strictEqual(codec.for('jsonl'), codec.jsonLines)
+    assert.strictEqual(codec.for('xml'), codec.xml)
+  })
+})

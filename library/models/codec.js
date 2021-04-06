@@ -8,6 +8,7 @@ const streams = require('stream')
 const cbor = require('cbor')
 exports.cbor = {
   handles: ['application/cbor', 'application/x-cbor'],
+  extensions: ['cbor'],
   decoderOpts: {},
   encoderOpts: { highWaterMark: 25000000 },
 
@@ -41,6 +42,7 @@ exports.cbor = {
 const json5 = require('json5')
 exports.json = {
   handles: ['application/json', 'text/json', 'application/feed+json'],
+  extensions: ['json'],
 
   reviver (key, value) {
     if (value && typeof value === 'object' && value.type === 'Buffer' && Array.isArray(value.data)) {
@@ -111,6 +113,7 @@ exports.json = {
 
 exports.jsonLines = {
   handles: ['ndjson', 'jsonlines'].flatMap(x => [`text/${x}`, `text/x-${x}`, `application/${x}`, `application/x-${x}`]),
+  extensions: ['jsonl'],
 
   encode (array) {
     if (array && typeof array === 'object' && array[Symbol.iterator]) {
@@ -174,6 +177,7 @@ exports.jsonLines = {
 const yaml = require('yaml')
 exports.yaml = {
   handles: ['application/yaml', 'application/x-yaml', 'text/yaml', 'text/x-yaml'],
+  extensions: ['yaml'],
 
   decode (yamlString) {
     if (Buffer.isBuffer(yamlString)) yamlString = yamlString.toString('utf-8')
@@ -228,6 +232,7 @@ const onml = require('onml')
 const jxon = require('jxon')
 exports.xml = {
   handles: ['application/xml', 'text/xml', 'application/rdf+xml', 'application/rss+xml', 'application/atom+xml', 'text/xml'],
+  extensions: ['xml', 'rss', 'atom'],
 
   encode (obj) {
     console.log(obj)
@@ -363,11 +368,18 @@ exports.mediaTypeHandlers = Object.fromEntries(Object.values(exports).flatMap(va
   return []
 }))
 
+exports.extensionHandlers = Object.fromEntries(Object.values(exports).flatMap(value => {
+  if (value && typeof value === 'object' && Array.isArray(value.extensions)) {
+    return value.extensions.map(ext => [ext.toLowerCase(), value])
+  }
+  return []
+}))
+
 /**
- * returns codec if a matching media type is found, otherwise undefined
- * @param {string} mediaType
+ * returns codec if a matching media type or file extension is found, otherwise undefined
+ * @param {string} query
  * @returns {object|undefined}
  */
-exports.for = function (mediaType) {
-  return exports.mediaTypeHandlers[mediaType]
+exports.for = function (query) {
+  return exports.mediaTypeHandlers[query] || exports.extensionHandlers[query]
 }
