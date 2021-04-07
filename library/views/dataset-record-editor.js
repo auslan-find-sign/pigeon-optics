@@ -55,7 +55,7 @@ module.exports = (req, data, error = null) => {
           })
         }
 
-        v.sourceCodeEditor('recordData', 'json5', data.recordData, { class: ['expand'] })
+        v.sourceCodeEditor('recordData', 'json5', data.recordData, { class: ['expand'], ace: { maxLines: 1000 } })
 
         v.footer(v => {
           v.button('Save', { type: 'submit' })
