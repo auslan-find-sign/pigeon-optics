@@ -1,79 +1,46 @@
 const express = require('express')
 const router = express.Router()
 
+const updateEvents = require('../utility/update-events')
+const attachments = require('../models/attachments')
 const readPath = require('../models/read-path')
 const codec = require('../models/codec')
-const attach = require('../models/attachment')
-const attachStorage = require('../models/attachment-storage')
 const uri = require('encodeuricomponent-tag')
-const pkg = require('../../package.json')
-const updateEvents = require('../utility/update-events')
 
 const { Readable } = require('stream')
 const ZipStream = require('zip-stream')
 const expresse = require('@toverux/expresse')
 const onFinished = require('on-finished')
-const fs = require('fs-extra')
-
-const encodingMimeTypes = {
-  cbor: 'application/cbor',
-  json: 'application/json',
-  'json-lines': 'text/plain'
-}
+const createHttpError = require('http-errors')
 
 /**
  * iterator which yields chunks of text or buffer in whichever encoding is requested
  * @param {string} path - path in form '/realm/user:name'
  * @param {object} opts - query string options
- * @param {string} opts.encoding - 'cbor', 'json', or 'json-lines'
- * @param {string} [opts.at] - version number string, only output records with this version number or higher
- * @param {string} [opts.after] - version number string, only output records with a newer version than this
+ * @param {string|number} [opts.at] - version number, records with a lower number than this will output a stub without a data field
  * @yields {string|Buffer}
  */
-async function * encodePath (dataPath, opts) {
-  const { encoding, after, at } = opts
-  if (encoding === 'json') yield '{\n'
-  let first = true
-  for await (const { path, version, read } of readPath.meta(dataPath)) {
-    if (after !== undefined && version <= parseInt(after)) continue
-    if (at !== undefined && version < parseInt(at)) continue
-
-    const data = await read()
-    const { recordID } = codec.path.decode(path)
-    if (encoding === 'cbor') {
-      yield codec.cbor.encode([recordID, data])
-    } else if (encoding === 'json') {
-      if (first) {
-        yield `  ${codec.json.encode(recordID)}:${codec.json.encode(data)}`
-      } else {
-        yield `,\n  ${codec.json.encode(recordID)}:${codec.json.encode(data)}`
-      }
-    } else if (encoding === 'json-lines') {
-      yield `${codec.json.encode([recordID, data])}\n`
-    }
-    first = false
+async function * pathQuery (dataPath, { at }) {
+  if (at !== undefined && typeof at !== 'number') {
+    at = parseInt(at)
+    if (isNaN(at)) at = undefined
   }
-  if (encoding === 'json') yield '\n}\n'
+
+  const filter = ({ version }) => at === undefined || version >= at
+
+  for await (const { path, version, hash, read } of readPath.meta(dataPath)) {
+    const { recordID } = codec.path.decode(path)
+    if (filter({ version })) {
+      yield { id: recordID, version, hash, data: await read() }
+    } else {
+      yield { id: recordID, version, hash }
+    }
+  }
 }
 
-/**
- * creates a node readable stream which outputs export data from the specified path
- * @param {string} path - path in form '/realm/user:name'
- * @param {object} opts - query string options
- * @param {string} opts.encoding - 'cbor', 'json', or 'json-lines'
- * @param {string} [opts.at] - version number string, only output records with this version number or higher
- * @param {string} [opts.after] - version number string, only output records with a newer version than this
- * @returns {Readable}
- */
-function readableStreamOfPath (...args) {
-  return Readable.from(encodePath(...args))
-}
-
-function streamArchive (dataPath, archiveType, includeAttachments) {
+function streamArchive (dataPath, archiveType, encoder, includeAttachments) {
   if (archiveType !== 'zip') throw new Error('Archiving only supports zip currently')
-  const zip = new ZipStream({
-    comment: `Archive of ${dataPath}, built by Datasets v${pkg.version}`
-  })
+  const zip = new ZipStream({ comment: `Archive of ${dataPath}` })
 
   // promisify the entry append thing
   const entry = (...args) => {
@@ -85,34 +52,28 @@ function streamArchive (dataPath, archiveType, includeAttachments) {
   const run = async () => {
     const writtenAttachments = new Set()
     // make directories
-    await entry(null, { name: '/cbor/' })
-    await entry(null, { name: '/json/' })
+    await entry(null, { name: '/records/' })
     if (includeAttachments) await entry(null, { name: '/attachments/' })
 
-    for await (const { path, data } of readPath(dataPath)) {
+    for await (const { path, data, links } of readPath(dataPath)) {
       const { recordID } = codec.path.decode(path)
       // zip-stream support for entry contents being strings or buffers seems broken
       // but stream inputs works, so just make streams
       // output cbor version
-      const cborStream = Readable.from((async function * () {
-        yield codec.cbor.encode(data)
-      })())
-      await entry(cborStream, { name: uri`/cbor/${recordID}.cbor` })
-      // output json version
-      const jsonStream = Readable.from((async function * () {
-        yield Buffer.from(codec.json.encode(data, 2))
-      })())
-      await entry(jsonStream, { name: uri`/json/${recordID}.json` })
+      const recordStream = Readable.from([encoder.encode(data)])
+      await entry(recordStream, { name: uri`/records/${recordID}.${encoder.extensions[0]}` })
+
       // write any attachments
       if (includeAttachments) {
-        const refs = attach.listReferences(data)
-        for (const ref of refs) {
-          const hexHash = ref.hash.toString('hex')
-          if (!writtenAttachments.has(hexHash)) {
-            writtenAttachments.add(hexHash)
-            const path = attachStorage.getPath(ref)
-            const readStream = fs.createReadStream(path)
-            await entry(readStream, { name: uri`/attachments/${hexHash}` })
+        for (const link of links) {
+          const url = new URL(link)
+          if (url.protocol.toLowerCase() === 'hash:' && url.host.toLowerCase() === 'sha256') {
+            const hexHash = (new URL(link)).pathname.slice(1)
+
+            if (!writtenAttachments.has(hexHash)) {
+              writtenAttachments.add(hexHash)
+              await entry(attachments.readStream(hexHash), { name: uri`/attachments/${hexHash}` })
+            }
           }
         }
       }
@@ -125,72 +86,73 @@ function streamArchive (dataPath, archiveType, includeAttachments) {
   return zip
 }
 
-// export a dataset/viewport output
-// query string must specify encoding as one of the following:
-//  - cbor: returns a cbor stream of arrays containing [entryID, entryData]
-//  - json-lines: returns a text file, where each line is a json array in the same format as cbor, followed by newlines \n
-//  - json: returns a json object where each key is an entryID and each value is entry data
-// json-lines maybe easier to process with large datasets, as you can just read a line in at a time
-router.get('/:source(datasets|lenses)/:user\\::name/export', async (req, res) => {
-  const path = uri`/${req.params.realm}/${req.params.user}:${req.params.name}`
-  const mimeType = encodingMimeTypes[req.query.encoding]
-
-  if (!mimeType) {
-    return res.status('500').send('Unsupported encoding')
-  }
+/**
+ * Exports a readable dataset in the requested format (anything codec can stream - implements encoder() function)
+ * Format can be specified either via .ext or Accepts header
+ * ?at=(number) subsets the response to omit data field on any entries whose version number is less than the number
+ * provided, allowing for more efficient pull syncing
+ */
+router.get('/:source(datasets|lenses)/:user\\::name/export.:format?', async (req, res) => {
+  const path = codec.path.encode(req.params)
 
   if (!await readPath.exists(path)) {
-    return res.status('404').send('Underlying data not found')
+    throw createHttpError.NotFound('Data Not Found')
   }
 
-  res.type(mimeType)
-  readableStreamOfPath(path, req.query).pipe(res)
+  const encoder = codec.for(req.params.format || req.accepts(Object.keys(codec.mediaTypeHandlers)))
+  if (encoder && typeof encoder.encoder === 'function') {
+    const mediaType = req.accepts(encoder.handles) || encoder.handles[0] // try to respond with the Content-Type asked for, otherwise use a default
+    res.type(mediaType)
+    Readable.from(pathQuery(codec.path.encode(req.params), req.query)).pipe(encoder.encoder()).pipe(res)
+  } else {
+    throw createHttpError.NotAcceptable('Encoder for requested format not available')
+  }
 })
 
 /**
  * export a dataset/viewport output as a zip file
  */
-router.get('/:source(datasets|lenses)/:user\\::name/zip', async (req, res) => {
+router.get('/:source(datasets|lenses)/:user\\::name/archive.:format.zip', async (req, res) => {
   const path = codec.path.encode(req.params)
 
   if (!await readPath.exists(path)) {
-    return res.status('404').send('Underlying data not found')
+    return createHttpError.NotFound('Data Not Found')
   }
 
-  streamArchive(path, 'zip', !!req.query.attachments).pipe(res.type('application/zip'))
+  if (!codec.for(req.params.format)) {
+    return createHttpError.NotFound(`Format ${req.params.format} not available`)
+  }
+
+  res.attachment(`export-${req.params.name.replace(/[^a-zA-Z0-9-_]+/g, '_')}-${req.params.format}.zip`)
+  streamArchive(path, 'zip', codec.for(req.params.format), !!req.query.attachments).pipe(res)
 })
 
 /**
  * stream out changes to a lens or dataset's contents
  */
-router.get('/:source(datasets|lenses)/:user\\::name/event-stream', expresse.sse({ flushAfterWrite: true }), async (req, res) => {
+router.get('/:source(datasets|lenses|meta)/:user\\::name/event-stream', expresse.sse({ flushAfterWrite: true }), async (req, res) => {
   const sources = {
     datasets: require('../models/dataset'),
-    lenses: require('../models/lens')
-  }
-  const source = sources[req.params.source]
-
-  async function send () {
-    const snapshot = await source.readVersion(req.params.user, req.params.name)
-    if (snapshot) {
-      // make a records collection with just version numbers as values
-      const records = Object.fromEntries(
-        Object.entries(snapshot.records).forEach(([id, { version }]) =>
-          [id, version]
-        )
-      )
-
-      res.sse.data({ version: snapshot.version, records })
-      return true
-    }
-    return false
+    lenses: require('../models/lens'),
+    meta: require('../models/meta-vfs')
   }
 
-  function cb () { send() }
-  updateEvents.events.on('update', cb)
-  onFinished(res, () => { updateEvents.events.off('update', cb) })
+  function send (info) {
+    res.sse.data({ ...info })
+  }
 
-  send() // send's current version of underlying dataset
+  // send's current version of dataset
+  const model = sources[req.params.source]
+  const version = (await model.readMeta(req.params.user, req.params.name)).version
+  const { source, user, name } = req.params
+  const path = codec.path.encode(req.params.source, req.params.user, req.params.name)
+  send({ path, source, user, name, version })
+
+  // watch for further updates, until the response closes
+  updateEvents.events.on('update', send)
+  onFinished(res, () => {
+    updateEvents.events.off('update', send)
+  })
 })
 
 module.exports = router
