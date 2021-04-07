@@ -26,11 +26,20 @@ YAML is a common text-based data language, which is technically a superset of JS
 
 ### application/xml, text/xml, application/rdf+xml, application/rss+xml, application/atom+xml, text/xml
 
-XML uploaded to a dataset is always translated using [JsonML](http://www.jsonml.org) in to an object structure. JsonML is able to preserve most aspects of XML, including tag order and whitespace, and can be used to store things like html. The record will be stored as an object containing one property, 'JsonML', which contains the JsonML structure.
+XML uploaded to a dataset is always translated using [JsonML](http://www.jsonml.org) in to an object structure. JsonML is able to preserve most aspects of XML, including tag order and whitespace, and can be used to store things like xhtml. The record will be stored as an object containing one property, 'JsonML', which contains the JsonML structure.
 
 When requesting records in xml formats, records which contain at their root an object, containing one property, which is 'JsonML', will be encoded using JsonML and served up.
 
-For records which aren't in this format, JXON will be attempted to translate it in to xml. JXON can represent objects, arrays, and strings accurately as XML. Other types like booleans and numbers will be stringified, so this is a fairly lossy format, but it enables processing datasets using tools like XPath, and XSLT, if that's what you need.
+For records which aren't in this format, a translation of the raw object structure is done:
+
+ - `"text"` become `<string>text</string>`
+ - `123` becomes `<number>123</number>`
+ - `true` becomes `<true/>`
+ - `false` becomes `<false/>`
+ - `null` becomes `<null/>`
+ - `undefined` becomes `<undefined/>`
+ - `[ arrays ]` and iterables become `<array>` and contain a sequence of tags without whitespace
+ - `{ objects }` becomes `<object>` and contain a sequence of tags without whitespace, and each tag also gains a 'name' attribute with the property name
 
 ### application/msgpack
 
