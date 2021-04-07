@@ -185,16 +185,15 @@ router.get('/lenses/:user\\::name/records/', async (req, res) => {
 
 // get a record from a user's lens
 router.get('/lenses/:user\\::name/records/:recordID', async (req, res) => {
-  const meta = await lens.readMeta(req.params.user, req.params.name)
   const record = await lens.read(req.params.user, req.params.name, req.params.recordID)
-  res.set('X-Version', meta.version)
 
   if (req.accepts('html')) {
+    const meta = await lens.readMeta(req.params.user, req.params.name)
+
     const title = `${req.params.user}:${req.params.name}/${req.params.recordID}`
     const sidebar = { recordIDs: Object.keys(meta.records) }
-    res.sendVibe('lens-record', title, { record, sidebar })
+    res.sendVibe('record', title, { record, sidebar, path: { source: 'lenses', ...req.params } })
   } else {
-    res.set('ETag', `"${meta.hash.toString('hex')}"`)
     codec.respond(req, res, record)
   }
 })

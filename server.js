@@ -118,14 +118,6 @@ app.use((error, req, res, next) => {
   }
 })
 
-if (settings.garbageCollectAttachmentsInterval) {
-  const attachmentStore = require('./library/models/attachment-storage')
-  function attachmentsGC () {
-    attachmentStore.pruneRandom()
-  }
-  setInterval(attachmentsGC, timestring(settings.garbageCollectAttachmentsInterval, 'ms'))
-}
-
 const port = process.env.PORT || 3000
 app.listen(port, '127.0.0.1', () => {
   console.log(`Application Server ready at http://localhost:${port}/`)

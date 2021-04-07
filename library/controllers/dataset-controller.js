@@ -262,9 +262,7 @@ router.all('/datasets/:user\\::name/records/:recordID', multipartAttachments, as
   if (!record) return next(createError.NotFound('Record Not Found'))
 
   if (req.accepts('html')) {
-    const sidebar = {
-      recordIDs: Object.keys((await dataset.readMeta(req.params.user, req.params.name)).records)
-    }
+    const sidebar = { recordIDs: Object.keys((await dataset.readMeta(req.params.user, req.params.name)).records) }
 
     const title = `${req.params.user}:${req.params.name}/${req.params.recordID}`
     if ((req.query.edit && req.owner) || req.method !== 'GET') {
@@ -274,7 +272,7 @@ router.all('/datasets/:user\\::name/records/:recordID', multipartAttachments, as
         recordData: codec.json.print(record, '\t')
       }, error)
     } else {
-      res.sendVibe('dataset-record', title, { record, sidebar })
+      res.sendVibe('record', title, { record, sidebar, path: { source: 'datasets', ...req.params } })
     }
   } else {
     codec.respond(req, res, record)
