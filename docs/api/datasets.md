@@ -57,6 +57,12 @@ Delete the entire dataset. Including all versions.
 
 returns the value of the record, as an arbitrary object, and the X-Version header specifying it's current version number.
 
+## GET /datasets/username:dataset-name/records/recordID/raw.format
+
+format maybe one of .cbor, .json, .jsonl, .yaml, .msgpack, .xml/rss/atom. In these cases, the record's data will be converted to the specified type, encoded, and returned.
+
+Also, if the record's root data type is a string, or a Buffer, any arbitrary type can be provided here, like .html, and the content will be served as that type, if a matching codec isn't available. You can also omit the file extension and rely on Accept http headers to negotiate Content-Type.
+
 ## PUT /datasets/username:dataset-name/records/recordID
 
 A new version of the dataset is created, changing the value of this record to whatever object is provided as the POST body.
