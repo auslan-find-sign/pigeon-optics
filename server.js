@@ -1,7 +1,6 @@
 // server.js
 // This is the application server for the Sign Dataset
 const settings = require('./library/models/settings')
-const timestring = require('timestring')
 const express = require('express')
 require('express-async-errors')
 const cookieSession = require('cookie-session')

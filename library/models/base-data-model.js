@@ -12,6 +12,7 @@ const stringNaturalCompare = require('string-natural-compare')
 const recordStructure = require('../utility/record-structure')
 const createMissingAttachmentsError = require('../utility/missing-attachments-error')
 const attachments = require('./attachments')
+const createHttpError = require('http-errors')
 
 /* read meta info about dataset */
 exports.readMeta = async function (user, name) {
@@ -72,8 +73,13 @@ exports.read = async function (user, name, recordID) {
 // which args are provided
 exports.iterate = async function * (user, name = undefined) {
   if (name === undefined) {
-    const file = require('./file/cbor').instance({ rootPath: this.path(user) })
-    yield * file.iterateFolders([])
+    const file = require('./file/cbor')
+    const path = this.path(user)
+    if (await file.exists(path)) {
+      yield * file.iterateFolders(path)
+    } else {
+      throw createHttpError.NotFound('User doesn\'t exist')
+    }
   } else {
     const meta = await this.readMeta(user, name)
     for (const id in meta.records) {

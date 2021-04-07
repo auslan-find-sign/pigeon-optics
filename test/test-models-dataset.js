@@ -5,7 +5,7 @@ const crypto = require('crypto')
 const createHttpError = require('http-errors')
 const dataset = require('../library/models/dataset')
 const user = 'system'
-const name = 'test'
+const name = 'test-models-dataset'
 
 function fakehash (size = 8000) {
   const data = crypto.randomBytes(size)
@@ -61,7 +61,12 @@ describe('models/dataset', function () {
     assert.isTrue(Buffer.isBuffer(await dataset.read(user, name, 'test-3')))
   })
 
-  it('dataset.list(user, name) works', async function () {
+  it('dataset.list(user)', async function () {
+    await assert.isRejected(dataset.list(crypto.randomBytes(16).toString('hex')), createHttpError.NotFound, 'User doesn\'t exist')
+    await assert.becomes(dataset.list(user), [name], 'listing a real user should provide a real list of datasets')
+  })
+
+  it('dataset.list(user, name)', async function () {
     const list = await dataset.list(user, name)
     assert.deepStrictEqual(list.map(x => x.id).sort(), ['test-1', 'test-2', 'test-3'].sort(), 'list should list out the right objects')
     const test3 = list.find(x => x.id === 'test-3')

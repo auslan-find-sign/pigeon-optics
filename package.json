@@ -75,6 +75,7 @@
       "guest",
       "operator",
       "debug",
+      "dev",
       "..",
       "."
     ],
