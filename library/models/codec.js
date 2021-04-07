@@ -115,15 +115,19 @@ exports.jsonLines = {
   handles: ['ndjson', 'jsonlines'].flatMap(x => [`application/${x}`, `text/${x}`, `application/x-${x}`, `text/x-${x}`]),
   extensions: ['jsonl'],
 
-  encode (array) {
-    if (array && typeof array === 'object' && array[Symbol.iterator]) {
-      const out = []
-      for (const item of array) {
-        out.push(exports.json.encode(item) + '\n')
+  encode (object) {
+    if (object && typeof object === 'object') {
+      if (object[Symbol.iterator]) {
+        const out = []
+        for (const item of object) {
+          out.push(exports.json.encode(item) + '\n')
+        }
+        return out.join('')
+      } else {
+        return this.encode(Object.entries(object))
       }
-      return out.join('')
     } else {
-      throw new Error('input must be an array or an iterable')
+      return exports.json.encode(object) + '\n'
     }
   },
 

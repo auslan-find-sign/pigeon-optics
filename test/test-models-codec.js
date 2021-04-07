@@ -72,6 +72,21 @@ describe('models/codec.jsonLines', function () {
     const roundtripped = codec.jsonLines.decode(codec.jsonLines.encode(tests))
     assert.deepStrictEqual(roundtripped, tests, 'roundtripped version should match deeply')
   })
+
+  it('encodes objects in to entries lists', function () {
+    const test = { a: 1, b: 2, 3: 4 }
+    const roundtripped = codec.jsonLines.decode(codec.jsonLines.encode(test))
+    assert.deepStrictEqual(Object.fromEntries(roundtripped), test, 'should match')
+  })
+
+  it('encodes root primitive types as normal json', function () {
+    for (const test of [1, 2, 3, true, false, null, 'hello']) {
+      const jsonDecode = codec.json.decode(codec.jsonLines.encode(test))
+      assert.strictEqual(jsonDecode, test, 'should match')
+      const roundtripped = codec.jsonLines.decode(codec.jsonLines.encode(test))
+      assert.deepStrictEqual(roundtripped, [test], 'should match')
+    }
+  })
 })
 
 describe('models/codec.xml', function () {
