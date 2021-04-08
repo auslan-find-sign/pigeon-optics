@@ -101,13 +101,13 @@ exports.login = async (user, pass) => {
     throw new Error('Account not found: ' + err.message)
   }
 
-  const hash = Buffer.from(nacl.hash(Buffer.concat([account.passSalt, Buffer.from(`${pass}`), account.passSalt])))
+  const hash = nacl.hash(Buffer.concat([account.passSalt, Buffer.from(`${pass}`), account.passSalt]))
 
   if (account.user !== user) {
     throw new Error("Corruption issue, user on account doesn't match user specified")
   }
 
-  if (!hash.equals(account.passHash)) {
+  if (!nacl.verify(hash, account.passHash)) {
     throw new Error('Password incorrect')
   }
 
