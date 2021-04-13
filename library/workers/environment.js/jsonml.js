@@ -72,3 +72,15 @@ exports.text = function textContents (element) {
   if (element && typeof element === 'object' && Array.isArray(element.JsonML)) element = element.JsonML
   return adapter.contents(element)
 }
+
+/**
+ * read attribute value of a JsonML Element
+ * @param {JsonMLElement} element - JsonMLElement, which is an Array
+ * @param {string} attributeName
+ * @returns {string}
+ */
+exports.attr = function getAttribute (element, attributeName) {
+  if (adapter.isTag(element)) {
+    return adapter.attr(element, attributeName)
+  }
+}

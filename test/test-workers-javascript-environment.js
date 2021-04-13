@@ -16,7 +16,7 @@ const testDocument = codec.xml.decode(`<root>
   </body>
 </root>`)
 
-describe('CSS.select()', () => {
+describe('JsonML.select()', () => {
   it('selects <root>', () => {
     expect(JsonML.select(testDocument, 'root')).to.be.an('array').that.deep.equals([
       testDocument.JsonML
@@ -44,5 +44,16 @@ describe('JsonML.text()', () => {
 
   it('can turn a selected node in to text', () => {
     expect(JsonML.text(JsonML.select(testDocument, 'title'))).to.equal('Wonderful World of Signs')
+  })
+})
+
+describe('JsonML.attr()', () => {
+  it('reads attributes from elements returned by JsonML.select', () => {
+    expect(JsonML.attr(JsonML.select(testDocument, 'a')[0], 'href')).to.equal('http://signs.com/')
+  })
+
+  it('reads hand crafted elements attributes', () => {
+    const el = ['test-element', { val: 'just a test' }]
+    expect(JsonML.attr(el, 'val')).to.equal('just a test')
   })
 })
