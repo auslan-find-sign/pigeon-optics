@@ -43,9 +43,13 @@ exports.startup = async function (config) {
   isolate = new ivm.Isolate({ memoryLimit: 256 })
   // Precompile the codec-lite.ivm init code
   context = await isolate.createContext()
+
+  // make 'global' ref to global available
+  // TODO: consider removing this before user code runs? or freezing it?
+  await context.global.set('global', context.global.derefInto())
   // load the codec library
-  const codecIvmCode = await fs.promises.readFile(require.resolve('./environment.ivm.js'))
-  await context.eval(codecIvmCode.toString())
+  const environmentIvmCode = await fs.promises.readFile(require.resolve('./environment.js/build.js'))
+  await context.eval(environmentIvmCode.toString('utf-8'))
 
   // setup safe logger console object
   const logger = ({ type, args, stack }) => {

@@ -6,7 +6,8 @@
   "repo": "https://github.com/auslan-find-sign/pigeon-optics.git",
   "homepage": "https://github.com/auslan-find-sign/pigeon-optics/",
   "scripts": {
-    "test": "mocha --exit --trace-warnings"
+    "test": "mocha --exit --trace-warnings",
+    "build": "browserify library/workers/environment.js/index.js --full-paths -o library/workers/environment.js/build.js"
   },
   "keywords": [
     "auslan",
@@ -20,6 +21,7 @@
   "dependencies": {
     "@toverux/expresse": "^2.4.0",
     "ace-builds": "^1.4.12",
+    "browserify": "^17.0.0",
     "cbor": "^7.0.4",
     "compression": "^1.7.4",
     "cookie-session": "^1.4.0",
@@ -50,6 +52,7 @@
     "superagent": "^6.1.0",
     "timestring": "^6.0.0",
     "tiny-function-queue": "^1.0.0",
+    "tree-selector": "^2.1.1",
     "tweetnacl": "^1.0.3",
     "unicode": "^13.0.0",
     "xbytes": "^1.7.0",

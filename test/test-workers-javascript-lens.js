@@ -1,5 +1,8 @@
 const { LensWorker } = require('../library/workers/interface')
-const assert = require('assert')
+const chai = require('chai')
+chai.use(require('chai-as-promised'))
+const assert = chai.assert
+const codec = require('../library/models/codec')
 
 const mapCode = `// this is my test map code
 // it should output five things, a, b, and c c c
@@ -169,6 +172,54 @@ describe('workers/interface.LensWorker#reduce', async function () {
   })
 
   after('shutdown worker', async function () {
+    await worker.shutdown()
+  })
+})
+
+// testing the worker environment code is working inside the worker, more extensive tests in ./test-workers-javascript-environment.js
+// doing tests across the process bridge is slow and irritating to debug when stuff breaks, so it happens in main thread in that suite
+describe('workers/environment.js', () => {
+  it('ivm environment: JsonML.select()', async () => {
+    const worker = new LensWorker()
+    // abuse reduce as a simple way of calling CSS.select in the virtual machine
+    const startup = await worker.startup({
+      mapType: 'javascript',
+      mapCode: '// no thank you',
+      reduceCode: 'return JsonML.select(left, right)'
+    })
+
+    assert.deepStrictEqual(startup.map.errors, [], 'no errors on startup')
+    assert.deepStrictEqual(startup.reduce.errors, [], 'no errors on startup')
+
+    const document = codec.xml.decode('<root><div id="yeah">no</div><span>cool</span></root>')
+    assert.deepStrictEqual(
+      await worker.reduce(document, '#yeah'),
+      { logs: [], errors: [], value: [['div', { id: 'yeah' }, 'no']] },
+      'expected "#yeah" css query to return the only div'
+    )
+
+    await worker.shutdown()
+  })
+
+  it('ivm environment: JsonML.text()', async () => {
+    const worker = new LensWorker()
+    const startup = await worker.startup({
+      mapType: 'javascript',
+      mapCode: 'output("result", JsonML.text(data))',
+      reduceCode: 'return left'
+    })
+
+    assert.deepStrictEqual(startup.map.errors, [], 'no errors on startup')
+    assert.deepStrictEqual(startup.reduce.errors, [], 'no errors on startup')
+
+    const document = codec.xml.decode('<root><div id="yeah">no</div><span>cool</span></root>')
+    assert.deepStrictEqual(document, { JsonML: ['root', {}, ['div', { id: 'yeah' }, 'no'], ['span', {}, 'cool']] }, 'xml decodes as expected')
+
+    const res = await worker.map({ path: '/datasets/test:test/records/foo', data: document })
+    assert.deepStrictEqual(res.errors, [], 'no errors')
+    assert.deepStrictEqual(res.logs, [], 'no logs')
+    assert.deepStrictEqual(res.outputs, [{ id: 'result', data: 'nocool' }], 'outputs text from inside xml')
+
     await worker.shutdown()
   })
 })
