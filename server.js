@@ -9,6 +9,7 @@ const crypto = require('crypto')
 const process = require('process')
 const codec = require('./library/models/codec')
 const Vibe = require('./library/vibe/rich-builder')
+const createHttpError = require('http-errors')
 
 // create web server
 const app = express()
@@ -84,38 +85,10 @@ app.get('/', (req, res) => {
 })
 
 app.use((req, res, next) => {
-  const err = new Error('Path not Found, web address maybe incorrect')
-  err.httpCode = 404
-  err.code = 'Path Not Found'
-  throw err
+  next(createHttpError.NotFound('Path not Found, web address maybe incorrect'))
 })
 
-app.use((error, req, res, next) => {
-  if (error.statusCode) {
-    res.status(error.statusCode)
-  } else if (error.code === 'ENOENT') {
-    res.status(404) // something tried to read a file that doesn't exist
-  } else if (error.name === 'SyntaxError' || error.stack.includes('/borc/src/decoder.js')) {
-    res.status(400) // parse errors are likely to be clients sending malformed data
-  } else {
-    res.status(500)
-  }
-
-  if (req.path !== '/favicon.ico') {
-    console.error(`For ${req.method} ${req.path}`)
-    console.error(error.name + ' Error: ' + error.message)
-    console.error(error.stack)
-  }
-
-  if (req.accepts('html')) {
-    res.sendVibe('error-handler', 'Request Error', error)
-  } else {
-    codec.respond(req, res, {
-      error: error.message,
-      stack: req.auth === 'admin' && error.stack
-    })
-  }
-})
+app.use(require('./library/utility/http-error-handler')({ silent: false }))
 
 const port = process.env.PORT || 3000
 app.listen(port, '127.0.0.1', () => {
