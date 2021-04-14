@@ -15,7 +15,7 @@ router.param('user', auth.ownerParam)
 // list all users and their datasets
 router.get('/datasets/', async (req, res) => {
   const list = {}
-  for await (const user of auth.iterateUsers()) {
+  for await (const user of auth.iterate()) {
     const datasets = await dataset.list(user)
     if (datasets && datasets.length > 0) {
       list[user] = datasets

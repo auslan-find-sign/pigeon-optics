@@ -19,7 +19,7 @@ exports.bootBroadcast = async function () {
   const datasets = require('../models/dataset')
   const lenses = require('../models/lens')
 
-  for await (const user of auth.iterateUsers()) {
+  for await (const user of auth.iterate()) {
     for await (const dataset of datasets.iterate(user)) {
       const meta = await datasets.readMeta(user, dataset)
       exports.pathUpdated(codec.path.encode('datasets', user, dataset), meta.version)

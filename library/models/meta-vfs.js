@@ -6,7 +6,7 @@ const lenses = require('./lens')
 const itToArray = require('../utility/async-iterable-to-array')
 
 const iterators = {
-  users: auth.iterateUsers,
+  users: auth.iterate,
 
   datasets: async function * () {
     for await (const user of iterators.users()) {

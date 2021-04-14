@@ -64,7 +64,7 @@ exports.validateRecord = async function (id, data) {
 exports.getInputs = async function () {
   // TODO: consider optimising/caching this somehow? seems expensive to do frequently
   const inputMap = {}
-  for await (const user of auth.iterateUsers()) {
+  for await (const user of auth.iterate()) {
     for await (const name of this.iterate(user)) {
       const lensConfig = await this.readMeta(user, name)
       for (const path of lensConfig.inputs) {

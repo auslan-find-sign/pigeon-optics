@@ -130,7 +130,7 @@ router.delete('/lenses/:user\\::name/', auth.ownerRequired, async (req, res) => 
 
 router.get('/lenses/', async (req, res) => {
   const list = {}
-  for await (const user of auth.iterateUsers()) {
+  for await (const user of auth.iterate()) {
     const lenses = await lens.list(user)
     if (lenses && lenses.length > 0) {
       list[user] = lenses
