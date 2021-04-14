@@ -11,6 +11,7 @@ const testDocument = codec.xml.decode(`<root>
     </div>
     <article>
       <p>Hello there!</p>
+      <img src="foo.png"/>
       <a href="/next">Next Page</a>
     </article>
   </body>
@@ -55,5 +56,45 @@ describe('JsonML.attr()', () => {
   it('reads hand crafted elements attributes', () => {
     const el = ['test-element', { val: 'just a test' }]
     expect(JsonML.attr(el, 'val')).to.equal('just a test')
+  })
+})
+
+describe('JsonML.toHTML()', () => {
+  it('serializes well', () => {
+    const output = JsonML.toHTML(testDocument)
+    expect(output).to.equal([
+      '<root><head><title>Wonderful World of Signs</title></head>',
+      '<body><div id=heading><a href=http://signs.com/>Signs Homepage</a></div>',
+      '<article><p>Hello there!</p><img src=foo.png><a href=/next>Next Page</a></article>',
+      '</body></root>'
+    ].join(''))
+  })
+
+  it('throws with bad JsonML structure', () => {
+    expect(() => JsonML.toHTML(false)).to.throw()
+    expect(() => JsonML.toHTML([1, 2, 3])).to.throw()
+    expect(() => JsonML.toHTML(['tag', [1, 2, 3]])).to.throw()
+  })
+
+  it('throws with impossible html structures', () => {
+    expect(() => JsonML.toHTML(['img', { src: 'foo.jpg' }, ['child', {}]])).to.throw()
+  })
+})
+
+describe('JsonML.toXML()', () => {
+  it('serializes well', () => {
+    const output = JsonML.toXML(testDocument)
+    expect(output).to.equal([
+      '<root><head><title>Wonderful World of Signs</title></head>',
+      '<body><div id="heading"><a href="http://signs.com/">Signs Homepage</a></div>',
+      '<article><p>Hello there!</p><img src="foo.png"/><a href="/next">Next Page</a></article>',
+      '</body></root>'
+    ].join(''))
+  })
+
+  it('throws with bad JsonML structure', () => {
+    expect(() => JsonML.toXML(false)).to.throw()
+    expect(() => JsonML.toXML([1, 2, 3])).to.throw()
+    expect(() => JsonML.toXML(['tag', [1, 2, 3]])).to.throw()
   })
 })

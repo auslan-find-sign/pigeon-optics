@@ -84,3 +84,58 @@ exports.attr = function getAttribute (element, attributeName) {
     return adapter.attr(element, attributeName)
   }
 }
+
+const toAttributes = require('../../vibe/to-attributes')
+const escapeText = require('../../vibe/escape-text')
+const escapeAttribute = require('../../vibe/escape-attribute')
+const selfClosingTags = new Set(require('html-tags/void'))
+/**
+ * Given a JsonML element, or a string, render it to a HTML string, suitably escaped and structured
+ * @param {string|Array} element
+ * @returns {string}
+ */
+exports.toHTML = function jsonmlToHTML (element) {
+  if (element && typeof element === 'object' && Array.isArray(element.JsonML)) element = element.JsonML
+  if (typeof element === 'string') return escapeText(element)
+  if (!Array.isArray(element)) throw new Error('Element must be an Array')
+  const [tag, attribs, ...children] = element
+  if (typeof tag !== 'string') throw new Error('First element of Array must be string tag name')
+  if (!attribs || typeof attribs !== 'object' || Array.isArray(attribs)) throw new Error('Second element of Array must be an object of attributes')
+  const isSelfClosing = selfClosingTags.has(tag.toLowerCase())
+
+  const output = [`<${escapeAttribute(tag)}${toAttributes(attribs)}>`]
+  if (isSelfClosing) {
+    if (children.length > 0) throw new Error(`<${tag}> is self closing, children aren't allowed`)
+  } else {
+    children.forEach(child => {
+      output.push(exports.toHTML(child))
+    })
+    output.push(`</${escapeAttribute(tag)}>`)
+  }
+
+  return output.join('')
+}
+
+/**
+ * Given a JsonML element, or a string, render it to an XML string, suitably escaped and structured
+ * @param {string|Array} element
+ * @returns {string}
+ */
+exports.toXML = function jsonmlToXML (element) {
+  if (element && typeof element === 'object' && Array.isArray(element.JsonML)) element = element.JsonML
+  if (typeof element === 'string') return escapeText(element)
+  if (!Array.isArray(element)) throw new Error('Element must be an Array')
+  const [tag, attribs, ...children] = element
+  if (typeof tag !== 'string') throw new Error('First element of Array must be string tag name')
+  if (!attribs || typeof attribs !== 'object' || Array.isArray(attribs)) throw new Error('Second element of Array must be an object of attributes')
+
+  if (children.length > 0) {
+    return [
+      `<${escapeAttribute(tag)}${toAttributes(attribs, { xml: true })}>`,
+      ...children.map(x => this.toXML(x)),
+      `</${escapeAttribute(tag)}>`
+    ].join('')
+  } else {
+    return `<${escapeAttribute(tag)}${toAttributes(attribs, { xml: true })}/>`
+  }
+}

@@ -1,4 +1,67 @@
-(function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({"/Users/phx/GitHub/pigeon-optics/library/workers/environment.js/index.js":[function(require,module,exports){
+(function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({"/Users/phx/GitHub/pigeon-optics/library/vibe/escape-attribute.js":[function(require,module,exports){
+/**
+ * HTML escape an attribute value
+ * @param {string} string
+ * @returns {string}
+ */
+module.exports = function escapeAttribute (string) {
+  return `${string}`
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+},{}],"/Users/phx/GitHub/pigeon-optics/library/vibe/escape-text.js":[function(require,module,exports){
+/**
+ * Escape a string for use as text inside html
+ * @param {string} string
+ * @returns {string}
+ */
+module.exports = function escapeText (string) {
+  return `${string}`
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+}
+
+},{}],"/Users/phx/GitHub/pigeon-optics/library/vibe/hyphenate.js":[function(require,module,exports){
+module.exports = function hyphenateString (string) {
+  return `${string}`
+    .replace(/([a-z])([A-Z])/g, '$1-$2')
+    .toLowerCase()
+}
+
+},{}],"/Users/phx/GitHub/pigeon-optics/library/vibe/to-attributes.js":[function(require,module,exports){
+const stringHyphenate = require('./hyphenate')
+const escapeAttribute = require('./escape-attribute')
+
+/**
+ * convert an object of attributes in to a stringified serialized version, starting with a space, for building tags
+ * @param {object} attributes - object of attributes, like { id: "foo", class: "whatever" }
+ * @param {object} [options] - settings to adjust output format
+ * @param {boolean} [options.xml] - if enabled, attributes will be formatted in an XML compatible style, less compact
+ * @param {boolean} [options.hyphenate] - if true, will convert attribute names from lowerCamelCase to hyphen-case automatically
+ * @returns {string}
+ */
+module.exports = function toAttributes (attributes, { xml = false, hyphenate = false } = {}) {
+  return Object.entries(attributes).map(([key, value]) => {
+    if (hyphenate) key = stringHyphenate(`${key}`)
+    if (value === false) {
+      return ''
+    } else if (value === true && xml !== true) {
+      return ` ${escapeAttribute(`${key}`)}`
+    } else {
+      if (typeof value === 'function') value = value()
+      if (typeof value !== 'string') value = JSON.stringify(value)
+      value = escapeAttribute(`${value}`)
+      if (xml === true || !value.match(/^[^ "'`=<>]+$/mg)) value = `"${value}"`
+      return ` ${escapeAttribute(`${key}`)}=${value}`
+    }
+  }).join('')
+}
+
+},{"./escape-attribute":"/Users/phx/GitHub/pigeon-optics/library/vibe/escape-attribute.js","./hyphenate":"/Users/phx/GitHub/pigeon-optics/library/vibe/hyphenate.js"}],"/Users/phx/GitHub/pigeon-optics/library/workers/environment.js/index.js":[function(require,module,exports){
 (function (global){(function (){
 // Environment script, establishes any APIs available inside of the javascript lens virtual machine
 // This script is run through browserify to embed libraries like css-select
@@ -85,7 +148,97 @@ exports.text = function textContents (element) {
   return adapter.contents(element)
 }
 
-},{"tree-selector":"/Users/phx/GitHub/pigeon-optics/node_modules/tree-selector/lib/cjs/index.js"}],"/Users/phx/GitHub/pigeon-optics/node_modules/tree-selector/lib/cjs/index.js":[function(require,module,exports){
+/**
+ * read attribute value of a JsonML Element
+ * @param {JsonMLElement} element - JsonMLElement, which is an Array
+ * @param {string} attributeName
+ * @returns {string}
+ */
+exports.attr = function getAttribute (element, attributeName) {
+  if (adapter.isTag(element)) {
+    return adapter.attr(element, attributeName)
+  }
+}
+
+const toAttributes = require('../../vibe/to-attributes')
+const escapeText = require('../../vibe/escape-text')
+const escapeAttribute = require('../../vibe/escape-attribute')
+const selfClosingTags = new Set(require('html-tags/void'))
+/**
+ * Given a JsonML element, or a string, render it to a HTML string, suitably escaped and structured
+ * @param {string|Array} element
+ * @returns {string}
+ */
+exports.toHTML = function jsonmlToHTML (element) {
+  if (element && typeof element === 'object' && Array.isArray(element.JsonML)) element = element.JsonML
+  if (typeof element === 'string') return escapeText(element)
+  if (!Array.isArray(element)) throw new Error('Element must be an Array')
+  const [tag, attribs, ...children] = element
+  if (typeof tag !== 'string') throw new Error('First element of Array must be string tag name')
+  if (!attribs || typeof attribs !== 'object' || Array.isArray(attribs)) throw new Error('Second element of Array must be an object of attributes')
+  const isSelfClosing = selfClosingTags.has(tag.toLowerCase())
+
+  const output = [`<${escapeAttribute(tag)}${toAttributes(attribs)}>`]
+  if (isSelfClosing) {
+    if (children.length > 0) throw new Error(`<${tag}> is self closing, children aren't allowed`)
+  } else {
+    children.forEach(child => {
+      output.push(exports.toHTML(child))
+    })
+    output.push(`</${escapeAttribute(tag)}>`)
+  }
+
+  return output.join('')
+}
+
+/**
+ * Given a JsonML element, or a string, render it to an XML string, suitably escaped and structured
+ * @param {string|Array} element
+ * @returns {string}
+ */
+exports.toXML = function jsonmlToXML (element) {
+  if (element && typeof element === 'object' && Array.isArray(element.JsonML)) element = element.JsonML
+  if (typeof element === 'string') return escapeText(element)
+  if (!Array.isArray(element)) throw new Error('Element must be an Array')
+  const [tag, attribs, ...children] = element
+  if (typeof tag !== 'string') throw new Error('First element of Array must be string tag name')
+  if (!attribs || typeof attribs !== 'object' || Array.isArray(attribs)) throw new Error('Second element of Array must be an object of attributes')
+
+  if (children.length > 0) {
+    return [
+      `<${escapeAttribute(tag)}${toAttributes(attribs, { xml: true })}>`,
+      ...children.map(x => this.toXML(x)),
+      `</${escapeAttribute(tag)}>`
+    ].join('')
+  } else {
+    return `<${escapeAttribute(tag)}${toAttributes(attribs, { xml: true })}/>`
+  }
+}
+
+},{"../../vibe/escape-attribute":"/Users/phx/GitHub/pigeon-optics/library/vibe/escape-attribute.js","../../vibe/escape-text":"/Users/phx/GitHub/pigeon-optics/library/vibe/escape-text.js","../../vibe/to-attributes":"/Users/phx/GitHub/pigeon-optics/library/vibe/to-attributes.js","html-tags/void":"/Users/phx/GitHub/pigeon-optics/node_modules/html-tags/void.js","tree-selector":"/Users/phx/GitHub/pigeon-optics/node_modules/tree-selector/lib/cjs/index.js"}],"/Users/phx/GitHub/pigeon-optics/node_modules/html-tags/html-tags-void.json":[function(require,module,exports){
+module.exports=[
+	"area",
+	"base",
+	"br",
+	"col",
+	"embed",
+	"hr",
+	"img",
+	"input",
+	"link",
+	"menuitem",
+	"meta",
+	"param",
+	"source",
+	"track",
+	"wbr"
+]
+
+},{}],"/Users/phx/GitHub/pigeon-optics/node_modules/html-tags/void.js":[function(require,module,exports){
+'use strict';
+module.exports = require('./html-tags-void.json');
+
+},{"./html-tags-void.json":"/Users/phx/GitHub/pigeon-optics/node_modules/html-tags/html-tags-void.json"}],"/Users/phx/GitHub/pigeon-optics/node_modules/tree-selector/lib/cjs/index.js":[function(require,module,exports){
 "use strict";
 function __export(m) {
     for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
