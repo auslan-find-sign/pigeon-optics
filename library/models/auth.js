@@ -196,13 +196,22 @@ exports.exists = async (user) => {
   return await file.exists(exports.userAccountPath(user))
 }
 
-/** list all users known to the system
- * @returns {AsyncIterable} - yields string account names
+/**
+ * list all users known to the system
+ * @yields {string} username
  */
-exports.iterateUsers = async function * () {
+exports.iterate = async function * () {
   for await (const user of file.iterateFolders(['users'])) {
     if (!settings.forbiddenUsernames.includes(user)) {
       yield user
     }
   }
+}
+
+/**
+ * return an array of all users known to the system
+ * @returns {string[]}
+ */
+exports.list = async function () {
+  return await asyncIterableToArray(this.iterate())
 }
