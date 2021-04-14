@@ -5,7 +5,6 @@ const dataset = require('../models/dataset')
 const lens = require('../models/lens')
 
 const codec = require('../models/codec')
-const itToArray = require('../utility/async-iterable-to-array')
 
 const router = express.Router()
 
@@ -37,11 +36,10 @@ router.get('/auth/logout', (req, res) => {
 })
 
 router.get('/users/', async (req, res) => {
-  const list = await itToArray(auth.iterateUsers())
   if (req.accepts('html')) {
-    res.sendVibe('user-list', 'Users', { list })
+    res.sendVibe('user-list', 'Users', { list: auth.iterate() })
   } else {
-    codec.respond(req, res, list)
+    codec.respond(req, res, auth.iterate())
   }
 })
 
