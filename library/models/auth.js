@@ -8,29 +8,27 @@ const unicodeLineSep = require('unicode/category/Zl')
 const unicodeParaSep = require('unicode/category/Zp')
 
 const file = require('./file/cbor')
-const codec = require('./codec')
 const settings = require('./settings')
 const updateEvents = require('../utility/update-events')
 const asyncIterableToArray = require('../utility/async-iterable-to-array')
+const createHttpError = require('http-errors')
 
 exports.basicAuthMiddleware = async (req, res, next) => {
   // handle http basic auth
   if (req.get('Authorization')) {
-    const authHeader = req.get('Authorization')
-    const [type, credsb64] = authHeader.split(' ', 2)
-    if (type.toLowerCase() === 'basic') {
-      const [user, pass] = Buffer.from(credsb64, 'base64').toString().split(':', 2)
+    const [type, credsb64] = req.get('Authorization').split(' ', 2)
+    if (type === 'Basic') {
+      const [user, pass] = Buffer.from(credsb64, 'base64').toString('utf-8').split(':', 2)
       try {
-        req.session.auth = await exports.login(user, pass)
+        Object.assign(req, await exports.login(user, pass))
       } catch (err) {
-        return codec.respond(req, res.status(400), { error: 'Invalid credentials supplied with Basic HTTP authentication' })
+        throw createHttpError.BadRequest(`Invalid credentials supplied with Basic HTTP authentication: ${err.message}`)
       }
     }
   }
 
   if (req.session && req.session.auth && req.session.auth.user) {
-    req.user = req.session.auth.user
-    req.auth = req.session.auth.auth
+    Object.assign(req, req.session.auth)
   }
 
   next()
@@ -46,13 +44,12 @@ exports.ownerParam = (req, res, next, value, id) => {
  * Express middleware to require auth and redirect users to login
  */
 exports.required = (req, res, next) => {
-  if (!req.session || !req.session.auth || !req.session.auth.user) {
+  if (!req.auth || !req.user) {
     if (req.accepts('html')) {
-      return res.redirect(303, uri`/auth?return=${req.originalUrl}`)
+      res.redirect(303, uri`/auth?return=${req.originalUrl}`)
     } else {
-      res.status(401).set('WWW-Authenticate', 'Basic realm="PigeonOptics", charset="UTF-8"]')
-      return codec.respond(req, res, {
-        error: 'This request requires you be logged in with basic auth or a cookie'
+      throw createHttpError(401, 'This request requires you be logged in with basic auth or a cookie', {
+        headers: { 'www-authenticate': 'Basic realm="PigeonOptics", charset="UTF-8"]' }
       })
     }
   } else {
@@ -67,11 +64,11 @@ exports.ownerRequired = (req, res, next) => {
   if (req.owner) {
     return next()
   } else {
-    const msg = { error: 'You need to login as someone with permission to edit this' }
+    const msg = 'You need to login as someone with permission to edit this'
     if (req.accepts('html')) {
-      return res.redirect(303, uri`/auth?err=${msg.err}&return=${req.originalUrl}`)
+      return res.redirect(303, uri`/auth?err=${msg}&return=${req.originalUrl}`)
     } else {
-      return codec.respond(req, res.status(403), msg)
+      throw createHttpError.Forbidden(msg)
     }
   }
 }
