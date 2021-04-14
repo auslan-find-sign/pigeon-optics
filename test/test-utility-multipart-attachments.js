@@ -1,9 +1,11 @@
 const multipart = require('../library/utility/multipart-attachments')
 const express = require('express')
 const crypto = require('crypto')
+const superagent = require('superagent')
 const fs = require('fs')
 const chai = require('chai')
-chai.use(require('chai-http'))
+chai.use(require('chai-as-promised'))
+const { expect } = chai
 
 // test data
 const testBody = {
@@ -41,41 +43,39 @@ app.post('/test', async (req, res) => {
 })
 
 describe('utility/multipart-attachments', function () {
-  it('decodes body as part of form-data', function (done) {
-    chai.request(app)
-      .post('/test')
+  let server
+  before(() => new Promise((resolve, reject) => { server = app.listen(5028, (err) => err ? reject(err) : resolve()) }))
+  after(async () => { server.close() })
+
+  it('decodes body as part of form-data', async function () {
+    const res = await superagent
+      .post('http://localhost:5028/test')
       .attach('body', Buffer.from(JSON.stringify(testBody)), { contentType: 'application/json', filename: 'woo.json' })
-      .end((err, res) => {
-        if (err) return done(err)
 
-        chai.assert.deepEqual(res.body.body, testBody, 'body should roundtrip correctly')
-
-        done()
-      })
+    expect(res.body).to.deep.equal({
+      body: testBody,
+      attachments: {},
+      filenames: {}
+    })
   })
 
-  it('decodes two attachments and body correctly', function (done) {
-    chai.request(app)
-      .post('/test')
+  it('decodes two attachments and body correctly', async function () {
+    const res = await superagent
+      .post('http://localhost:5028/test')
       .attach('body', Buffer.from(JSON.stringify(testBody)), { contentType: 'application/json', filename: 'woo.json' })
       .attach('attachment', Buffer.from(attach1), { contentType: 'video/mp4', filename: 'clip.mp4' })
       .attach('attachment', Buffer.from(attach2), { contentType: 'application/zip', filename: 'lovely-dinner-set.zip' })
-      .end((err, res) => {
-        if (err) return done(err)
 
-        chai.assert.deepEqual(res.body.body, testBody, 'body should roundtrip correctly')
-
-        chai.assert.deepEqual(res.body.filenames, {
-          'clip.mp4': attach1,
-          'lovely-dinner-set.zip': attach2
-        }, 'filenames should be read correctly')
-
-        chai.assert.deepEqual(res.body.attachments, {
-          [hashBuf(attach1)]: attach1,
-          [hashBuf(attach2)]: attach2
-        }, 'attachments should hash correctly')
-
-        done()
-      })
+    expect(res.body).to.deep.equal({
+      body: testBody,
+      filenames: {
+        'clip.mp4': attach1,
+        'lovely-dinner-set.zip': attach2
+      },
+      attachments: {
+        [hashBuf(attach1)]: attach1,
+        [hashBuf(attach2)]: attach2
+      }
+    })
   })
 })
