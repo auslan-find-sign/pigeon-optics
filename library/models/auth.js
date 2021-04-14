@@ -11,6 +11,7 @@ const file = require('./file/cbor')
 const codec = require('./codec')
 const settings = require('./settings')
 const updateEvents = require('../utility/update-events')
+const asyncIterableToArray = require('../utility/async-iterable-to-array')
 
 exports.basicAuthMiddleware = async (req, res, next) => {
   // handle http basic auth
@@ -79,26 +80,30 @@ exports.ownerRequired = (req, res, next) => {
  * @param {string} username
  * @returns {string}
 */
-exports.userFolder = (username) => ['users', username]
+exports.userFolder = function (username) {
+  return ['users', username]
+}
 
 /** Helper function, path inside cbor-file database, where user's account is stored
  * @param {string} username
  * @returns {string}
 */
-exports.userAccountPath = (username) => [...exports.userFolder(username), 'account']
+exports.userAccountPath = function (username) {
+  return [...this.userFolder(username), 'account']
+}
 
 /** check a login attempt for a user account
  * @param {string} username
  * @param {string} password
  * @returns {object} - { user: "string username", auth: "string authorization level" }
  */
-exports.login = async (user, pass) => {
+exports.login = async function (user, pass) {
   let account
 
   try {
-    account = await file.read(exports.userAccountPath(user))
+    account = await file.read(this.userAccountPath(user))
   } catch (err) {
-    throw new Error('Account not found: ' + err.message)
+    throw new Error('Account not found')
   }
 
   const hash = nacl.hash(Buffer.concat([account.passSalt, Buffer.from(`${pass}`), account.passSalt]))
@@ -119,8 +124,8 @@ exports.login = async (user, pass) => {
  * @param {string} password
  * @returns {object} - { user: "string username", auth: "string authorization level" }
  */
-exports.register = async (user, pass, auth = 'user') => {
-  const path = exports.userAccountPath(user)
+exports.register = async function (user, pass, auth = 'user') {
+  const path = this.userAccountPath(user)
   const badChars = "!*'();:@&=+$,/?%#[]`“‘’’”".split('')
   const userChars = user.split('')
 
@@ -156,44 +161,48 @@ exports.register = async (user, pass, auth = 'user') => {
  * @param {string} username
  * @param {string} newPassword
  */
-exports.changePassword = async (user, newPass) => {
-  const path = exports.userAccountPath(user)
-  const account = await file.read(path)
-  account.passSalt = Buffer.from(nacl.randomBytes(64))
-  account.passHash = Buffer.from(nacl.hash(Buffer.concat([account.passSalt, Buffer.from(`${newPass}`), account.passSalt])))
-  await file.write(path, account)
+exports.changePassword = async function (user, newPass) {
+  await file.update(this.userAccountPath(user), account => {
+    if (!account) throw new Error('User not found')
+    account.passSalt = Buffer.from(nacl.randomBytes(64))
+    account.passHash = Buffer.from(nacl.hash(Buffer.concat([account.passSalt, Buffer.from(`${newPass}`), account.passSalt])))
+    return account
+  })
 }
 
 /** Change authorization setting on a user account
  * @param {string} username
  * @param {string} authorization - default "user"
  */
-exports.changeAuth = async (user, auth) => {
-  const path = exports.userAccountPath(user)
-  const account = await file.read(path)
-  account.auth = auth
-  await file.write(path, account)
+exports.changeAuth = async function (user, auth) {
+  await file.update(this.userAccountPath(user), account => {
+    if (!account) throw new Error('User not found')
+    account.auth = auth
+    return account
+  })
 }
 
 /** get a user's profile */
-exports.getProfile = async (user) => {
-  const account = await file.read(exports.userAccountPath(user))
+exports.getProfile = async function (user) {
+  const account = await file.read(this.userAccountPath(user))
+  delete account.passHash
+  delete account.passSalt
   return account
 }
 
 /** delete a user
  * @param {string} username
  */
-exports.delete = async (user) => {
-  await file.delete(exports.userFolder(user))
+exports.delete = async function (user) {
+  await file.delete(this.userFolder(user))
   process.nextTick(() => updateEvents.pathUpdated('/meta/system:system/users'))
 }
 
 /** check if user account exists
  * @param {string} username
  */
-exports.exists = async (user) => {
-  return await file.exists(exports.userAccountPath(user))
+exports.exists = async function (user) {
+  return await file.exists(this.userAccountPath(user))
 }
 
 /**
