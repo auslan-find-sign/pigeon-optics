@@ -6,9 +6,10 @@ const SelfClosingTags = new Set(require('html-tags/void'))
 const Tags = new Set(require('html-tags'))
 const { PassThrough } = require('stream')
 
-const hyphenate = (string) => `${string}`.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase()
-const escapeAttribute = (string) => `${string}`.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-const escapeText = (string) => `${string}`.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+const hyphenate = require('./hyphenate')
+const escapeAttribute = require('./escape-attribute')
+const escapeText = require('./escape-text')
+const toAttributes = require('./to-attributes')
 
 // handle 'data' attribute with object value, converting in to data-prop-name=value1 type of formatting for html data attributes / dataset
 const attributeMapDataConvert = (tagName, key, value) => {
@@ -125,17 +126,7 @@ class VibeBuilder {
       })
     }
 
-    return entries.map(([key, value]) => {
-      if (value === false) {
-        return ''
-      } else if (value === true) {
-        return ` ${escapeAttribute(hyphenate(`${key}`))}`
-      } else {
-        value = escapeAttribute(value)
-        if (!value.match(/^[^ "'`=<>]+$/mg)) value = `"${value}"`
-        return ` ${escapeAttribute(hyphenate(`${key}`))}=${value}`
-      }
-    }).join('')
+    return toAttributes(Object.fromEntries(entries), { hyphenate: true, xml: false })
   }
 
   /** create a html tag with specified name
