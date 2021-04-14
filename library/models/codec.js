@@ -346,8 +346,7 @@ exports.objectHash = (object) => {
  * @param {*} object - object to send back as JSON, CBOR, or a stylised webpage
  */
 exports.respond = async function respond (req, res, object) {
-  const supportedTypes = ['text/html', ...Object.values(respond.handlers).flat()]
-  const bestMatch = req.accepts(supportedTypes)
+  const bestMatch = req.accepts(['text/html', ...Object.keys(exports.mediaTypeHandlers)])
   const handler = exports.for(bestMatch)
 
   if (object[Symbol.asyncIterator]) { // AsyncIterators will stream out as an array or some kind of list
