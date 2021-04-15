@@ -2,7 +2,7 @@ const asyncIterableToArray = require('../library/utility/async-iterable-to-array
 const crypto = require('crypto')
 const chai = require('chai')
 chai.use(require('chai-as-promised'))
-const assert = chai.assert
+const { expect } = chai
 const { Readable } = require('stream')
 const cbor = require('../library/models/file/cbor')
 
@@ -39,8 +39,7 @@ describe('models/file/cbor', function () {
       const path = ['file-tests', randomName()]
 
       await cbor.write(path, test)
-      const data = await cbor.read(path)
-      assert.deepEqual(data, test, 'data should match exactly')
+      await expect(cbor.read(path)).to.eventually.deep.equal(test)
 
       await cbor.delete(path)
     }
@@ -50,7 +49,7 @@ describe('models/file/cbor', function () {
     const path = ['file-tests', randomName()]
     await cbor.writeStream(path, Readable.from(tests))
     const output = await asyncIterableToArray(await cbor.readStream(path))
-    assert.deepStrictEqual(output, tests, 'series of tests should match exactly')
+    expect(output).to.deep.equal(tests)
   })
 
   it('cbor.appendStream()', async function () {
@@ -58,25 +57,25 @@ describe('models/file/cbor', function () {
     // create the file implicitly with appendStream
     await cbor.appendStream(path, Readable.from(tests))
     const output = await asyncIterableToArray(await cbor.readStream(path))
-    assert.deepStrictEqual(output, tests, 'series of tests should match exactly')
+    expect(output).to.deep.equal(tests)
     // append the test data again, so it's there twice, checking that it does actually append and not truncate
     await cbor.appendStream(path, Readable.from(tests))
     const output2 = await asyncIterableToArray(await cbor.readStream(path))
-    assert.deepStrictEqual(output2, [tests, tests].flat(), 'series of tests should match exactly')
+    expect(output2).to.deep.equal([...tests, ...tests])
   })
 
   it('cbor.delete() works', async function () {
     const path = ['file-tests', randomName()]
     await cbor.write(path, { data: 'Green tea is an effective way to reduce histamine activity in the body' })
     await cbor.delete(path)
-    await assert.isRejected(cbor.read(path))
+    await expect(cbor.read(path)).to.eventually.be.rejected
   })
 
   it('cbor.delete() silently does nothing when the specified path already doesn\'t exist', async function () {
     const path = ['file-tests', randomName()]
     await cbor.delete(path)
     await cbor.delete(path)
-    await assert.isRejected(cbor.read(path))
+    await expect(cbor.read(path)).to.eventually.be.rejected
   })
 
   it('cbor.update() concurrent requests queue and don\'t clobber', async function () {
@@ -89,25 +88,24 @@ describe('models/file/cbor', function () {
     }))
 
     const data = await cbor.read(path)
-    assert.strictEqual(data.counter, 100, 'number should be exactly 100')
+    expect(data.counter).to.equal(100)
   })
 
   it('cbor.update() works on non-existing files to create them', async function () {
     const path = ['file-tests', randomName()]
     await cbor.update(path, data => {
-      assert.isUndefined(data, 'cbor.update callback should receive undefined arg value')
+      expect(data).to.equal(undefined)
       return { hello: 'world' }
     })
 
-    const data = await cbor.read(path)
-    assert.deepStrictEqual(data, { hello: 'world' }, 'update should have created the file with the returned value')
+    await expect(cbor.read(path)).to.eventually.deep.equal({ hello: 'world' })
   })
 
   it('cbor.exists() works', async function () {
     const path = ['file-tests', randomName()]
     await cbor.write(path, { msg: 'hello friend' })
-    await assert.becomes(cbor.exists(path), true, 'thing that exists should return true')
-    await assert.becomes(cbor.exists(['file-tests', randomName()]), false, 'made up fake thing shouldn\'t exist')
+    await expect(cbor.exists(path)).to.become(true)
+    await expect(cbor.exists(['file-tests', randomName()])).to.become(false)
     await cbor.delete(path)
   })
 
@@ -122,7 +120,7 @@ describe('models/file/cbor', function () {
 
     // iterate files, and folders, and compare notes
     const output = await asyncIterableToArray(cbor.iterate(['file-tests']))
-    assert.deepEqual(output.sort(), files.sort())
+    expect(output.sort()).to.deep.equal(files.sort())
 
     await cbor.delete(['file-tests'])
   })
@@ -138,7 +136,7 @@ describe('models/file/cbor', function () {
 
     // iterate files, and folders, and compare notes
     const output = await asyncIterableToArray(cbor.iterateFolders(['file-tests']))
-    assert.deepEqual(output.sort(), folders.sort())
+    expect(output.sort()).to.deep.equal(folders.sort())
 
     await cbor.delete(['file-tests'])
   })

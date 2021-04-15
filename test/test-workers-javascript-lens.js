@@ -1,7 +1,8 @@
+/* eslint-disable no-unused-expressions */
 const { LensWorker } = require('../library/workers/interface')
 const chai = require('chai')
 chai.use(require('chai-as-promised'))
-const assert = chai.assert
+const { expect } = chai
 const codec = require('../library/models/codec')
 
 const mapCode = `// this is my test map code
@@ -30,7 +31,7 @@ describe('workers/interface.LensWorker#startup', async function () {
 
     await worker.shutdown()
 
-    assert(startup.map.errors.length > 0, 'startup should return at least one error about the map code syntax')
+    expect(startup.map.errors).to.not.be.empty
   })
 
   it('catches reduce syntax errors', async function () {
@@ -43,7 +44,7 @@ describe('workers/interface.LensWorker#startup', async function () {
 
     await worker.shutdown()
 
-    assert(startup.reduce.errors.length > 0, 'startup should return at least one error about the map code syntax')
+    expect(startup.reduce.errors).to.not.be.empty
   })
 
   it('catches map and reduce syntax errors in the same run', async function () {
@@ -56,8 +57,8 @@ describe('workers/interface.LensWorker#startup', async function () {
 
     await worker.shutdown()
 
-    assert(startup.map.errors.length > 0, 'startup should return at least one error about the map code syntax')
-    assert(startup.reduce.errors.length > 0, 'startup should return at least one error about the map code syntax')
+    expect(startup.map.errors).to.not.be.empty
+    expect(startup.reduce.errors).to.not.be.empty
   })
 
   it('starts up correctly with good code', async function () {
@@ -70,8 +71,8 @@ describe('workers/interface.LensWorker#startup', async function () {
 
     await worker.shutdown()
 
-    assert.strictEqual(startup.map.errors.length, 0, 'there should be no map code errors')
-    assert.strictEqual(startup.reduce.errors.length, 0, 'there should be no reduce code errors')
+    expect(startup.map.errors).to.be.an('array').and.be.empty
+    expect(startup.reduce.errors).to.be.an('array').and.be.empty
   })
 })
 
@@ -101,9 +102,9 @@ describe('workers/interface.LensWorker#map', async function () {
       { id: 'c', data: 'yehaw' }
     ]
 
-    assert.deepStrictEqual(result.outputs, expected, 'outputs should be as expected')
-    assert.deepStrictEqual(result.logs, [], 'there shouldn\'t be any log messages')
-    assert.deepStrictEqual(result.errors, [], 'there shouldn\'t be any errors')
+    expect(result.outputs).to.deep.equal(expected)
+    expect(result.logs).to.be.an('array').and.be.empty
+    expect(result.errors).to.be.an('array').and.be.empty
   })
 
   it('logs from maps and catches throws', async function () {
@@ -112,11 +113,11 @@ describe('workers/interface.LensWorker#map', async function () {
       data: { foo: 'bar', v: 'yehaw', plzthrow: 'nice', plzlog: 'hey' }
     })
 
-    assert.deepStrictEqual(result.logs.length, 1, 'there should be one log output')
-    assert.deepStrictEqual(result.logs[0].args, ['hey'], 'the log should have the right message')
-    assert.deepStrictEqual(result.errors.length, 1, 'there should be one error thrown')
-    assert.deepStrictEqual(result.errors[0].message, 'nice', 'error message should be correct')
-    assert.deepStrictEqual(result.errors[0].type, 'Error', 'error message should be of the Error type')
+    expect(result.logs).to.have.length(1)
+    expect(result.logs[0].args).to.deep.equal(['hey'])
+    expect(result.errors).to.have.length(1)
+    expect(result.errors[0].message).to.equal('nice')
+    expect(result.errors[0].type).to.equal('Error')
   })
 
   after('shutdown worker', async function () {
@@ -139,36 +140,36 @@ describe('workers/interface.LensWorker#reduce', async function () {
   it('reduces correctly', async function () {
     const result = await worker.reduce(10, 20)
 
-    assert.deepStrictEqual(result.value, 30, 'value should be as expected')
-    assert.deepStrictEqual(result.logs, [], 'there shouldn\'t be any log messages')
-    assert.deepStrictEqual(result.errors, [], 'there shouldn\'t be any errors')
+    expect(result.value).to.equal(30)
+    expect(result.logs).to.be.an('array').and.be.empty
+    expect(result.errors).to.be.an('array').and.be.empty
   })
 
   it('reduces captures log messages', async function () {
     const result = await worker.reduce('log', 'foo')
 
-    assert.deepStrictEqual(result.value, 'logfoo', 'value should be as expected')
-    assert.deepStrictEqual(result.logs.length, 1, 'there should be one log message')
-    assert.deepStrictEqual(result.logs[0].args, ['hey', 'whats up', 5], 'the message contents should be correct')
-    assert.deepStrictEqual(result.errors, [], 'there shouldn\'t be any errors')
+    expect(result.value).to.equal('logfoo')
+    expect(result.logs).to.have.length(1)
+    expect(result.logs[0].args).to.deep.equal(['hey', 'whats up', 5])
+    expect(result.errors).to.be.an('array').and.be.empty
   })
 
   it('reduces captures thrown errors', async function () {
     const result = await worker.reduce('we gonna ', 'error')
 
-    assert.deepStrictEqual(result.value, undefined, 'value should be undefined')
-    assert.deepStrictEqual(result.logs, [], 'there should be no logs')
-    assert.deepStrictEqual(result.errors.length, 1, 'there should be an error')
-    assert.deepStrictEqual(result.errors[0].message, 'oops', 'error message should be correct')
-    assert.deepStrictEqual(result.errors[0].type, 'Error', 'error message should be of the Error type')
+    expect(result.value).to.be.undefined
+    expect(result.logs).to.be.an('array').and.be.empty
+    expect(result.errors).to.be.an('array').and.have.length(1)
+    expect(result.errors[0].message).to.equal('oops')
+    expect(result.errors[0].type).to.equal('Error')
   })
 
   it('reduces preserves logs when it catches thrown errors', async function () {
     const result = await worker.reduce('log', 'error')
 
-    assert.deepStrictEqual(result.value, undefined, 'value should be undefined')
-    assert.deepStrictEqual(result.logs.length, 1, 'there should be a log message')
-    assert.deepStrictEqual(result.errors.length, 1, 'there should be an error')
+    expect(result.value).is.undefined
+    expect(result.logs).is.an('array').and.has.length(1)
+    expect(result.errors).is.an('array').and.has.length(1)
   })
 
   after('shutdown worker', async function () {
@@ -179,47 +180,53 @@ describe('workers/interface.LensWorker#reduce', async function () {
 // testing the worker environment code is working inside the worker, more extensive tests in ./test-workers-javascript-environment.js
 // doing tests across the process bridge is slow and irritating to debug when stuff breaks, so it happens in main thread in that suite
 describe('workers/environment.js', () => {
-  it('ivm environment: JsonML.select()', async () => {
-    const worker = new LensWorker()
+  let worker
+  before(async () => {
+    worker = new LensWorker()
     // abuse reduce as a simple way of calling CSS.select in the virtual machine
     const startup = await worker.startup({
       mapType: 'javascript',
       mapCode: '// no thank you',
-      reduceCode: 'return JsonML.select(left, right)'
+      reduceCode: 'return JsonML[left](...right)'
     })
 
-    assert.deepStrictEqual(startup.map.errors, [], 'no errors on startup')
-    assert.deepStrictEqual(startup.reduce.errors, [], 'no errors on startup')
+    expect(startup.map.errors).is.an('array').and.is.empty
+    expect(startup.reduce.errors).is.an('array').and.is.empty
+  })
 
+  it('ivm environment: JsonML.select()', async () => {
     const document = codec.xml.decode('<root><div id="yeah">no</div><span>cool</span></root>')
-    assert.deepStrictEqual(
-      await worker.reduce(document, '#yeah'),
-      { logs: [], errors: [], value: [['div', { id: 'yeah' }, 'no']] },
-      'expected "#yeah" css query to return the only div'
-    )
-
-    await worker.shutdown()
+    const result = await worker.reduce('select', [document, '#yeah'])
+    expect(result).to.deep.equal({ logs: [], errors: [], value: [['div', { id: 'yeah' }, 'no']] })
   })
 
   it('ivm environment: JsonML.text()', async () => {
-    const worker = new LensWorker()
-    const startup = await worker.startup({
-      mapType: 'javascript',
-      mapCode: 'output("result", JsonML.text(data))',
-      reduceCode: 'return left'
-    })
+    const document = { JsonML: ['root', {}, ['div', { id: 'yeah' }, 'no'], ['span', {}, 'cool']] }
+    const res = await worker.reduce('text', [document])
+    expect(res).to.deep.equal({ errors: [], logs: [], value: 'nocool' })
+  })
 
-    assert.deepStrictEqual(startup.map.errors, [], 'no errors on startup')
-    assert.deepStrictEqual(startup.reduce.errors, [], 'no errors on startup')
+  it('ivm environment: JsonML.attr()', async () => {
+    const element = ['div', { id: 'yeah' }, 'no']
+    const res = await worker.reduce('attr', [element, 'id'])
+    expect(res).to.deep.equal({ errors: [], logs: [], value: 'yeah' })
+  })
 
-    const document = codec.xml.decode('<root><div id="yeah">no</div><span>cool</span></root>')
-    assert.deepStrictEqual(document, { JsonML: ['root', {}, ['div', { id: 'yeah' }, 'no'], ['span', {}, 'cool']] }, 'xml decodes as expected')
+  it('ivm environment: JsonML.toHTML()', async () => {
+    const document = { JsonML: ['root', {}, ['div', { id: 'yeah' }, 'no'], ['span', {}, 'cool']] }
+    const expected = '<root><div id=yeah>no</div><span>cool</span></root>'
+    const res = await worker.reduce('toHTML', [document])
+    expect(res).to.deep.equal({ errors: [], logs: [], value: expected })
+  })
 
-    const res = await worker.map({ path: '/datasets/test:test/records/foo', data: document })
-    assert.deepStrictEqual(res.errors, [], 'no errors')
-    assert.deepStrictEqual(res.logs, [], 'no logs')
-    assert.deepStrictEqual(res.outputs, [{ id: 'result', data: 'nocool' }], 'outputs text from inside xml')
+  it('ivm environment: JsonML.toXML()', async () => {
+    const document = { JsonML: ['root', {}, ['div', { id: 'yeah' }, 'no'], ['span', {}, 'cool']] }
+    const expected = '<root><div id="yeah">no</div><span>cool</span></root>'
+    const res = await worker.reduce('toXML', [document])
+    expect(res).to.deep.equal({ errors: [], logs: [], value: expected })
+  })
 
+  after(async () => {
     await worker.shutdown()
   })
 })

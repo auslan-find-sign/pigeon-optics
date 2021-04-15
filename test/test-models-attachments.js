@@ -1,6 +1,6 @@
 const chai = require('chai')
 chai.use(require('chai-as-promised'))
-const assert = chai.assert
+const { expect } = chai
 const crypto = require('crypto')
 const streams = require('stream')
 const fs = require('fs')
@@ -25,7 +25,7 @@ describe('models/attachments', function () {
     const hash = await attachments.writeStream(stream, { linkers: ['/datasets/system:attachments-test/records/writeStream'] })
     const stream2 = streams.Readable.from(pseudorandom('writeStream test', 500)) // 16kb of data
     const hash2 = await attachments.writeStream(stream2, { linkers: ['/datasets/system:attachments-test/records/writeStream2'] })
-    assert(hash.equals(hash2), 'the buffers should be equal')
+    expect(hash).to.deep.equal(hash2)
     mess.push(hash)
   })
 
@@ -34,12 +34,12 @@ describe('models/attachments', function () {
     const hash = await attachments.writeStream(stream, { linkers: ['/datasets/system:attachments-test/records/readMetaTest'] })
     const stream2 = streams.Readable.from(pseudorandom('readMeta test', 100))
     const hash2 = await attachments.writeStream(stream2, { linkers: ['/datasets/system:attachments-test/records/readMetaTest2'] })
-    assert(hash.equals(hash2), 'the hash outputs should be equal')
+    expect(hash).to.deep.equal(hash2)
     const meta = await attachments.readMeta(hash)
-    assert.strictEqual(typeof meta, 'object', 'metadata should be an object')
-    assert.strictEqual(typeof meta.created, 'number', 'created field should be a number')
-    assert.strictEqual(typeof meta.updated, 'number', 'created field should be a number')
-    assert.deepStrictEqual(meta.linkers.sort(), [
+    expect(meta).to.be.a('object')
+    expect(meta.created).to.be.a('number')
+    expect(meta.updated).to.be.a('number')
+    expect(meta.linkers.sort()).to.deep.equal([
       '/datasets/system:attachments-test/records/readMetaTest',
       '/datasets/system:attachments-test/records/readMetaTest2'
     ].sort())
@@ -51,7 +51,7 @@ describe('models/attachments', function () {
     const input = streams.Readable.from(testData)
     const hash = await attachments.writeStream(input, { linkers: ['/datasets/system:attachments-test/records/readStreamTest'] })
     const outputData = await asyncIterableToArray(await attachments.readStream(hash))
-    assert(Buffer.concat(testData).equals(Buffer.concat(outputData)), 'buffers should be equal')
+    expect(Buffer.concat(testData)).to.deep.equal(Buffer.concat(outputData))
     mess.push(hash)
   })
 
@@ -60,23 +60,23 @@ describe('models/attachments', function () {
     const input = streams.Readable.from(testData)
     const hash = await attachments.writeStream(input, { linkers: ['/datasets/system:attachments-test/records/getPathTest'] })
     const outputData = await asyncIterableToArray(await fs.createReadStream(attachments.getPath(hash)))
-    assert(Buffer.concat(testData).equals(Buffer.concat(outputData)), 'buffers should be equal')
+    expect(Buffer.concat(testData)).to.deep.equal(Buffer.concat(outputData))
     mess.push(hash)
   })
 
   it('attachments.has(hash) works', async function () {
-    assert.isFalse(await attachments.has(crypto.randomBytes(32)), 'shouldn\'t have a random made up hash')
+    await expect(attachments.has(crypto.randomBytes(32))).to.eventually.be.false
     const stream = streams.Readable.from(pseudorandom('has test', 100))
     const hash = await attachments.writeStream(stream, { linkers: ['/datasets/system:attachments-test/records/hasTest'] })
-    assert.isTrue(await attachments.has(hash), 'real existing hash should exist')
+    await expect(attachments.has(hash)).to.eventually.be.true
     mess.push(hash)
   })
 
   it('attachments.validate(hash) works to clean out unlinked attachments', async function () {
     for (const hash of mess) {
-      assert.isTrue(await attachments.has(hash), 'attachment mess from previous tests should still exist')
+      await expect(attachments.has(hash)).to.eventually.be.true
       await attachments.validate(hash)
-      assert.isFalse(await attachments.has(hash), 'attachment from test should have been removed')
+      await expect(attachments.has(hash)).to.eventually.be.false
     }
   })
 })

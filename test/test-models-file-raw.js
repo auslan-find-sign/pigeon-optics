@@ -2,8 +2,8 @@ const asyncIterableToArray = require('../library/utility/async-iterable-to-array
 const crypto = require('crypto')
 const chai = require('chai')
 chai.use(require('chai-as-promised'))
+const expect = chai.expect
 const { Readable } = require('stream')
-const assert = chai.assert
 const raw = require('../library/models/file/raw')
 
 const tests = [
@@ -25,8 +25,8 @@ describe('models/file/raw', function () {
 
       await raw.write(path, test)
       const data = await raw.read(path)
-      assert(Buffer.isBuffer(data), 'raw.read() should return a Buffer')
-      assert(test.equals(data), 'data should match exactly')
+      expect(data).is.a('Uint8Array')
+      expect(data.equals(test)).to.equal(true)
 
       await raw.delete(path)
     }
@@ -35,22 +35,23 @@ describe('models/file/raw', function () {
   it('raw.append()', async function () {
     const path = ['file-tests', randomName()]
     for (const test of tests) await raw.append(path, test)
-    assert(Buffer.concat(tests).equals(await raw.read(path)), 'appends should happen in order and be correct')
+    expect(Buffer.concat(tests).equals(await raw.read(path))).to.equal(true)
   })
 
   it('raw.writeStream()', async function () {
     for (const test of tests) {
       const path = ['file-tests', randomName()]
       await raw.writeStream(path, Readable.from(test))
-      const read = await raw.read(path)
-      assert(read.equals(test))
+      const data = await raw.read(path)
+      expect(data.equals(test)).to.equal(true)
     }
   })
 
   it('raw.appendStream()', async function () {
     const path = ['file-tests', randomName()]
     await raw.appendStream(path, Readable.from(tests))
-    assert(Buffer.concat(tests).equals(await raw.read(path)))
+    const readback = await raw.read(path)
+    expect(readback.equals(Buffer.concat(tests))).to.equal(true)
   })
 
   it('raw.appendStream() anticlobbering', async function () {
@@ -58,21 +59,22 @@ describe('models/file/raw', function () {
     const writes = []
     for (const test of tests) writes.push(raw.appendStream(path, Readable.from(test)))
     await Promise.all(writes)
-    assert(Buffer.concat(tests).equals(await raw.read(path)))
+    const readback = await raw.read(path)
+    expect(readback.equals(Buffer.concat(tests))).to.equal(true)
   })
 
   it('raw.delete() works', async function () {
     const path = ['file-tests', randomName()]
     await raw.write(path, Buffer.from('Green tea is an effective way to reduce histamine activity in the body'))
     await raw.delete(path)
-    await assert.isRejected(raw.read(path))
+    await expect(raw.read(path)).to.be.rejected
   })
 
   it('raw.delete() silently does nothing when the specified path already doesn\'t exist', async function () {
     const path = ['file-tests', randomName()]
     await raw.delete(path)
     await raw.delete(path)
-    await assert.isRejected(raw.read(path))
+    await expect(raw.read(path)).to.be.rejected
   })
 
   it('raw.update() concurrent requests queue and don\'t clobber', async function () {
@@ -86,7 +88,7 @@ describe('models/file/raw', function () {
     }))
 
     const buf = await raw.read(path)
-    assert.strictEqual(buf.readUInt16LE(0), 100, 'number should be exactly 100')
+    expect(buf.readUInt16LE(0)).to.equal(100)
   })
 
   it('raw.rename() works', async function () {
@@ -94,19 +96,19 @@ describe('models/file/raw', function () {
     const path2 = ['file-tests', randomName()]
     const testData = crypto.randomBytes(64)
     await raw.write(path1, testData)
-    assert(testData.equals(await raw.read(path1)), 'data should read back correctly from the first location')
+    await expect(raw.read(path1)).to.eventually.deep.equal(testData)
     await raw.rename(path1, path2)
-    assert(testData.equals(await raw.read(path2)), 'data should read back correctly from the new location')
-    assert.isFalse(await raw.exists(path1), 'data shouldn\'t be available at first path')
-    assert.isTrue(await raw.exists(path2), 'data should be available at first path')
+    await expect(raw.read(path2)).to.eventually.deep.equal(testData)
+    await expect(raw.exists(path1)).to.become(false)
+    await expect(raw.exists(path2)).to.become(true)
     await raw.delete(path2)
   })
 
   it('raw.exists() works', async function () {
     const path = ['file-tests', randomName()]
     await raw.write(path, Buffer.from('hello friend'))
-    await assert.becomes(raw.exists(path), true, 'thing that exists should return true')
-    await assert.becomes(raw.exists(['file-tests', randomName()]), false, 'made up fake thing shouldn\'t exist')
+    await expect(raw.exists(path)).to.become(true)
+    await expect(raw.exists(['file-tests', randomName()])).to.become(false)
     await raw.delete(path)
   })
 
@@ -121,7 +123,7 @@ describe('models/file/raw', function () {
 
     // iterate files, and folders, and compare notes
     const output = await asyncIterableToArray(raw.iterate(['file-tests']))
-    assert.deepEqual(output.sort(), files.sort())
+    expect(output.sort()).to.deep.equal(files.sort())
 
     await raw.delete(['file-tests'])
   })
@@ -137,7 +139,7 @@ describe('models/file/raw', function () {
 
     // iterate files, and folders, and compare notes
     const output = await asyncIterableToArray(raw.iterateFolders(['file-tests']))
-    assert.deepEqual(output.sort(), folders.sort())
+    expect(output.sort()).to.deep.equal(folders.sort())
 
     await raw.delete(['file-tests'])
   })

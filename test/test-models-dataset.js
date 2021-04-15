@@ -1,6 +1,6 @@
 const chai = require('chai')
 chai.use(require('chai-as-promised'))
-const assert = chai.assert
+const { expect } = chai
 const crypto = require('crypto')
 const createHttpError = require('http-errors')
 const dataset = require('../library/models/dataset')
@@ -25,7 +25,7 @@ describe('models/dataset', function () {
     await dataset.create(user, name, {
       memo: 'Automated Unit Testing created this dataset to verify internal models are working correctly'
     })
-    assert.isTrue((await dataset.readMeta(user, name)).memo.startsWith('Automated Unit Testing'), 'memo should be preserved in new dataset')
+    await expect(dataset.readMeta(user, name)).eventually.property('memo').does.include('Automated Unit Testing')
   })
 
   it('dataset.write(user, name, recordID, data) works', async function () {
@@ -35,18 +35,17 @@ describe('models/dataset', function () {
   })
 
   it('dataset.read(user, name, recordID) works', async function () {
-    const read = await dataset.read(user, name, 'test-1')
-    assert.deepStrictEqual(read, { hello: 'world' }, 'should read back the same object that was created in the write test')
+    await expect(dataset.read(user, name, 'test-1')).to.eventually.deep.equal({ hello: 'world' })
   })
 
   it('dataset.readMeta(user, name) contains correct versions', async function () {
     const meta = await dataset.readMeta(user, name)
-    assert.hasAllKeys(meta, ['memo', 'version', 'updated', 'created', 'records'])
-    assert.equal(meta.memo, 'Automated Unit Testing created this dataset to verify internal models are working correctly')
-    assert.equal(meta.version, 1, 'version number should be 1')
-    assert.deepStrictEqual(Object.keys(meta.records), ['test-1'])
-    assert.equal(meta.records['test-1'].version, 1)
-    assert.hasAllKeys(meta.records['test-1'], ['hash', 'version', 'links'])
+    expect(meta).to.have.all.keys('memo', 'version', 'updated', 'created', 'records')
+    expect(meta.memo).to.equal('Automated Unit Testing created this dataset to verify internal models are working correctly')
+    expect(meta.version).to.equal(1)
+    expect(meta.records).to.have.all.keys('test-1')
+    expect(meta.records['test-1'].version).to.equal(1)
+    expect(meta.records['test-1']).to.have.all.keys('hash', 'version', 'links')
   })
 
   it('dataset.merge(user, name, records) works as expected', async function () {
@@ -55,110 +54,86 @@ describe('models/dataset', function () {
       'test-3': Buffer.from('looks good?')
     })
     const meta = await dataset.readMeta(user, name)
-    assert.equal(meta.version, 2)
-    assert.hasAllKeys(meta.records, ['test-1', 'test-2', 'test-3'])
-    assert.equal(await dataset.read(user, name, 'test-2'), 1)
-    assert.isTrue(Buffer.isBuffer(await dataset.read(user, name, 'test-3')))
+    expect(meta.version).to.equal(2)
+    expect(meta.records).has.all.keys('test-1', 'test-2', 'test-3')
+    await expect(dataset.read(user, name, 'test-2')).to.eventually.equal(1)
+    await expect(dataset.read(user, name, 'test-3')).to.eventually.be.a('Uint8Array')
   })
 
   it('dataset.list(user)', async function () {
-    await assert.isRejected(dataset.list(crypto.randomBytes(16).toString('hex')), createHttpError.NotFound, 'User doesn\'t exist')
-    await assert.becomes(dataset.list(user), [name], 'listing a real user should provide a real list of datasets')
+    await expect(dataset.list(crypto.randomBytes(16).toString('hex'))).is.rejectedWith(createHttpError.NotFound)
+    await expect(dataset.list(user)).to.eventually.deep.equal([name])
   })
 
   it('dataset.list(user, name)', async function () {
     const list = await dataset.list(user, name)
-    assert.deepStrictEqual(list.map(x => x.id).sort(), ['test-1', 'test-2', 'test-3'].sort(), 'list should list out the right objects')
+    expect(list.map(x => x.id).sort()).to.deep.equal(['test-1', 'test-2', 'test-3'].sort())
     const test3 = list.find(x => x.id === 'test-3')
-    assert.equal(test3.version, 2, 'version number should be correct')
-    assert.isTrue(Buffer.isBuffer(test3.hash), 'hash is a Buffer')
-    assert.equal(test3.hash.length, 32, 'hash length must be correct for sha256')
+    expect(test3.version).to.equal(2)
+    expect(test3.hash).to.be.a('Uint8Array')
+    expect(test3.hash.length).to.equal(32)
     const read = await test3.read()
-    assert.isTrue(Buffer.isBuffer(read))
-    assert.isTrue(read.equals(Buffer.from('looks good?')))
+    expect(read).to.be.a('Uint8Array')
+    expect(read).to.deep.equal(Buffer.from('looks good?'))
   })
 
   it('dataset.overwrite(user, name, records) works as expected', async function () {
     await dataset.overwrite(user, name, { abc: 123, def: 456 })
     const meta = await dataset.readMeta(user, name)
-    assert.equal(meta.version, 3)
-    assert.hasAllKeys(meta.records, ['abc', 'def'])
-    assert.equal(await dataset.read(user, name, 'abc'), 123)
-    assert.equal(await dataset.read(user, name, 'def'), 456)
+    expect(meta.version).to.equal(3)
+    expect(meta.records).has.all.keys('abc', 'def')
+    await expect(dataset.read(user, name, 'abc')).to.eventually.equal(123)
+    await expect(dataset.read(user, name, 'def')).to.eventually.equal(456)
   })
 
   it('dataset.write() with same value doesn\'t change version number', async function () {
     await dataset.write(user, name, 'def', 456)
     const meta = await dataset.readMeta(user, name)
-    assert.equal(meta.version, 4)
-    assert.equal(meta.records.abc.version, 3)
-    assert.equal(meta.records.def.version, 3)
+    expect(meta.version).to.equal(4)
+    expect(meta.records.abc.version).to.equal(3)
+    expect(meta.records.def.version).to.equal(3)
   })
 
   it('dataset.exists() works correctly', async function () {
-    assert.isTrue(await dataset.exists(user, name))
-    assert.isTrue(await dataset.exists(user, name, 'abc'))
-    assert.isTrue(await dataset.exists(user, name, 'def'))
-    assert.isFalse(await dataset.exists(user, name, 'xyz'))
-    assert.isFalse(await dataset.exists(user, name, 'test-1'))
-    assert.isFalse(await dataset.exists(user, 'fake-dataset-doesnt-exist'))
-    assert.isFalse(await dataset.exists(user, 'fake-dataset-doesnt-exist', 'non-existing-record'))
+    await expect(dataset.exists(user, name)).to.eventually.be.true
+    await expect(dataset.exists(user, name, 'abc')).to.eventually.be.true
+    await expect(dataset.exists(user, name, 'def')).to.eventually.be.true
+    await expect(dataset.exists(user, name, 'xyz')).to.eventually.be.false
+    await expect(dataset.exists(user, name, 'test-1')).to.eventually.be.false
+    await expect(dataset.exists(user, 'fake-dataset-doesnt-exist')).to.eventually.be.false
+    await expect(dataset.exists(user, 'fake-dataset-doesnt-exist', 'non-existing-record')).to.eventually.be.false
   })
 
   it('dataset.delete(user, name, record) works', async function () {
     await dataset.delete(user, name, 'def')
     const meta = await dataset.readMeta(user, name)
-    assert.hasAllKeys(meta.records, ['abc'])
-    assert.equal(meta.version, 5)
+    expect(meta.records).has.all.keys('abc')
+    expect(meta.version).does.equal(5)
   })
 
   it('dataset.write() throws for missing hashURLs', async function () {
     const { hashURL } = fakehash()
-
-    try {
-      await dataset.write(user, name, 'with-attachment', {
-        type: 'just a test',
-        file: hashURL
-      })
-    } catch (err) {
-      return assert(err instanceof createHttpError.BadRequest, 'should throw a bad request error')
-    }
-    assert(false, 'shouldn\'t reach this point')
+    const prom = dataset.write(user, name, 'attach', { file: hashURL })
+    await expect(prom).to.be.rejectedWith(createHttpError.BadRequest)
   })
 
   it('dataset.merge() throws for missing hashURLs', async function () {
     const { hashURL } = fakehash()
-
-    try {
-      await dataset.merge(user, name, {
-        record1: { msg: 'just a test' },
-        record2: { file: hashURL }
-      })
-    } catch (err) {
-      return assert(err instanceof createHttpError.BadRequest, 'should throw a bad request error')
-    }
-    assert(false, 'shouldn\'t reach this point')
+    const prom = dataset.merge(user, name, { r1: { msg: 'test' }, r2: { file: hashURL } })
+    await expect(prom).to.be.rejectedWith(createHttpError.BadRequest)
   })
 
   it('dataset.overwrite() throws for missing hashURLs', async function () {
     const { hashURL } = fakehash()
-
-    try {
-      await dataset.overwrite(user, name, {
-        recordA: { msg: 'just a test' },
-        recordB: { file: hashURL }
-      })
-    } catch (err) {
-      return assert(err instanceof createHttpError.BadRequest, 'should throw a bad request error')
-    }
-    assert(false, 'shouldn\'t reach this point')
+    const prom = dataset.overwrite(user, name, { A: { msg: 'test' }, B: { file: hashURL } })
+    await expect(prom).to.be.rejectedWith(createHttpError.BadRequest)
   })
 
   it('dataset.delete(user, name) works', async function () {
-    assert.isTrue(await dataset.exists(user, name))
-    assert.isTrue(await dataset.exists(user, name, 'abc'))
+    await expect(dataset.exists(user, name)).to.eventually.be.true
+    await expect(dataset.exists(user, name, 'abc')).to.eventually.be.true
     await dataset.delete(user, name)
-    assert.isFalse(await dataset.exists(user, name))
-    assert.isFalse(await dataset.exists(user, name, 'abc'))
+    await expect(dataset.exists(user, name)).to.eventually.be.false
+    await expect(dataset.exists(user, name, 'abc')).to.eventually.be.false
   })
 })
