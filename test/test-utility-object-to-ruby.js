@@ -1,5 +1,5 @@
 const objectToRuby = require('../library/utility/object-to-ruby')
-const assert = require('assert')
+const { expect } = require('chai')
 
 /* eslint-disable */
 const tests = {
@@ -31,7 +31,7 @@ describe('utility/object-to-ruby', function () {
   for (const [expects, obj] of Object.entries(tests)) {
     it(`encode to ${expects}`, function () {
       const output = objectToRuby(obj)
-      assert.strictEqual(output, expects, 'encoded value should match ruby encoding goal')
+      expect(output).does.equal(expects)
     })
   }
 })

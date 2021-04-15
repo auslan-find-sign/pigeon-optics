@@ -1,6 +1,6 @@
 const chai = require('chai')
 chai.use(require('chai-as-promised'))
-const assert = chai.assert
+const { expect } = chai
 const codec = require('../library/models/codec')
 const dataset = require('../library/models/dataset')
 const lens = require('../library/models/lens')
@@ -30,7 +30,7 @@ describe('models/lens', function () {
       reduceCode: 'return [...left, ...right].sort()',
       inputs: [codec.path.encode('datasets', user, datasetName)]
     })
-    assert.isTrue((await lens.readMeta(user, lensName)).memo.startsWith('Automated Unit Testing'), 'memo should be preserved in new dataset')
+    await expect(lens.readMeta(user, lensName)).eventually.is.an('object').with.property('memo').that.includes('Automated Unit Testing')
   })
 
   it('lens.build(user, name) works', async function () {
@@ -39,9 +39,9 @@ describe('models/lens', function () {
 
     const data = {}
     for (const { id, read } of list) data[id] = await read()
-    assert.deepStrictEqual(data, {
-      cat: ['abc', 'ghi'].sort(),
-      dog: ['abc', 'def', 'ghi'].sort(),
+    expect(data).does.deep.equal({
+      cat: ['abc', 'ghi'],
+      dog: ['abc', 'def', 'ghi'],
       mango: ['def']
     })
   })
@@ -54,24 +54,24 @@ describe('models/lens', function () {
     const logs = {}
     for await (const log of lens.iterateLogs(user, lensName)) logs[codec.path.decode(log.input).recordID] = log
 
-    assert.strictEqual(logs.abc.logs.length, 0, 'abc shouldn\'t have logged anything')
-    assert.strictEqual(logs.abc.errors.length, 0, 'abc shouldn\'t have errored anything')
-    assert.strictEqual(logs.def.logs.length, 1, 'def should have logged one thing')
-    assert.strictEqual(logs.def.errors.length, 0, 'def shouldn\'t have errored')
-    assert.strictEqual(logs.ghi.logs.length, 0, 'ghi shouldn\'t have logged')
-    assert.strictEqual(logs.ghi.errors.length, 1, 'ghi should have errored')
-    assert.strictEqual(logs.def.logs[0].type, 'log', 'log type should be "log"')
-    assert.deepStrictEqual(logs.def.logs[0].args, ['log test'])
-    assert.strictEqual(logs.ghi.errors[0].type, 'Error', 'error.type should === "Error"')
-    assert.strictEqual(logs.ghi.errors[0].message, 'error test', 'error.message should be "error test" exactly')
+    expect(logs.abc.logs).is.an('array').and.has.length(0)
+    expect(logs.abc.errors).is.an('array').and.has.length(0)
+    expect(logs.def.logs).is.an('array').and.has.length(1)
+    expect(logs.def.errors).is.an('array').and.has.length(0)
+    expect(logs.ghi.logs).is.an('array').and.has.length(0)
+    expect(logs.ghi.errors).is.an('array').and.has.length(1)
+    expect(logs.def.logs[0].type).does.equal('log')
+    expect(logs.ghi.errors[0].type).does.equal('Error')
+    expect(logs.ghi.errors[0].message).does.equal('error test')
+    expect(logs.def.logs[0].args).is.an('array').and.deep.equals(['log test'])
   })
 
   it('lens.delete(user, name) works', async function () {
-    assert.isTrue(await lens.exists(user, lensName))
-    assert.isTrue(await lens.exists(user, lensName, 'cat'))
+    await expect(lens.exists(user, lensName)).is.eventually.ok
+    await expect(lens.exists(user, lensName, 'cat')).is.eventually.ok
     await lens.delete(user, lensName)
-    assert.isFalse(await lens.exists(user, lensName))
-    assert.isFalse(await lens.exists(user, lensName, 'cat'))
+    await expect(lens.exists(user, lensName)).is.eventually.not.ok
+    await expect(lens.exists(user, lensName, 'cat')).is.eventually.not.ok
     await dataset.delete(user, datasetName)
   })
 })
