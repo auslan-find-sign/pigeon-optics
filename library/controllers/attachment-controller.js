@@ -5,6 +5,7 @@ const codec = require('../models/codec')
 
 // get a list of datasets owned by a specific user
 router.get('/attachments/:hash([0-9A-Fa-f]{64})', async (req, res) => {
+  const release = attachments.hold(req.params.hash)
   res.sendFile(attachments.getPath(req.params.hash), {
     immutable: true,
     maxAge: '1 year',
@@ -12,6 +13,9 @@ router.get('/attachments/:hash([0-9A-Fa-f]{64})', async (req, res) => {
       'Content-Security-Policy': 'sandbox',
       'Content-Type': req.query.type ? `${req.query.type}` : 'application/octet-stream'
     }
+  }, function done (err) {
+    if (err) console.warn('error during attachment download:', err)
+    release()
   })
 })
 

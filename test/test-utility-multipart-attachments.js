@@ -78,4 +78,44 @@ describe('utility/multipart-attachments', function () {
       }
     })
   })
+
+  it('does it again without clobbering issues', async function () {
+    const res = await superagent
+      .post('http://localhost:5028/test')
+      .attach('body', Buffer.from(JSON.stringify(testBody)), { contentType: 'application/json', filename: 'woo.json' })
+      .attach('attachment', Buffer.from(attach1), { contentType: 'video/mp4', filename: 'clip.mp4' })
+      .attach('attachment', Buffer.from(attach2), { contentType: 'application/zip', filename: 'lovely-dinner-set.zip' })
+
+    expect(res.body).to.deep.equal({
+      body: testBody,
+      filenames: {
+        'clip.mp4': attach1,
+        'lovely-dinner-set.zip': attach2
+      },
+      attachments: {
+        [hashBuf(attach1)]: attach1,
+        [hashBuf(attach2)]: attach2
+      }
+    })
+  })
+
+  it("understands 'file' field name as well, as a synonym for attachment", async function () {
+    const res = await superagent
+      .post('http://localhost:5028/test')
+      .attach('body', Buffer.from(JSON.stringify(testBody)), { contentType: 'application/json', filename: 'woo.json' })
+      .attach('file', Buffer.from(attach1), { contentType: 'video/mp4', filename: 'clip.mp4' })
+      .attach('file', Buffer.from(attach2), { contentType: 'application/zip', filename: 'lovely-dinner-set.zip' })
+
+    expect(res.body).to.deep.equal({
+      body: testBody,
+      filenames: {
+        'clip.mp4': attach1,
+        'lovely-dinner-set.zip': attach2
+      },
+      attachments: {
+        [hashBuf(attach1)]: attach1,
+        [hashBuf(attach2)]: attach2
+      }
+    })
+  })
 })

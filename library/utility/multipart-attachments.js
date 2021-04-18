@@ -13,16 +13,14 @@ const uploadEngine = {
   _handleFile: function (req, file, cb) {
     if (file.fieldname === 'body') {
       return memStore._handleFile(req, file, cb)
-    } else if (file.fieldname === 'attachment') {
-      attachments.writeStream(file.stream, { linkers: [] }).then(hash => {
-        cb(null, { path: attachments.getPath(hash), hash })
+    } else {
+      attachments.writeStream(file.stream, { linkers: [] }).then(({ hash, release }) => {
+        cb(null, { path: attachments.getPath(hash), hash, release })
       }).catch(err => cb(err))
     }
   },
   _removeFile: async function (req, file, cb) {
-    if (file.hash) {
-      await attachments.validate(file.hash)
-    }
+    if (file.release) file.release()
     cb(null)
   }
 }
@@ -32,7 +30,8 @@ const multerInstance = multer({
   storage: uploadEngine
 }).fields([
   { name: 'body', maxCount: 1 },
-  { name: 'attachment' }
+  { name: 'attachment' },
+  { name: 'file' }
 ])
 
 const postProcess = async function (req, res, next) {
@@ -41,18 +40,19 @@ const postProcess = async function (req, res, next) {
   const tasks = []
 
   if (req.files) {
-    if (Array.isArray(req.files.attachment)) {
-      for (const file of req.files.attachment) {
-        if (file.originalname) req.attachedFilesByName[file.originalname] = file
-        if (file.hash) req.attachedFilesByHash[file.hash.toString('hex')] = file
-      }
-
-      // clean up after request finishes
-      finished(res, async () => {
-        for (const file of req.files.attachment) {
-          if (file.hash) await attachments.validate(file.hash)
+    if (Array.isArray(req.files.attachment) || Array.isArray(req.files.file)) {
+      for (const file of [...(req.files.attachment || []), ...(req.files.file || [])]) {
+        if (file.originalname) {
+          req.attachedFilesByName[file.originalname] = file
         }
-      })
+
+        const hexHash = file.hash.toString('hex')
+        req.attachedFilesByHash[hexHash] = file
+        // if file has a release function to release reference hold and allow GC, call it when the response is finished
+        if (typeof file.release === 'function') {
+          finished(res, file.release)
+        }
+      }
     }
 
     if (req.files.body && req.files.body[0]) {

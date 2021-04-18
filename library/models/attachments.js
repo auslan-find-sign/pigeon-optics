@@ -3,12 +3,17 @@
  */
 const assert = require('assert')
 const readPath = require('./read-path')
+const HashThrough = require('hash-through')
+const crypto = require('crypto')
+const tq = require('tiny-function-queue')
 
+// final location blobs are moved in to
 const blobStore = require('./file/blob').instance({
   extension: '.data',
   rootPath: ['attachments', 'blobs']
 })
 
+// metadata storage for blobs
 const metaStore = require('./file/cbor').instance({
   rootPath: ['attachments', 'meta']
 })
@@ -30,23 +35,39 @@ exports.getPath = function (hash) {
  * Write a stream of arbitrary data to the attachment store
  * @param {Readable} stream Readable stream to write to attachment store
  * @param {object} meta metadata object, importantly containing linkers array
+ * @returns {{hash, release}} - hash is a buffer of sha256 of blob's contents, release is a function which triggers GC
  * @async
  */
 exports.writeStream = async function (stream, meta) {
   assert(meta && typeof meta === 'object', 'meta argument must be an object')
   assert(Array.isArray(meta.linkers), 'meta object must contain a linkers property which is an array')
 
-  const hash = await blobStore.writeStream(stream)
-  await metaStore.update([hash.toString('hex')], oldValue => {
-    return {
-      created: Date.now(),
-      ...oldValue || {},
-      updated: Date.now(),
-      ...meta,
-      linkers: [...new Set([...(oldValue || {}).linkers || [], ...meta.linkers])]
-    }
+  const tempPath = [`attachment-write-stream-temp-${crypto.randomBytes(20).toString('hex')}`]
+  const hasher = new HashThrough(blobStore.getHashObject)
+  await blobStore.raw.writeStream(tempPath, stream.pipe(hasher))
+  const hash = hasher.digest()
+  const hexHash = hash.toString('hex')
+  const dataPath = [hexHash]
+  const release = exports.hold(hexHash)
+
+  return await tq.lockWhile(['attachments', hexHash], async () => {
+    await metaStore.update([hexHash], async oldValue => {
+      try {
+        await blobStore.raw.rename(tempPath, dataPath)
+      } catch (err) {
+        await blobStore.raw.delete(tempPath)
+      }
+
+      return {
+        created: Date.now(),
+        ...oldValue || {},
+        updated: Date.now(),
+        ...meta,
+        linkers: [...new Set([...(oldValue || {}).linkers || [], ...meta.linkers])]
+      }
+    })
+    return { hash, release }
   })
-  return hash
 }
 
 /**
@@ -76,6 +97,23 @@ exports.readMeta = async function (hash) {
 }
 
 /**
+ * Add a link to an attachment
+ * @param {Buffer|string} hash - attachment content hash
+ * @param {string} dataPath - path to record linking to attachment
+ */
+exports.link = async function (hash, dataPath) {
+  const hexHash = hash.toString('hex')
+  return await tq.lockWhile(['attachments', hexHash], async () => {
+    await metaStore.update([hexHash], meta => {
+      if (!meta) throw new Error('Cannot link non-existant attachment')
+      meta.updated = Date.now()
+      meta.linkers.push(dataPath)
+      return meta
+    })
+  })
+}
+
+/**
  * check if attachment store has the requested item
  * @param {Buffer|string} hash
  * @returns {boolean}
@@ -85,7 +123,54 @@ exports.has = async function (hash) {
   if (typeof hash === 'string') hash = Buffer.from(hash, 'hex')
   assert(Buffer.isBuffer(hash), 'hash argument must be a buffer or hex string')
 
-  return await blobStore.exists(hash)
+  return (await Promise.all([
+    blobStore.exists(hash),
+    metaStore.exists([hash.toString('hex')])
+  ])).every(x => x === true)
+}
+
+/**
+ * hold on to an attachment, don't let it get garbage collected until the callback is called
+ * triggers .validate() when all hold references are released, clearing out the data unless it
+ * has linkers retaining it in filesystem.
+ * @param {Buffer|string} hash - buffer or hex string hash of attachment to hold on to
+ * @returns {async function release ()}
+ */
+const holding = {}
+exports.hold = function (hash) {
+  if (Buffer.isBuffer(hash)) hash = hash.toString('hex')
+  if (hash in holding) {
+    holding[hash] += 1
+  } else {
+    holding[hash] = 1
+  }
+
+  // create warning here to get a good stacktrace
+  const warning = new Error('attachment.hold called, but release wasn\'t called within 10 seconds')
+  const warnTimer = setTimeout(() => { console.warn(warning) }, 10000)
+
+  let released = false
+  /**
+   * release hold on attachment, if no holds remain, will validate and possibly remove it from disk
+   * if there are no linker documents to retain it. Async, resolves after all work is done (including possible deletion)
+   * @returns {boolean} - false if the attachment stayed on disk, true if it was removed from disk
+   * @async
+   */
+  return async function release () {
+    if (released) {
+      console.warn('attachments.hold() => release() called multiple times')
+      return undefined
+    }
+    released = true
+    clearTimeout(warnTimer)
+    holding[hash] -= 1
+    if (holding[hash] === 0) {
+      delete holding[hash]
+      return !(await exports.validate(hash))
+    } else {
+      return false
+    }
+  }
 }
 
 /**
@@ -98,22 +183,18 @@ exports.has = async function (hash) {
 exports.validate = async function (hash) {
   if (typeof hash === 'string') hash = Buffer.from(hash, 'hex')
   assert(Buffer.isBuffer(hash), 'hash argument must be a buffer or hex string')
+  const hexHash = hash.toString('hex')
 
   let retain = false
-  await metaStore.update([hash.toString('hex')], async meta => {
-    if (meta === undefined) {
-      return undefined // the attachment doesn't even exist. whatever
-    } else {
+  await metaStore.update([hexHash], async meta => {
+    if (meta !== undefined) {
       const newLinkers = []
-      const hashPath = `/${hash.toString('hex').toLowerCase()}`
+      const hashURL = `hash://sha256/${hexHash.toLowerCase()}`
       for await (const { path, links } of readPath.meta(meta.linkers)) {
         if (links && Array.isArray(links)) {
           for (const link of links) {
-            const linkURL = new URL(link)
-            if (linkURL.protocol.toLowerCase() === 'hash:' && linkURL.host.toLowerCase() === 'sha256') {
-              if (linkURL.pathname.toLowerCase() === hashPath) {
-                newLinkers.push(path)
-              }
+            if (link.toLowerCase().startsWith(hashURL)) {
+              newLinkers.push(path)
             }
           }
         }
@@ -128,12 +209,11 @@ exports.validate = async function (hash) {
   })
 
   // if we found valid linkers, keep the attachment
-  if (!retain) {
-    await Promise.all([
-      blobStore.delete(hash),
-      metaStore.delete([hash.toString('hex')])
-    ])
-  }
+  await tq.lockWhile(['attachments', hexHash], async () => {
+    if (!retain && !(hexHash in holding)) {
+      await Promise.all([blobStore.delete(hash), metaStore.delete([hexHash])])
+    }
+  })
 
   return retain
 }

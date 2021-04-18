@@ -78,10 +78,10 @@ exports.writeStream = async function (stream) {
   await this.raw.writeStream(tempPath, stream.pipe(hasher))
   const hash = hasher.digest()
   const dataPath = [hash.toString('hex')]
-  if (await this.raw.exists(dataPath)) {
-    await this.raw.delete(tempPath)
-  } else {
+  try {
     await this.raw.rename(tempPath, dataPath)
+  } catch (err) {
+    await this.raw.delete(tempPath)
   }
   return hash
 }
