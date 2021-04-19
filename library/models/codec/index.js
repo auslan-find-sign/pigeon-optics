@@ -7,6 +7,7 @@ exports.jsonLines = require('./json-lines')
 exports.yaml = require('./yaml')
 exports.msgpack = require('./msgpack')
 exports.xml = require('./xml')
+exports.html = require('./html')
 
 exports.path = require('./path')
 exports.objectHash = require('./object-hash')

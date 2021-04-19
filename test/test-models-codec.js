@@ -155,6 +155,28 @@ describe('models/codec.xml', function () {
   })
 })
 
+describe('models/codec.html', () => {
+  it('can encode and decode a simple page', () => {
+    const testPage = [
+      '<!DOCTYPE html>',
+      '<html><head><title>Hello World</title></head>',
+      '<body><p id="universe">how you doing??</p><!-- comments get stripped --></body>',
+      '</html>'
+    ].join('\n')
+
+    const dec = codec.html.decode(testPage)
+    const enc = codec.html.encode(dec)
+    const roundtrip = codec.html.decode(enc)
+    expect(dec).to.deep.equal(roundtrip)
+    expect(dec).to.deep.equal({
+      JsonML: ['html',
+        ['head', ['title', 'Hello World']],
+        ['body', ['p', { id: 'universe' }, 'how you doing??']]
+      ]
+    })
+  })
+})
+
 describe('models/codec streaming mode', function () {
   // json doesn't have a decoder currently, special case
   it('codec.json.encoder() works', async function () {
