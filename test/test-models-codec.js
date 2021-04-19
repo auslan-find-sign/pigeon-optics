@@ -240,11 +240,11 @@ describe('models/codec.for()', () => {
   })
 
   it('looks up by extension', function () {
-    expect(codec.for('json')).to.equal(codec.json)
-    expect(codec.for('cbor')).to.equal(codec.cbor)
-    expect(codec.for('msgpack')).to.equal(codec.msgpack)
-    expect(codec.for('yaml')).to.equal(codec.yaml)
-    expect(codec.for('jsonl')).to.equal(codec.jsonLines)
-    expect(codec.for('xml')).to.equal(codec.xml)
+    expect(codec.for('/path/to/some-file.json')).to.equal(codec.json)
+    expect(codec.for('/path/to/some-file.cbor')).to.equal(codec.cbor)
+    expect(codec.for('/path/to/some-file.msgpack')).to.equal(codec.msgpack)
+    expect(codec.for('/path/to/some-file.yaml')).to.equal(codec.yaml)
+    expect(codec.for('/path/to/some-file.jsonl')).to.equal(codec.jsonLines)
+    expect(codec.for('/path/to/some-file.xml')).to.equal(codec.xml)
   })
 })
