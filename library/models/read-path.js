@@ -1,11 +1,7 @@
 /**
  * Read data from a dataset or viewport or anything else that can show up in the changelog
  */
-const datasets = require('./dataset')
-const lenses = require('./lens')
-const metaVFS = require('./meta-vfs')
 const codec = require('./codec')
-const sources = { datasets, lenses, meta: metaVFS }
 
 /** ReadPathOutput is what readPath yields
  * @typedef {Object} ReadPathOutput
@@ -41,6 +37,12 @@ async function * readPath (path) {
  */
 readPath.meta = async function * readPathMeta (path) {
   if (typeof path === 'string') {
+    const sources = {
+      datasets: require('./dataset'),
+      lenses: require('./lens'),
+      meta: require('./meta-vfs')
+    }
+
     const params = codec.path.decode(path)
     const source = sources[params.source]
 
@@ -79,6 +81,13 @@ readPath.meta = async function * readPathMeta (path) {
 readPath.exists = async function readPathExists (path) {
   const params = codec.path.decode(path)
   if (!params) return false
+
+  const sources = {
+    datasets: require('./dataset'),
+    lenses: require('./lens'),
+    meta: require('./meta-vfs')
+  }
+
   const source = sources[params.source]
   if (source.recordID) {
     return await source.exists(params.user, params.name, params.recordID)
