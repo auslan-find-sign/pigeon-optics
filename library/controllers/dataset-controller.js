@@ -7,6 +7,7 @@ const dataset = require('../models/dataset')
 const uri = require('encodeuricomponent-tag')
 const createError = require('http-errors')
 const assert = require('assert')
+const fs = require('fs/promises')
 const multipartAttachments = require('../utility/multipart-attachments')
 
 // add req.owner boolean for any routes with a :user param
@@ -222,20 +223,42 @@ router.all('/datasets/:user\\::name/records/:recordID', multipartAttachments, as
   }
 })
 
-router.get('/datasets/:user\\::name/records/:recordID/raw.:format', multipartAttachments, async (req, res) => {
+// import individual json, yaml, cbor, or xml files as individual records named from their filename
+router.all('/datasets/:user\\::name/import/files', auth.ownerRequired, multipartAttachments, async (req, res) => {
+  const state = {}
+
+  if (req.method === 'PUT') {
+    state.wroteCount = 0
+    for (const filename in req.attachmentsByFilename) {
+      const fileCodec = codec.for(filename.toLowerCase())
+      if (fileCodec) {
+        const ext = fileCodec.extensions.find(x => filename.endsWith(`.${x}`))
+        const recordID = filename.slice(0, filename.length - (ext.length + 1))
+        const recordData = fileCodec.decode(await fs.readFile(req.attachmentsByFilename[filename].path))
+        // todo: make some kind of input analogy to dataset.iterate that consumes async iterators or streams, to do this in one write
+        await dataset.write(req.params.user, req.params.name, recordID, recordData)
+        state.wroteCount += 1
+      }
+    }
+  }
+
+  res.sendVibe('dataset-import-files', 'Import Files', state)
+})
+
+router.get(`/datasets/:user\\::name/records/:recordID/raw.:format(${codec.exts.join('|')})?`, multipartAttachments, async (req, res) => {
   const record = await dataset.read(req.params.user, req.params.name, req.params.recordID)
   const format = req.params.format || req.query.type
   const encoder = codec.for(format)
 
-  if (encoder && encoder.encode) {
-    res.type(encoder.handles[0])
+  if (typeof record === 'string' || Buffer.isBuffer(record)) {
+    res.type(format || typeof record === 'string' ? 'text/plain' : 'application/octet-stream')
     res.set('Content-Security-Policy', 'sandbox')
-    res.send(encoder.encode(record))
+    res.send(record)
   } else {
-    if (typeof record === 'string' || Buffer.isBuffer(record)) {
-      res.type(format || typeof record === 'string' ? 'text/plain' : 'application/octet-stream')
+    if (encoder && encoder.encode) {
+      res.type(encoder.handles[0])
       res.set('Content-Security-Policy', 'sandbox')
-      res.send(record)
+      res.send(encoder.encode(record))
     } else {
       throw createError.InternalServerError('No way to encode content to this type')
     }

@@ -12,15 +12,22 @@ module.exports = (req, data, error = null) => {
     v.form({ class: 'simple-form', method: 'PUT', action: data.create ? '' : uri`/datasets/${req.params.user}:${req.params.name}/configuration` }, v => {
       v.panel(v => {
         v.header(v => {
-          v.breadcrumbs(v => {
-            v.a('Datasets', { href: '/datasets/' })
-            v.iconLink('cassette', 'Create Dataset', { href: uri`/datasets/create` })
-          })
+          if (data.create) {
+            v.breadcrumbs(v => {
+              v.a('Datasets', { href: '/datasets/' })
+              v.iconLink('cassette', 'Create Dataset', { href: uri`/datasets/create` })
+            })
+          } else {
+            v.breadcrumbs(v => {
+              v.a('Datasets', { href: '/datasets/' })
+              v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}` })
+              v.iconLink('cassette', req.params.name, { href: uri`/datasets/${req.params.user}:${req.params.name}/` })
+            })
 
-          if (req.owner && !data.create) {
             v.panelTabs(
               { label: 'View', href: uri`/datasets/${req.params.user}:${req.params.name}/` },
-              { label: 'Edit', href: uri`/datasets/${req.params.user}:${req.params.name}/configuration`, current: true }
+              { label: 'Edit', href: uri`/datasets/${req.params.user}:${req.params.name}/configuration`, current: true },
+              { label: 'Import', href: uri`/datasets/${req.params.user}:${req.params.name}/import/files`, current: true }
             )
           }
         })

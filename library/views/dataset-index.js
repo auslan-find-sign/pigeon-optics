@@ -21,7 +21,8 @@ module.exports = (req, { config }) => {
         if (req.owner) {
           v.panelTabs(
             { label: 'View', href: uri`/datasets/${req.params.user}:${req.params.name}/`, current: true },
-            { label: 'Edit', href: uri`/datasets/${req.params.user}:${req.params.name}/configuration` }
+            { label: 'Edit', href: uri`/datasets/${req.params.user}:${req.params.name}/configuration` },
+            { label: 'Import', href: uri`/datasets/${req.params.user}:${req.params.name}/import/files` }
           )
         }
       })
