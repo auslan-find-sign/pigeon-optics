@@ -92,7 +92,7 @@ function streamArchive (dataPath, archiveType, encoder, includeAttachments) {
  * ?at=(number) subsets the response to omit data field on any entries whose version number is less than the number
  * provided, allowing for more efficient pull syncing
  */
-router.get('/:source(datasets|lenses)/:user\\::name/export.:format?', async (req, res) => {
+router.get(`/:source(datasets|lenses)/:user\\::name/export.:format(${codec.exts.join('|')})?`, async (req, res) => {
   const path = codec.path.encode(req.params)
 
   if (!await readPath.exists(path)) {
@@ -112,7 +112,7 @@ router.get('/:source(datasets|lenses)/:user\\::name/export.:format?', async (req
 /**
  * export a dataset/viewport output as a zip file
  */
-router.get('/:source(datasets|lenses)/:user\\::name/archive.:format.zip', async (req, res) => {
+router.get(`/:source(datasets|lenses)/:user\\::name/archive.:format(${codec.exts.join('|')}).zip`, async (req, res) => {
   const path = codec.path.encode(req.params)
 
   if (!await readPath.exists(path)) {
