@@ -108,83 +108,69 @@ exports.write = async function (user, name, recordID, data) {
   assert(data !== undefined, 'Records cannot be set to undefined')
   assert(data !== null, 'Records cannot be set to null')
 
-  // apply source specific validation rules
-  await this.validateRecord(recordID, data)
+  await this.writeEntries(user, name, [[recordID, data]])
+}
 
-  // calculate links
-  const links = await recordStructure.listHashURLs(data)
+/**
+ * Writes an entries list like Object.entries() format, to the dataset, in a merge-like fashion.
+ * Undefined or null value causes deletions like exports.merge(). If overwrite is true, replaces dataset contents.
+ * @param {string} user
+ * @param {string} name
+ * @param {AsyncIterable|Array} entries - entries list of recordIDs and recordData
+ * @param {object} [options]
+ * @param {boolean} [options.overwrite] - overwrite? if true, all existing records are removed if they aren't in the entries list
+ */
+exports.writeEntries = async function (user, name, entries, { overwrite = false } = {}) {
+  const objectStore = this.getObjectStore(user, name)
+  const includedRecords = new Set()
 
-  // validate attachment store has attachments referenced
-  const linkChecks = await Promise.all(links.map(async link => {
-    const present = await attachments.has(link.hash)
-    return { link, present }
-  }))
+  await this.updateMeta(user, name, async meta => {
+    const prevRecords = new Set(Object.keys(meta.records))
 
-  // if any linkChecks failed, throw back a missing attachments error
-  const missingLinks = linkChecks.filter(check => !check.present)
-  if (missingLinks.length > 0) throw createMissingAttachmentsError(missingLinks.map(x => x.link.toString()))
+    for await (const [id, data] of entries) {
+      if (data !== null && data !== undefined) {
+        const links = recordStructure.listHashURLs(data)
+        const linkChecks = await Promise.all(links.map(async link => ({ link, present: await attachments.has(link.hash) })))
+        const missingLinks = linkChecks.filter(x => !x.present).map(x => x.link.toString())
+        if (missingLinks.length > 0) throw createMissingAttachmentsError(missingLinks)
 
-  await this.updateMeta(user, name, async (meta) => {
-    const hash = await this.getObjectStore(user, name).write(data)
-    if (meta.records[recordID] && meta.records[recordID].hash.equals(hash)) {
-      meta.records[recordID].links = links.map(x => x.toString())
-      return meta
-    } else {
-      meta.records[recordID] = { hash, links: links.map(x => x.toString()) }
-      return meta
+        // apply source specific validation rules
+        await this.validateRecord(id, data)
+
+        // note down what records we're updating, to support overwrite: true
+        includedRecords.add(id)
+
+        const hash = await objectStore.write(data)
+
+        // record didn't exist, or it's value changed
+        if (!meta.records[id] || !meta.records[id].hash.equals(hash)) {
+          meta.records[id] = { hash, links: links.map(x => x.toString()) }
+        }
+      } else {
+        delete meta.records[id]
+      }
     }
+
+    if (overwrite) {
+      for (const id of prevRecords) {
+        if (!includedRecords.has(id)) {
+          delete meta.records[id]
+        }
+      }
+    }
+
+    return meta
   })
 }
 
 /* given an input object, merge it (like Object.assign) on to the dataset, but delete any entries whose value is undefined or null */
 exports.merge = async function (user, name, records) {
-  const deletes = Object.entries(records).filter(([k, v]) => v === undefined || v === null).map(([k, v]) => k)
-  const writes = Object.entries(records).filter(([k, v]) => v !== undefined && v !== null)
-
-  // validate server has all attachments mentioned in the merge, if not, throw back a 400 error with a list of what's needed
-  const links = recordStructure.listHashURLs(Object.values(records))
-  const linkChecks = await Promise.all(links.map(async link => ({ link, present: await attachments.has(link.hash) })))
-  const missingLinks = linkChecks.filter(x => !x.present).map(x => x.link.toString())
-  if (missingLinks.length > 0) throw createMissingAttachmentsError(missingLinks)
-
-  await this.updateMeta(user, name, async meta => {
-    const objectStore = this.getObjectStore(user, name)
-    const writen = Promise.all(writes.map(async ([id, value]) => ({
-      id,
-      hash: await objectStore.write(value),
-      links: recordStructure.listHashURLs(value)
-    })))
-    for (const del of deletes) delete meta.records[del]
-    for (const { id, hash, links } of (await writen)) {
-      if (!meta.records[id] || !meta.records[id].hash.equals(hash)) {
-        meta.records[id] = { hash }
-      }
-      meta.records[id].links = links.map(x => x.toString())
-    }
-    return meta
-  })
+  return await this.writeEntries(user, name, Object.entries(records), { overwrite: false })
 }
 
 /* like merge, but doesn't preserve unmentioned records, the dataset only contains the records provided */
 exports.overwrite = async function (user, name, records) {
-  assert(Object.values(records).every(x => x !== undefined && x !== null), 'Records cannot be set to undefined or null value')
-
-  // validate server has all attachments mentioned in the merge, if not, throw back a 400 error with a list of what's needed
-  const links = recordStructure.listHashURLs(Object.values(records))
-  const linkChecks = await Promise.all(links.map(async link => ({ link, present: await attachments.has(link.hash) })))
-  const missingLinks = linkChecks.filter(x => !x.present).map(x => x.link.toString())
-  if (missingLinks.length > 0) throw createMissingAttachmentsError(missingLinks)
-
-  await this.updateMeta(user, name, async meta => {
-    const objectStore = this.getObjectStore(user, name)
-    meta.records = Object.fromEntries(await Promise.all(Object.entries(records).map(async ([k, v]) => {
-      const hash = await objectStore.write(v)
-      const links = recordStructure.listHashURLs(v).map(x => x.toString())
-      if (meta.records[k] && meta.records[k].hash.equals(hash)) return [k, { ...meta.records[k], links }]
-      return [k, { hash, links }]
-    })))
-    return meta
-  })
+  await this.writeEntries(user, name, Object.entries(records), { overwrite: true })
 }
 
 /** delete an entry from a dataset, or the whole dataset if recordID is undefined
