@@ -155,4 +155,25 @@ router.get('/:source(datasets|lenses|meta)/:user\\::name/event-stream', expresse
   })
 })
 
+router.get(`/:source(datasets|lenses|meta)/:user\\::name/records/:recordID/raw.:format(${codec.exts.join('|')})?`, async (req, res) => {
+  const encoder = codec.for(`.${req.params.format}`)
+
+  for await (const { data } of readPath(codec.path.encode(req.params))) {
+    if (typeof data === 'string' || Buffer.isBuffer(data)) {
+      res.type(req.params.format || req.query.type || typeof record === 'string' ? 'text/plain' : 'application/octet-stream')
+      res.set('Content-Security-Policy', 'sandbox')
+      res.send(data)
+    } else {
+      if (encoder && encoder.encode) {
+        const encoded = encoder.encode(data)
+        res.type(encoder.handles[0])
+        res.set('Content-Security-Policy', 'sandbox')
+        return res.send(encoded)
+      } else {
+        throw createHttpError.InternalServerError('No way to encode content to this type')
+      }
+    }
+  }
+})
+
 module.exports = router

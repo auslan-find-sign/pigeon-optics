@@ -256,23 +256,3 @@ router.all('/datasets/:user\\::name/import/files', auth.ownerRequired, multipart
 
   res.sendVibe('dataset-import-files', 'Import Files', state)
 })
-
-router.get(`/datasets/:user\\::name/records/:recordID/raw.:format(${codec.exts.join('|')})?`, multipartAttachments, async (req, res) => {
-  const record = await dataset.read(req.params.user, req.params.name, req.params.recordID)
-  const format = req.params.format || req.query.type
-  const encoder = codec.for(format)
-
-  if (typeof record === 'string' || Buffer.isBuffer(record)) {
-    res.type(format || typeof record === 'string' ? 'text/plain' : 'application/octet-stream')
-    res.set('Content-Security-Policy', 'sandbox')
-    res.send(record)
-  } else {
-    if (encoder && encoder.encode) {
-      res.type(encoder.handles[0])
-      res.set('Content-Security-Policy', 'sandbox')
-      res.send(encoder.encode(record))
-    } else {
-      throw createError.InternalServerError('No way to encode content to this type')
-    }
-  }
-})
