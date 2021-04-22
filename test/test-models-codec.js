@@ -23,7 +23,9 @@ const tests = [
     },
     bools: [true, false],
     buffery: Buffer.from('hello world')
-  }
+  },
+  ['element', { name: 'foo' }, 'text node', ['subel', { name: 'bar' }], 'after text node'],
+  { JsonML: ['element', { name: 'foo' }, 'text node', ['subel', { name: 'bar' }], 'after text node'] }
 ]
 
 describe('models/codec.json', function () {

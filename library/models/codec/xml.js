@@ -40,9 +40,10 @@ Object.assign(exports, {
     } else if (Buffer.isBuffer(obj)) {
       return ['buffer', { encoding: 'base64' }, obj.toString('base64')]
     } else if (obj && Symbol.iterator in obj) {
-      return ['array', ...[...obj].map(this.arbitraryObjectToJsonML)]
+      return ['array', ...[...obj].map(v => this.arbitraryObjectToJsonML(v))]
     } else if (typeof obj === 'object') {
       return ['object', ...Object.entries(obj).map(([prop, value]) => {
+        if (typeof this.arbitraryObjectToJsonML !== 'function') console.log('arbObjToMl type:', typeof this.arbitraryObjectToJsonML)
         const enc = expandElement(this.arbitraryObjectToJsonML(value))
         enc[1].name = prop
         return enc
@@ -80,7 +81,7 @@ Object.assign(exports, {
   },
 
   encode (obj) {
-    if (obj && typeof obj === 'object' && ('JsonML' in obj)) {
+    if (obj && typeof obj === 'object' && !Array.isArray(obj) && ('JsonML' in obj) && Array.isArray(obj.JsonML)) {
       return onml.stringify(obj.JsonML)
     } else {
       const arbitrary = expandElement(this.arbitraryObjectToJsonML(obj))
