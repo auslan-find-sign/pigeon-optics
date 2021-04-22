@@ -1,4 +1,4 @@
-const multipart = require('../library/utility/multipart-attachments')
+const multipart = require('../library/utility/multipart-files')
 const express = require('express')
 const crypto = require('crypto')
 const superagent = require('superagent')
@@ -31,18 +31,18 @@ app.post('/test', async (req, res) => {
     filenames: {}
   }
 
-  for (const [hash, file] of Object.entries(req.attachedFilesByHash)) {
+  for (const [hash, file] of Object.entries(req.filesByHash)) {
     response.attachments[hash] = fs.readFileSync(file.path).toString('utf-8')
   }
 
-  for (const [name, file] of Object.entries(req.attachedFilesByName)) {
+  for (const [name, file] of Object.entries(req.filesByName)) {
     response.filenames[name] = fs.readFileSync(file.path).toString('utf-8')
   }
 
   res.send(response)
 })
 
-describe('utility/multipart-attachments', function () {
+describe('utility/multipart-files', function () {
   let server
   before(() => new Promise((resolve, reject) => { server = app.listen(5028, (err) => err ? reject(err) : resolve()) }))
   after(async () => { server.close() })
