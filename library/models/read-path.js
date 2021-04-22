@@ -50,9 +50,11 @@ readPath.meta = async function * readPathMeta (path) {
       if (params.recordID !== undefined) {
         // just yield the specific entry
         if (await source.exists(params.user, params.name, params.recordID)) {
+          const meta = await source.readMeta(params.user, params.name)
           yield {
             path: codec.path.encode(params.source, params.user, params.name, params.recordID),
-            ...await source.read(params.user, params.name, params.recordID)
+            ...meta.records[params.recordID],
+            read: () => source.read(params.user, params.name, params.recordID)
           }
         }
       } else {
