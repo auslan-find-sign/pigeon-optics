@@ -7,8 +7,9 @@ const dataset = require('../models/dataset')
 const uri = require('encodeuricomponent-tag')
 const createError = require('http-errors')
 const assert = require('assert')
+const multipartFiles = require('../utility/multipart-files')
+const autoImport = require('../utility/auto-import-attachments')
 const fs = require('fs/promises')
-const multipartAttachments = require('../utility/multipart-attachments')
 
 // add req.owner boolean for any routes with a :user param
 router.param('user', auth.ownerParam)
@@ -135,9 +136,10 @@ router.all('/datasets/:user\\::name/create-record', auth.ownerRequired, async (r
   let error
   if (req.method === 'PUT') {
     try {
-      const data = codec.json.decode(req.body.recordData)
+      const path = codec.path.encode('datasets', req.params.user, req.params.name, req.body.recordID)
+      const data = await autoImport(req, path, codec.json.decode(req.body.recordData))
       await dataset.write(req.params.user, req.params.name, req.body.recordID, data)
-      return res.redirect(303, uri`/datasets/${req.params.user}:${req.params.name}/records/${req.body.recordID}`)
+      return res.redirect(303, path)
     } catch (err) {
       error = err.message
     }
@@ -154,24 +156,32 @@ router.get('/datasets/:user\\::name/records/', async (req, res) => {
   codec.respond(req, res, Object.fromEntries(records.map(({ id, version, hash }) => [id, { version, hash }])))
 })
 
-router.post('/datasets/:user\\::name/records/', auth.ownerRequired, multipartAttachments, async (req, res) => {
+router.post('/datasets/:user\\::name/records/', auth.ownerRequired, multipartFiles, async (req, res) => {
   assert(req.body !== null, 'request body must not be null')
   assert(typeof req.body === 'object', 'request body must be an object')
 
-  await dataset.merge(req.params.user, req.params.name, Object.entries(req.body))
+  for (const key in req.body) {
+    req.body[key] = await autoImport(req, codec.path.encode('datasets', req.params.user, req.params.name, key), req.body[key])
+  }
+
+  await dataset.merge(req.params.user, req.params.name, req.body)
   return res.sendStatus(204)
 })
 
-router.put('/datasets/:user\\::name/records/', auth.ownerRequired, multipartAttachments, async (req, res) => {
+router.put('/datasets/:user\\::name/records/', auth.ownerRequired, multipartFiles, async (req, res) => {
   assert(req.body !== null, 'request body must not be null')
   assert(typeof req.body === 'object', 'request body must be an object')
 
-  await dataset.overwrite(req.params.user, req.params.name, Object.entries(req.body))
+  for (const key in req.body) {
+    req.body[key] = await autoImport(req, codec.path.encode('datasets', req.params.user, req.params.name, key), req.body[key])
+  }
+
+  await dataset.overwrite(req.params.user, req.params.name, req.body)
   return res.sendStatus(204)
 })
 
 // get a record from a user's dataset
-router.all('/datasets/:user\\::name/records/:recordID', multipartAttachments, async (req, res, next) => {
+router.all('/datasets/:user\\::name/records/:recordID', multipartFiles, async (req, res, next) => {
   let error
 
   if (req.method === 'PUT') {
@@ -181,8 +191,10 @@ router.all('/datasets/:user\\::name/records/:recordID', multipartAttachments, as
         req.body = codec.json.decode(req.body.recordData)
       }
 
+      const data = await autoImport(req, codec.path.encode('datasets', req.params.user, req.params.name, req.params.recordID), req.body)
+
       // write record
-      await dataset.write(req.params.user, req.params.name, req.params.recordID, req.body)
+      await dataset.write(req.params.user, req.params.name, req.params.recordID, data)
 
       if (req.accepts('html')) {
         return res.redirect(303, uri`/datasets/${req.params.user}:${req.params.name}/records/${req.params.recordID}`)
@@ -224,7 +236,7 @@ router.all('/datasets/:user\\::name/records/:recordID', multipartAttachments, as
 })
 
 // import individual json, yaml, cbor, or xml files as individual records named from their filename
-router.all('/datasets/:user\\::name/import/files', auth.ownerRequired, multipartAttachments, async (req, res) => {
+router.all('/datasets/:user\\::name/import/files', auth.ownerRequired, multipartFiles, async (req, res) => {
   const state = {}
 
   if (req.method === 'PUT') {

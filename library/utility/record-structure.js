@@ -30,7 +30,7 @@ exports.iterateHashURLs = function * iterateHashURLs (input) {
 
 /** get an array of all the hash url's in the input
  * @param {*} input
- * @returns {object[]} hashes - { algo: 'sha256', hash <Buffer>, params <URLSearchParams> }
+ * @returns {object[]} hashes - { algo: 'sha256', hash <Buffer>, params <URLSearchParams>, toString() }
  */
 exports.listHashURLs = function listHashURLs (input) {
   return [...this.iterateHashURLs(input)]

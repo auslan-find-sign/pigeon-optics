@@ -5,6 +5,7 @@ const assert = require('assert')
 const readPath = require('./read-path')
 const HashThrough = require('hash-through')
 const crypto = require('crypto')
+const fs = require('fs/promises')
 const tq = require('tiny-function-queue')
 
 // final location blobs are moved in to
@@ -99,18 +100,36 @@ exports.readMeta = async function (hash) {
 /**
  * Add a link to an attachment
  * @param {Buffer|string} hash - attachment content hash
- * @param {string} dataPath - path to record linking to attachment
+ * @param {...string} dataPath - path to record linking to attachment
  */
-exports.link = async function (hash, dataPath) {
+exports.link = async function (hash, ...dataPaths) {
   const hexHash = hash.toString('hex')
   return await tq.lockWhile(['attachments', hexHash], async () => {
     await metaStore.update([hexHash], meta => {
       if (!meta) throw new Error('Cannot link non-existant attachment')
-      meta.updated = Date.now()
-      meta.linkers.push(dataPath)
-      return meta
+      const missing = dataPaths.filter(x => !meta.linkers.includes(x))
+      if (missing.length > 0) {
+        meta.linkers.push(...missing)
+        meta.updated = Date.now()
+        return meta
+      }
     })
   })
+}
+
+/** import an attachment from the filesystem with a precomputed hash
+ * !!! This is really dangerous and potentially leaky. Do not trust outside users specifying what the hash is
+ * This exists only as a utility for form file submissions where hash is computed during upload
+ */
+exports.import = async function ({ path, hash, linkers }) {
+  // if we already have the attachment, just make sure the linkers are up to date in it's metadata
+  if (await this.has(hash)) {
+    await this.link(hash, ...linkers)
+  } else {
+    // this could be more efficient, in the future it could attempt to hardlink or copy on write duplication, but for now, this will do
+    const result = await this.writeStream(fs.createReadStream(path), { linkers })
+    if (result.hash.toString('hex') !== hash.toString('hex')) throw new Error('Hashes do not match! Bad things are happening!')
+  }
 }
 
 /**

@@ -107,9 +107,7 @@ describe('models/codec.xml', function () {
   for (const obj of tests) {
     it(`encodes type ${typeof obj} reversably`, function () {
       const encoded = codec.xml.encode(obj)
-      console.log(obj, 'became', encoded)
       const roundtripped = codec.xml.decode(encoded)
-      console.log('decoded to', roundtripped)
       expect(roundtripped).to.deep.equal(obj)
     })
   }
