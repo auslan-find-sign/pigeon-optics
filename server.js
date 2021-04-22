@@ -28,19 +28,6 @@ app.use(express.urlencoded({ extended: true }))
 // handle decoding json and cbor
 app.use(express.raw({ limit: settings.maxRecordSize, type: Object.keys(codec.mediaTypeHandlers) }))
 
-// log requests
-app.use((req, res, next) => {
-  console.info(`req ${req.method} ${req.path}`)
-  if (req.method !== 'GET') {
-    for (const [name, value] of Object.entries(req.headers)) console.info(`  - ${name}: ${value}`)
-    if (req.body) {
-      console.info('Body:')
-      console.info(req.body)
-    }
-  }
-  next()
-})
-
 app.use((req, res, next) => {
   const reqType = req.is(...Object.keys(codec.mediaTypeHandlers))
   if (reqType) {
@@ -65,6 +52,19 @@ app.use((req, res, next) => {
 app.use(cookieSession({
   secret: process.env.SECRET || crypto.randomBytes(64).toString('base64')
 }))
+
+// log requests
+app.use((req, res, next) => {
+  console.info(`req ${req.method} ${req.path}`)
+  if (req.method !== 'GET') {
+    for (const [name, value] of Object.entries(req.headers)) console.info(`  - ${name}: ${value}`)
+    if (req.body) {
+      console.info('Body:')
+      console.info(req.body)
+    }
+  }
+  next()
+})
 
 app.use(require('./library/models/auth').basicAuthMiddleware)
 
