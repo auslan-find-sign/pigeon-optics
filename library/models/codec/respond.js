@@ -5,6 +5,11 @@ const codec = require('./index')
 const json = require('./json')
 
 /**
+ * @typedef {import('express').Request} Request
+ * @typedef {import('express').Response} Response
+ */
+
+/**
  * Respond to an expressjs web request, with an object encoded as JSON, CBOR, or a stylised webpage according to Accepts header
  * @param {Request} req - expressjs http request object
  * @param {Response} res - expressjs http response object

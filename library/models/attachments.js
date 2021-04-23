@@ -5,7 +5,6 @@ const assert = require('assert')
 const readPath = require('./read-path')
 const HashThrough = require('hash-through')
 const crypto = require('crypto')
-const fs = require('fs/promises')
 const tq = require('tiny-function-queue')
 
 // final location blobs are moved in to
@@ -117,19 +116,14 @@ exports.link = async function (hash, ...dataPaths) {
   })
 }
 
-/** import an attachment from the filesystem with a precomputed hash
- * !!! This is really dangerous and potentially leaky. Do not trust outside users specifying what the hash is
- * This exists only as a utility for form file submissions where hash is computed during upload
+/** import an attachment from multipart-files file object
+ * @param {object} file - file object from ../utility/multipart-files
+ * @param {{linkers<string[]>}} meta - meta stuff to add, only linkers gets handled currently
  */
-exports.import = async function ({ path, hash, linkers }) {
-  // if we already have the attachment, just make sure the linkers are up to date in it's metadata
-  if (await this.has(hash)) {
-    await this.link(hash, ...linkers)
-  } else {
-    // this could be more efficient, in the future it could attempt to hardlink or copy on write duplication, but for now, this will do
-    const result = await this.writeStream(fs.createReadStream(path), { linkers })
-    if (result.hash.toString('hex') !== hash.toString('hex')) throw new Error('Hashes do not match! Bad things are happening!')
-  }
+exports.import = async function (file, { linkers }) {
+  // import the file
+  await blobStore.import(file.storage, file.hash)
+  return await this.link(file.hash, ...linkers)
 }
 
 /**
