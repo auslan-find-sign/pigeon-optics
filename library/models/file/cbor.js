@@ -131,7 +131,12 @@ exports.iterateFolders = async function * iterateFolders (dataPath = []) {
   yield * this.raw.iterateFolders(dataPath)
 }
 
-// create an instance scoped in to a rootPath
+/**
+ * Create an instance of cbor file which is sandboxed to a specified rootPath
+ * @param {object} options
+ * @param {string[]} [options.rootPath] - dataPath to folder that should be root directory of instance
+ * @returns {import('./cbor')}
+ */
 exports.instance = function ({ rootPath = [] }) {
   const instance = Object.create(exports)
   instance.raw = require('./raw').instance({ rootPath, extension: '.cbor' })

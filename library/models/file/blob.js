@@ -147,7 +147,7 @@ exports.retain = async function (list) {
  * @param {string[]} [config.rootPath] - set a dataPath to the folder which will contain the objects
  * @param {object} [config.codec] - set a codec like codec.json or codec.cbor, an object which has encode and decode methods
  * @param {function} [config.hash] - set a hash function, given a Buffer input returns a hash Buffer, can be async/promise returning
- * @returns {module:models/file/blob} - blob store instance, configured
+ * @returns {import('./blob')} - blob store instance, configured
  */
 exports.instance = function ({
   extension = exports.extension,
