@@ -50,5 +50,21 @@ Object.assign(exports, {
         try { callback(null, `${this.encode(chunk)}...\n`) } catch (err) { callback(err) }
       }
     })
+  },
+
+  // speciality encoder for building xml flat file exports
+  entriesEncoder () {
+    return new streams.Transform({
+      writableObjectMode: true,
+      transform: (chunk, encoding, callback) => {
+        const block = {
+          id: chunk.id,
+          version: chunk.version,
+          hash: chunk.hash.toString('hex'),
+          data: chunk.data
+        }
+        try { callback(null, `${this.encode(block)}...\n`) } catch (err) { callback(err) }
+      }
+    })
   }
 })
