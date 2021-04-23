@@ -30,32 +30,34 @@ exports.updateMeta = async function (user, name, block) {
     // collect prev version's objects, just to avoid some minor clobbering
     Object.values(config.records).map(({ hash }) => retainObjectList.push(hash))
 
-    const result = await block(config)
-    assert(result && typeof result === 'object', 'block callback function must return an object')
-    assert(result.records && typeof result.records === 'object', 'block callback must contain records object property')
-    for (const meta of Object.values(result.records)) {
-      assert(meta && typeof meta === 'object', 'records property must have object values')
-      if (!('version' in meta)) meta.version = config.version
-      assert(typeof meta.version === 'number', 'record object value must have a numeric version number')
-      assert(meta.version > 0, 'record object must contain version number above 0')
-      assert(Buffer.isBuffer(meta.hash), 'record object\'s hash property must be a Buffer')
-      assert.strictEqual(meta.hash.length, 32, 'record object\'s hash property must be 32 bytes long')
-      retainObjectList.push(meta.hash)
+    try {
+      const result = await block(config)
+      assert(result && typeof result === 'object', 'block callback function must return an object')
+      assert(result.records && typeof result.records === 'object', 'block callback must contain records object property')
+      for (const meta of Object.values(result.records)) {
+        assert(meta && typeof meta === 'object', 'records property must have object values')
+        if (!('version' in meta)) meta.version = config.version
+        assert(typeof meta.version === 'number', 'record object value must have a numeric version number')
+        assert(meta.version > 0, 'record object must contain version number above 0')
+        assert(Buffer.isBuffer(meta.hash), 'record object\'s hash property must be a Buffer')
+        assert.strictEqual(meta.hash.length, 32, 'record object\'s hash property must be 32 bytes long')
+        retainObjectList.push(meta.hash)
+      }
+
+      // sort records object
+      result.records = Object.fromEntries(Object.entries(result.records).sort((a, b) => stringNaturalCompare(a[0], b[0])))
+
+      // validate that updated version is good
+      await this.validateConfig(user, name, result)
+
+      // update notifyVersion number so downstream lenses don't process repeatedly
+      notifyVersion = result.version
+
+      return result
+    } finally {
+      // garbage collect objects that aren't used in this or the previous version
+      await this.getObjectStore(user, name).retain(retainObjectList)
     }
-
-    // sort records object
-    result.records = Object.fromEntries(Object.entries(result.records).sort((a, b) => stringNaturalCompare(a[0], b[0])))
-
-    // validate that updated version is good
-    await this.validateConfig(user, name, result)
-
-    // garbage collect objects that aren't used in this or the previous version
-    await this.getObjectStore(user, name).retain(retainObjectList)
-
-    // update notifyVersion number so downstream lenses don't process repeatedly
-    notifyVersion = result.version
-
-    return result
   })
 
   // notify downstream lenses of the change
