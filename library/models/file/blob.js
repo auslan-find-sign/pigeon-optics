@@ -91,7 +91,11 @@ exports.writeStream = async function (stream) {
  * @async
  */
 exports.delete = async function (hash) {
-  return await this.raw.delete([hash.toString('hex')])
+  if (hash) {
+    return await this.raw.delete([hash.toString('hex')])
+  } else {
+    return await this.raw.delete([])
+  }
 }
 
 /** Checks a given data path for an existing record, and returns true or false async
