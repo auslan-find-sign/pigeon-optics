@@ -9,7 +9,6 @@ const createError = require('http-errors')
 const assert = require('assert')
 const multipartFiles = require('../utility/multipart-files')
 const autoImport = require('../utility/auto-import-attachments')
-const fs = require('fs/promises')
 
 // add req.owner boolean for any routes with a :user param
 router.param('user', auth.ownerParam)
@@ -239,19 +238,26 @@ router.all('/datasets/:user\\::name/records/:recordID', multipartFiles, async (r
 router.all('/datasets/:user\\::name/import/files', auth.ownerRequired, multipartFiles, async (req, res) => {
   const state = {}
 
+  console.log('dataset-import-files method', req.method)
   if (req.method === 'PUT') {
+    console.log('file import request starting')
     state.wroteCount = 0
-    for (const filename in req.attachmentsByFilename) {
-      const fileCodec = codec.for(filename.toLowerCase())
-      if (fileCodec) {
-        const ext = fileCodec.extensions.find(x => filename.endsWith(`.${x}`))
-        const recordID = filename.slice(0, filename.length - (ext.length + 1))
-        const recordData = fileCodec.decode(await fs.readFile(req.attachmentsByFilename[filename].path))
-        // todo: make some kind of input analogy to dataset.iterate that consumes async iterators or streams, to do this in one write
-        await dataset.write(req.params.user, req.params.name, recordID, recordData)
-        state.wroteCount += 1
+    async function * generator () {
+      for (const filename in req.filesByName) {
+        const fileCodec = codec.for(filename.toLowerCase())
+        if (fileCodec) {
+          console.log('importing', filename)
+          const ext = fileCodec.extensions.find(x => filename.endsWith(`.${x}`))
+          const recordID = filename.slice(0, filename.length - (ext.length + 1))
+          const recordData = fileCodec.decode(await req.filesByName[filename].read())
+          const recordPath = codec.path.encode('datasets', req.params.user, req.params.name, recordID)
+          yield [recordID, await autoImport(req, recordPath, recordData)]
+          state.wroteCount += 1
+        }
       }
     }
+
+    await dataset.writeEntries(req.params.user, req.params.name, generator(), { overwrite: req.query.overwrite === 'true' })
   }
 
   res.sendVibe('dataset-import-files', 'Import Files', state)
