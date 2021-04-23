@@ -2,7 +2,6 @@ const multipart = require('../library/utility/multipart-files')
 const express = require('express')
 const crypto = require('crypto')
 const superagent = require('superagent')
-const fs = require('fs')
 const chai = require('chai')
 chai.use(require('chai-as-promised'))
 const { expect } = chai
@@ -28,15 +27,20 @@ app.post('/test', async (req, res) => {
   const response = {
     body: req.body,
     attachments: {},
-    filenames: {}
+    filenames: {},
+    fields: {}
   }
 
   for (const [hash, file] of Object.entries(req.filesByHash)) {
-    response.attachments[hash] = fs.readFileSync(file.path).toString('utf-8')
+    response.attachments[hash] = (await file.read()).toString('utf-8')
   }
 
   for (const [name, file] of Object.entries(req.filesByName)) {
-    response.filenames[name] = fs.readFileSync(file.path).toString('utf-8')
+    response.filenames[name] = (await file.read()).toString('utf-8')
+  }
+
+  for (const [field, files] of Object.entries(req.filesByField)) {
+    response.fields[field] = (await Promise.all(files.map(file => file.read()))).map(x => x.toString('utf-8'))
   }
 
   res.send(response)
@@ -55,7 +59,8 @@ describe('utility/multipart-files', function () {
     expect(res.body).to.deep.equal({
       body: testBody,
       attachments: {},
-      filenames: {}
+      filenames: {},
+      fields: {}
     })
   })
 
@@ -75,6 +80,9 @@ describe('utility/multipart-files', function () {
       attachments: {
         [hashBuf(attach1)]: attach1,
         [hashBuf(attach2)]: attach2
+      },
+      fields: {
+        attachment: [attach1, attach2]
       }
     })
   })
@@ -95,6 +103,9 @@ describe('utility/multipart-files', function () {
       attachments: {
         [hashBuf(attach1)]: attach1,
         [hashBuf(attach2)]: attach2
+      },
+      fields: {
+        attachment: [attach1, attach2]
       }
     })
   })
@@ -115,6 +126,9 @@ describe('utility/multipart-files', function () {
       attachments: {
         [hashBuf(attach1)]: attach1,
         [hashBuf(attach2)]: attach2
+      },
+      fields: {
+        file: [attach1, attach2]
       }
     })
   })

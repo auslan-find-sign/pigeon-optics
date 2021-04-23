@@ -1,87 +1,88 @@
 // given an express request, if the body is multipart/form-data, streams attachments in to the attachment store
 // and copies the cbor/json data in to req.body
-const multer = require('multer')
-const settings = require('../models/settings')
+// const settings = require('../models/settings')
 const createHttpError = require('http-errors')
-const HashThrough = require('hash-through')
 const crypto = require('crypto')
 const codec = require('../models/codec')
-const xbytes = require('xbytes')
+// const xbytes = require('xbytes')
 const finished = require('on-finished')
-const fs = require('fs/promises')
+const blob = require('../models/file/blob')
+const multipart = require('it-multipart')
+const { Readable } = require('stream')
+const ctype = require('content-type')
+const cdisp = require('content-disposition')
+const asyncIterableToArray = require('./async-iterable-to-array')
 
-const memStore = multer.memoryStorage()
-const diskStore = multer.diskStorage({ })
-const uploadEngine = {
-  _handleFile: function (req, file, cb) {
-    const hashStream = new HashThrough(() => crypto.createHash('sha256'))
-    file.stream.pipe(hashStream)
-    const proxyFile = { ...file, stream: hashStream }
-    const proxyCb = (err, ...args) => {
-      if (!err) {
-        const hash = hashStream.digest('hex')
-        return cb(err, { hash, ...args[0] })
-      }
-      cb(err, ...args)
-    }
+// const maxAttachment = xbytes.parseSize(settings.maxAttachmentSize)
+// const maxRecord = xbytes.parseSize(settings.maxRecordSize)
 
-    if (file.fieldname === 'body') {
-      return memStore._handleFile(req, proxyFile, proxyCb)
-    } else {
-      return diskStore._handleFile(req, proxyFile, proxyCb)
-    }
-  },
-  _removeFile: async function (req, file, cb) {
-    if (file.buffer) return memStore._removeFile(req, file, cb)
-    else if (file.path) return diskStore._removeFile(req, file, cb)
-  }
-}
-
-const multerInstance = multer({
-  limits: { fileSize: xbytes.parse(settings.maxAttachmentSize).bytes },
-  storage: uploadEngine
-}).fields([
-  { name: 'body', maxCount: 1 },
-  { name: 'attachment' },
-  { name: 'file' }
-])
-
-const postProcess = async function (req, res, next) {
+/**
+ * Middleware which parses multipart files in the way Pigeon Optics supports and expects
+ * Attachments are written out to hashed files and made available via
+ *  - req.filesByHash - string hex hash of file's contents is the key, value is the file object with read and readStream methods
+ *  - req.filesByName - string filename as supplied by client is key, value is the file object
+ *  - req.filesByField - string key is form field name as supplied by client, value is an array of file objects
+ *  - and req.files - array of all file objects
+ * Files are automatically cleaned out at the end of http response, so they need to be copied or processed fully before res closes
+ * @param {import('express/lib/request')} req - express Request object
+ * @param {import('express/lib/response')} res - express Response object
+ * @param {function} next - express next() function
+ */
+module.exports = async function (req, res, next) {
   req.filesByHash = {}
   req.filesByName = {}
-  const tasks = []
+  req.filesByField = {}
+  req.files = []
+  req.body = req.body || {}
 
-  if (req.files) {
-    if (Array.isArray(req.files.attachment) || Array.isArray(req.files.file)) {
-      for (const file of [...(req.files.attachment || []), ...(req.files.file || [])]) {
-        if (file.originalname) req.filesByName[file.originalname] = file
-        req.filesByHash[file.hash] = file
+  if (req.is('multipart/form-data')) {
+    const randomID = crypto.randomBytes(32).toString('hex')
+    const storage = blob.instance({ rootPath: ['uploads', randomID] })
 
-        // if file has a release function to release reference hold and allow GC, call it when the response is finished
-        if (file.path) {
-          finished(res, async () => {
-            try {
-              await fs.unlink(file.path)
-            } catch (err) {
-              // no big deal, we tried
-            }
-          })
+    req.on('error', () => {
+      storage.delete()
+    })
+
+    for await (const { headers, body } of multipart(req)) {
+      const contentType = ctype.parse(headers['content-type'])
+      const { encoding } = contentType.parameters
+      const contentDisp = cdisp.parse(headers['content-disposition'])
+      const { name, filename } = contentDisp.parameters
+
+      if (filename && name !== 'body') {
+        // it's a file
+        const hash = await storage.writeStream(Readable.from(body))
+
+        const read = storage.read.bind(storage, hash)
+        const readStream = storage.readStream.bind(storage, hash)
+        const file = { hash, field: name, filename, storage, read, readStream, type: contentType.type, encoding }
+        req.files.push(file)
+        req.filesByHash[hash.toString('hex')] = file
+        req.filesByName[filename] = file
+        req.filesByField[name] = (req.filesByField[name] || [])
+        req.filesByField[name].push(file)
+      } else if (contentType.type === 'text/plain') {
+        // it's probably a form field? parse it in to req.body's properties
+        req.body[name] = Buffer.concat(await asyncIterableToArray(body)).toString(encoding || 'utf-8')
+      } else {
+        const encoder = codec.for(contentType.type)
+        if (encoder && encoder.decode) {
+          const value = encoder.decode(Buffer.concat(await asyncIterableToArray(body)))
+          if (name === 'body') {
+            req.body = value
+          } else {
+            req.body[name] = value
+          }
+        } else {
+          return next(createHttpError.BadRequest(`Form data field ${name} is not a file (doesn't have filename in content-disposition) and is not parseable with any codec on server. Unacceptable.`))
         }
       }
     }
 
-    if (req.files.body && req.files.body[0]) {
-      const bodyInfo = req.files.body[0]
-      const specificCodec = codec.for(bodyInfo.mimetype)
-      if (specificCodec && typeof specificCodec.decode === 'function') {
-        Object.assign(req.body, specificCodec.decode(bodyInfo.buffer))
-      } else {
-        return next(new createHttpError.BadRequest('Unsupported body mime type'))
-      }
-    }
+    finished(res, () => {
+      storage.delete()
+    })
   }
 
-  Promise.all(tasks).then(x => next()).catch(x => next(x))
+  next()
 }
-
-module.exports = [multerInstance, postProcess]
