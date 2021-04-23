@@ -18,7 +18,7 @@ module.exports = async function autoImportAttachments (req, destination, recordD
     const hexhash = link.hash.toString('hex')
     const file = req.filesByHash[hexhash]
     if (file) {
-      await attachments.import({ path: file.path, hash: file.hash, linkers: [destination] })
+      await attachments.import(file, { linkers: [destination] })
     } else {
       if (!await attachments.has(link.hash)) {
         missing.push(link.toString())
