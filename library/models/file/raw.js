@@ -274,6 +274,7 @@ exports.iterateFolders = async function * iterateFolders (dataPath = []) {
  * @param {string[]} [options.rootPath=[]] - data path to directory where all operations should be sandboxed
  * @param {string} [options.extension='.data'] - file extension to use for raw files
  * @returns {import('./raw')}
+ */
 exports.instance = function ({ rootPath = exports.rootPath, extension = exports.extension }) {
   return Object.assign(Object.create(this), {
     rootPath, extension

@@ -8,6 +8,7 @@
 const asyncIterableToArray = require('../../utility/async-iterable-to-array')
 const HashThrough = require('hash-through')
 const { PassThrough } = require('stream')
+const fs = require('fs/promises')
 const crypto = require('crypto')
 
 // used to store attachments in attachment store
@@ -86,8 +87,28 @@ exports.writeStream = async function (stream) {
   return hash
 }
 
-/** Remove a cbor data file
- * @param {string|string[]} path - relative path inside data directory the data is located at
+/**
+ * Import a blob from another blob storage instance, attempts to use hardlink to do it quick, falling back to copy otherwise
+ * @param {import('./blob')} storage - blob storage instance
+ * @param {string|Buffer} hash - content hash
+ */
+exports.import = async function (storage, hash) {
+  const fspath = storage.getPath(hash)
+  const target = this.getPath(hash)
+  if (!await this.exists(hash)) {
+    try {
+      await fs.link(fspath, target)
+    } catch (err) {
+      // something didn't work about hardlinking, fallback to copying
+      console.warn('hardlinking blob import failed:', err)
+      console.warn('Copying streams instead')
+      await this.writeStream(await storage.readStream(hash))
+    }
+  }
+}
+
+/** Remove a blob from the blob store by hash, or remove the entire folder of blobs
+ * @param {string|Buffer} [hash] - hash of blob to delete. If undefined, deletes the whole folder and all the blobs, nuking the whole store
  * @async
  */
 exports.delete = async function (hash) {
