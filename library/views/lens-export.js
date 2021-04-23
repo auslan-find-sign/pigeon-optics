@@ -1,7 +1,14 @@
 const layout = require('./layout')
 const uri = require('encodeuricomponent-tag')
+const exportFragment = require('./fragment-export')
 
-module.exports = (req, { mapOutputs }) => {
+/**
+ * block to build a dataset manual record editor
+ * @param {Request} req - express Request
+ * @param {string} data - object with state info for the form
+ * @param {null|string} error - null or a string with an error message
+ */
+module.exports = (req, state) => {
   return layout(req, v => {
     v.panel(v => {
       v.header(v => {
@@ -9,29 +16,17 @@ module.exports = (req, { mapOutputs }) => {
           v.a('Lenses', { href: '/lenses/' })
           v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}/` })
           v.iconLink('3dglasses', req.params.name, { href: uri`/lenses/${req.params.user}:${req.params.name}/` })
-          v.a('Lens Build Logs', { href: uri`/lenses/${req.params.user}:${req.params.name}/logs` })
         })
 
         v.panelTabs(
           { label: 'Lens', href: uri`/lenses/${req.params.user}:${req.params.name}/` },
           { label: 'Edit', href: uri`/lenses/${req.params.user}:${req.params.name}/configuration`, if: req.owner },
-          { label: 'Logs', href: uri`/lenses/${req.params.user}:${req.params.name}/logs`, current: true },
-          { label: 'Export', href: uri`/lenses/${req.params.user}:${req.params.name}/export` }
+          { label: 'Logs', href: uri`/lenses/${req.params.user}:${req.params.name}/logs` },
+          { label: 'Export', href: uri`/lenses/${req.params.user}:${req.params.name}/export`, current: true }
         )
       })
 
-      for (const { input, errors, logs } of mapOutputs) {
-        v.heading({ level: 3 }, v => v.a(input, { href: input }))
-
-        for (const error of errors) {
-          v.stacktrace(error)
-        }
-
-        if (logs && logs.length > 0) {
-          v.heading('console.log/warn/info/error:')
-          v.logs(logs)
-        }
-      }
+      exportFragment(v, req, state)
     })
   })
 }

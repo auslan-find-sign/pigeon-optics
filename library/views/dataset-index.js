@@ -18,14 +18,12 @@ module.exports = (req, { config }) => {
           v.iconLink('cassette', req.params.name, { href: uri`/datasets/${req.params.user}:${req.params.name}/` })
         })
 
-        if (req.owner) {
-          v.panelTabs(
-            { label: 'View', href: uri`/datasets/${req.params.user}:${req.params.name}/`, current: true },
-            { label: 'Edit', href: uri`/datasets/${req.params.user}:${req.params.name}/configuration` },
-            { label: 'Import', href: uri`/datasets/${req.params.user}:${req.params.name}/import` },
-            { label: 'Export', href: uri`/datasets/${req.params.user}:${req.params.name}/export` }
-          )
-        }
+        v.panelTabs(
+          { label: 'View', href: uri`/datasets/${req.params.user}:${req.params.name}/`, current: true },
+          { label: 'Edit', href: uri`/datasets/${req.params.user}:${req.params.name}/configuration`, if: req.owner },
+          { label: 'Import', href: uri`/datasets/${req.params.user}:${req.params.name}/import`, if: req.owner },
+          { label: 'Export', href: uri`/datasets/${req.params.user}:${req.params.name}/export` }
+        )
       })
 
       v.heading(`Dataset: ${req.params.name}`)

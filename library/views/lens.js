@@ -13,7 +13,6 @@ module.exports = (req, config) => {
     v.panel(v => {
       v.header(v => {
         v.breadcrumbs(v => {
-          v.a('Home', { href: '/' })
           v.a('Lenses', { href: '/lenses/' })
           v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}/` })
           v.iconLink('3dglasses', req.params.name, { href: uri`/lenses/${req.params.user}:${req.params.name}/` })
@@ -21,8 +20,9 @@ module.exports = (req, config) => {
 
         v.panelTabs(
           { label: 'Lens', href: uri`/lenses/${req.params.user}:${req.params.name}/`, current: true },
-          req.owner && { label: 'Edit', href: uri`/lenses/${req.params.user}:${req.params.name}/configuration` },
-          { label: 'Logs', href: uri`/lenses/${req.params.user}:${req.params.name}/logs` }
+          { label: 'Edit', href: uri`/lenses/${req.params.user}:${req.params.name}/configuration`, if: req.owner },
+          { label: 'Logs', href: uri`/lenses/${req.params.user}:${req.params.name}/logs` },
+          { label: 'Export', href: uri`/lenses/${req.params.user}:${req.params.name}/export` }
         )
       })
 

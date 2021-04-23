@@ -13,6 +13,8 @@ const expresse = require('@toverux/expresse')
 const onFinished = require('on-finished')
 const createHttpError = require('http-errors')
 
+router.param('user', require('../models/auth').ownerParam)
+
 /**
  * iterator which yields chunks of text or buffer in whichever encoding is requested
  * @param {string} path - path in form '/realm/user:name'

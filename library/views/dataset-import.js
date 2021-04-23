@@ -20,8 +20,9 @@ module.exports = (req, state) => {
 
           v.panelTabs(
             { label: 'View', href: uri`/datasets/${req.params.user}:${req.params.name}/` },
-            { label: 'Edit', href: uri`/datasets/${req.params.user}:${req.params.name}/configuration` },
-            { label: 'Import', href: uri`/datasets/${req.params.user}:${req.params.name}/import/files`, current: true }
+            { label: 'Edit', href: uri`/datasets/${req.params.user}:${req.params.name}/configuration`, if: req.owner },
+            { label: 'Import', href: uri`/datasets/${req.params.user}:${req.params.name}/import`, current: true, if: req.owner },
+            { label: 'Export', href: uri`/datasets/${req.params.user}:${req.params.name}/export` }
           )
         })
 
@@ -36,6 +37,12 @@ module.exports = (req, state) => {
         v.dl(v => {
           v.dt('Select Files')
           v.dd(v => v.input({ name: 'file', type: 'file', required: true, multiple: true }))
+
+          v.dt('Overwrite')
+          v.dd(v => {
+            v.input({ name: 'overwrite', value: 'true', type: 'checkbox', id: 'overwrite-check', checked: state.overwrite })
+            v.label(' Replace existing entries, removing anything not in this file', { for: 'overwrite-check' })
+          })
         })
 
         v.footer(v => {

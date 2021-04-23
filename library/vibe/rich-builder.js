@@ -238,6 +238,7 @@ class RichVibeBuilder extends VibeBuilder {
     this.nav({ class: 'panel-tabs', role: 'tablist' }, v => {
       for (const entry of list) {
         if (!entry) continue
+        if ('if' in entry && !entry.if) continue
 
         const attribs = entry.current ? { ariaCurrent: 'page', role: 'tab' } : { role: 'tab' }
         if (entry.icon) v.iconLink(entry.icon, entry.label, { href: entry.href, ...attribs })

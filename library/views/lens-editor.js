@@ -19,15 +19,15 @@ module.exports = (req, data, error = null) => {
             } else {
               v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}/` })
               v.iconLink('3dglasses', req.params.name, { href: uri`/lenses/${req.params.user}:${req.params.name}/` })
-              v.a('Edit Lens', { href: uri`/lenses/${req.params.user}:${req.params.name}/configuration` })
             }
           })
 
           if (!data.create) {
             v.panelTabs(
               { label: 'Lens', href: uri`/lenses/${req.params.user}:${req.params.name}/` },
-              req.owner && { label: 'Edit', href: uri`/lenses/${req.params.user}:${req.params.name}/configuration`, current: true },
-              { label: 'Logs', href: uri`/lenses/${req.params.user}:${req.params.name}/logs` }
+              { label: 'Edit', href: uri`/lenses/${req.params.user}:${req.params.name}/configuration`, if: req.owner, current: true },
+              { label: 'Logs', href: uri`/lenses/${req.params.user}:${req.params.name}/logs` },
+              { label: 'Export', href: uri`/lenses/${req.params.user}:${req.params.name}/export` }
             )
           }
         })
