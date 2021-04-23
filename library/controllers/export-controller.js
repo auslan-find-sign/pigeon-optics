@@ -86,24 +86,40 @@ function streamArchive (dataPath, archiveType, encoder, includeAttachments) {
   return zip
 }
 
+router.get('/:source(datasets|lenses)/:user\\::name/export', async (req, res) => {
+  if (req.params.source === 'datasets') {
+    return res.sendVibe('dataset-export', 'Export Dataset', {})
+  } else if (req.params.source === 'lenses') {
+    return res.sendVibe('lens-export', 'Export Lens', {})
+  } else {
+    throw new Error('Unsupported')
+  }
+})
+
 /**
  * Exports a readable dataset in the requested format (anything codec can stream - implements encoder() function)
  * Format can be specified either via .ext or Accepts header
  * ?at=(number) subsets the response to omit data field on any entries whose version number is less than the number
  * provided, allowing for more efficient pull syncing
  */
-router.get(`/:source(datasets|lenses)/:user\\::name/export.:format(${codec.exts.join('|')})?`, async (req, res) => {
+router.get(`/:source(datasets|lenses)/:user\\::name/export/flat-file.:format(${codec.exts.join('|')})?`, async (req, res) => {
   const path = codec.path.encode(req.params)
 
   if (!await readPath.exists(path)) {
     throw createHttpError.NotFound('Data Not Found')
   }
 
-  const encoder = codec.for(req.params.format || req.accepts(Object.keys(codec.mediaTypeHandlers)))
+  const encoder = codec.for(`.${req.params.format}`) || codec.for(req.accepts(Object.keys(codec.mediaTypeHandlers)))
   if (encoder && typeof encoder.encoder === 'function') {
     const mediaType = req.accepts(encoder.handles) || encoder.handles[0] // try to respond with the Content-Type asked for, otherwise use a default
     res.type(mediaType)
-    Readable.from(pathQuery(codec.path.encode(req.params), req.query)).pipe(encoder.encoder()).pipe(res)
+    res.attachment(`Export ${req.params.name}.${encoder.extensions[0]}`)
+    const dataStream = Readable.from(pathQuery(codec.path.encode(req.params), req.query))
+    if (encoder.entriesEncoder) {
+      dataStream.pipe(encoder.entriesEncoder()).pipe(res)
+    } else {
+      dataStream.pipe(encoder.encoder()).pipe(res)
+    }
   } else {
     throw createHttpError.NotAcceptable('Encoder for requested format not available')
   }
@@ -112,7 +128,7 @@ router.get(`/:source(datasets|lenses)/:user\\::name/export.:format(${codec.exts.
 /**
  * export a dataset/viewport output as a zip file
  */
-router.get(`/:source(datasets|lenses)/:user\\::name/archive.:format(${codec.exts.join('|')}).zip`, async (req, res) => {
+router.get(`/:source(datasets|lenses)/:user\\::name/export/archive.:format(${codec.exts.join('|')}).zip`, async (req, res) => {
   const path = codec.path.encode(req.params)
 
   if (!await readPath.exists(path)) {
@@ -124,7 +140,7 @@ router.get(`/:source(datasets|lenses)/:user\\::name/archive.:format(${codec.exts
   }
 
   res.attachment(`export-${req.params.name.replace(/[^a-zA-Z0-9-_]+/g, '_')}-${req.params.format}.zip`)
-  streamArchive(path, 'zip', codec.for(req.params.format), !!req.query.attachments).pipe(res)
+  streamArchive(path, 'zip', codec.for(`.${req.params.format}`), !!req.query.attachments).pipe(res)
 })
 
 /**

@@ -19,6 +19,10 @@ function expandElement (element) {
   }
 }
 
+function isJsonML (doc) {
+  return doc && typeof doc === 'object' && !Array.isArray(doc) && doc.JsonML
+}
+
 Object.assign(exports, {
   handles: ['application/xml', 'text/xml', 'application/rdf+xml', 'application/rss+xml', 'application/atom+xml', 'text/xml', 'application/xhtml+xml'],
   extensions: ['xml', 'rss', 'atom', 'xhtml'],
@@ -54,7 +58,7 @@ Object.assign(exports, {
   },
 
   jsonMLToArbitraryObject (jsonml) {
-    if (jsonml && typeof jsonml === 'object' && jsonml.JsonML) return this.jsonMLToArbitraryObject(jsonml.JsonML)
+    if (isJsonML(jsonml)) jsonml = jsonml.JsonML
     const tag = jsonml[0]
     const hasAttributes = jsonml[1] && typeof jsonml[1] === 'object'
     const attributes = hasAttributes ? jsonml[1] : {}
@@ -120,6 +124,39 @@ Object.assign(exports, {
       },
       flush (callback) {
         callback(null, Buffer.from('</array>\n', 'utf-8'))
+      }
+    })
+  },
+
+  // speciality encoder for building xml flat file exports
+  entriesEncoder () {
+    let first = true
+
+    return new streams.Transform({
+      writableObjectMode: true,
+      transform: (chunk, encoding, callback) => {
+        try {
+          let { id, data, hash, version } = chunk
+          if (!isJsonML(data)) {
+            data = expandElement(this.arbitraryObjectToJsonML(data))
+            data[1].xmlns = arbitraryNS
+          }
+          const entry = {
+            JsonML: ['record', { hash: hash.toString('hex'), version: version.toString(), id }, data]
+          }
+          const xmlString = this.encode(entry)
+          if (first) {
+            callback(null, Buffer.from(`<export xmlns="pigeon-optics:export">\n${xmlString}\n`, 'utf-8'))
+            first = false
+          } else {
+            callback(null, Buffer.from(`${xmlString}\n`, 'utf-8'))
+          }
+        } catch (err) {
+          callback(err)
+        }
+      },
+      flush (callback) {
+        callback(null, Buffer.from('</export>\n', 'utf-8'))
       }
     })
   }
