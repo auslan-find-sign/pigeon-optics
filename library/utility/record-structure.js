@@ -38,13 +38,13 @@ exports.listHashURLs = function listHashURLs (input) {
 
 /** transform an object which might contain file:/// URLs to use hash:// URLs instead
  * @param {*} input - input document, could be any kind of object that is cbor serialisable
- * @param {object} [attachedFilesByName] - the req.attachedFilesByName property that ./multipart-attachments makes
+ * @param {object} [filesByName] - the req.attachedFilesByName property that ./multipart-attachments makes
  * @returns {*} - input object, deep cloned, with file:/// strings swapped for hash:// strings
  */
-exports.resolveFileURLs = function resolveFileURLs (input, attachedFilesByName = {}) {
+exports.resolveFileURLs = function resolveFileURLs (input, filesByName = {}) {
   if (typeof input === 'string' && input.match(/^file:\/\/\//im)) {
     const filename = decodeURI(input.slice('file:///'.length))
-    const file = attachedFilesByName[filename]
+    const file = filesByName[filename]
     if (file) {
       return `hash://sha256/${file.hash.toString('hex')}?type=${encodeURIComponent(file.type)}`
     } else {
@@ -54,17 +54,17 @@ exports.resolveFileURLs = function resolveFileURLs (input, attachedFilesByName =
     if (input instanceof Map) {
       return new Map((function * () {
         for (const entry of input.entries()) {
-          yield entry.map(x => exports.resolveFileURLs(x, attachedFilesByName))
+          yield entry.map(x => exports.resolveFileURLs(x, filesByName))
         }
       })())
     } else if (input instanceof Set) {
       return new Set((function * () {
-        for (const value of input.values()) yield exports.resolveFileURLs(value, attachedFilesByName)
+        for (const value of input.values()) yield exports.resolveFileURLs(value, filesByName)
       })())
     } else if (Array.isArray(input)) {
-      return input.map(x => exports.resolveFileURLs(x, attachedFilesByName))
+      return input.map(x => exports.resolveFileURLs(x, filesByName))
     } else {
-      return Object.fromEntries(Object.entries(input).map(e => e.map(x => exports.resolveFileURLs(x, attachedFilesByName))))
+      return Object.fromEntries(Object.entries(input).map(e => e.map(x => exports.resolveFileURLs(x, filesByName))))
     }
   } else {
     return input

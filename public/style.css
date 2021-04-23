@@ -38,6 +38,7 @@ a {
   text-decoration: underline;
   text-decoration-style: dotted;
   text-decoration-color: inherit;
+  text-decoration-thickness: 1px;
 }
 
 a svg.icon {
