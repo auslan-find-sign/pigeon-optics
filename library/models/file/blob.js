@@ -8,7 +8,7 @@
 const asyncIterableToArray = require('../../utility/async-iterable-to-array')
 const HashThrough = require('hash-through')
 const { PassThrough } = require('stream')
-const fs = require('fs/promises')
+const fs = require('fs').promises
 const crypto = require('crypto')
 
 // used to store attachments in attachment store

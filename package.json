@@ -14,7 +14,7 @@
     "find-sign"
   ],
   "engines": {
-    "node": ">=14"
+    "node": ">=11.7.0"
   },
   "author": "Phoenix Fox",
   "license": "SEE LICENSE IN LICENSE.txt",
