@@ -63,6 +63,7 @@ describe('JsonML.toHTML()', () => {
   it('serializes well', () => {
     const output = JsonML.toHTML(testDocument)
     expect(output).to.equal([
+      '<!DOCTYPE html>\n',
       '<root><head><title>Wonderful World of Signs</title></head>',
       '<body><div id=heading><a href=http://signs.com/>Signs Homepage</a></div>',
       '<article><p>Hello there!</p><img src=foo.png><a href=/next>Next Page</a></article>',

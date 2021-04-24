@@ -7,7 +7,7 @@ const adapter = {
   className (node) { return this.attr(node, 'class') || '' },
   parent (node) { return elParents.get(node) },
   children (node) {
-    return node.filter((v, i) => i >= 2 && this.isTag(v))
+    return node.filter((v, i) => i >= 1 && this.isTag(v))
   },
   attr (node, attr) {
     return node[1] && node[1][attr]
@@ -15,20 +15,19 @@ const adapter = {
 
   // ducktype a JsonML tag
   isTag (node) {
-    return Array.isArray(node) && typeof node[0] === 'string' && node[1] && typeof node[1] === 'object'
+    return Array.isArray(node) && typeof node[0] === 'string'
   },
-  // getChildren (node) { return node.slice(2) },
-  // getParent (node) { return elParents.get(node) || null },
-
-  // getTagName (node) { return node[0] },
-  // getSiblings (node) { return this.getChildren(this.getParent(node)) },
 
   // like Element#textContents textContent dom api
   contents (node) {
     if (typeof node === 'string') {
       return node
     } else if (this.isTag(node)) {
-      return node.slice(2).map(x => this.contents(x)).join('')
+      if (node[0] === '#comment') {
+        return ''
+      } else {
+        return node.filter((v, i) => i >= 1 && (adapter.isTag(v) || typeof v === 'string')).map(x => this.contents(x)).join('')
+      }
     } else {
       throw new Error(`Unexpected data structure ${JSON.stringify(node)}`)
     }
@@ -88,33 +87,12 @@ exports.attr = function getAttribute (element, attributeName) {
 const toAttributes = require('../../vibe/to-attributes')
 const escapeText = require('../../vibe/escape-text')
 const escapeAttribute = require('../../vibe/escape-attribute')
-const selfClosingTags = new Set(require('html-tags/void'))
 /**
  * Given a JsonML element, or a string, render it to a HTML string, suitably escaped and structured
  * @param {string|Array} element
  * @returns {string}
  */
-exports.toHTML = function jsonmlToHTML (element) {
-  if (element && typeof element === 'object' && Array.isArray(element.JsonML)) element = element.JsonML
-  if (typeof element === 'string') return escapeText(element)
-  if (!Array.isArray(element)) throw new Error('Element must be an Array')
-  const [tag, attribs, ...children] = element
-  if (typeof tag !== 'string') throw new Error('First element of Array must be string tag name')
-  if (!attribs || typeof attribs !== 'object' || Array.isArray(attribs)) throw new Error('Second element of Array must be an object of attributes')
-  const isSelfClosing = selfClosingTags.has(tag.toLowerCase())
-
-  const output = [`<${escapeAttribute(tag)}${toAttributes(attribs)}>`]
-  if (isSelfClosing) {
-    if (children.length > 0) throw new Error(`<${tag}> is self closing, children aren't allowed`)
-  } else {
-    children.forEach(child => {
-      output.push(exports.toHTML(child))
-    })
-    output.push(`</${escapeAttribute(tag)}>`)
-  }
-
-  return output.join('')
-}
+exports.toHTML = require('../../models/codec/html/encode')
 
 /**
  * Given a JsonML element, or a string, render it to an XML string, suitably escaped and structured
