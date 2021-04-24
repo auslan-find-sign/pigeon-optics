@@ -62,7 +62,9 @@ function streamArchive (dataPath, archiveType, encoder, includeAttachments) {
       // zip-stream support for entry contents being strings or buffers seems broken
       // but stream inputs works, so just make streams
       // output cbor version
-      const recordStream = Readable.from([encoder.encode(data)])
+      let encoded = encoder.encode(data)
+      if (!Buffer.isBuffer(encoded)) encoded = Buffer.from(encoded, 'utf-8')
+      const recordStream = Readable.from([encoded])
       await entry(recordStream, { name: uri`/records/${recordID}.${encoder.extensions[0]}` })
 
       // write any attachments
@@ -134,11 +136,11 @@ router.get(`/:source(datasets|lenses)/:user\\::name/export/archive.:format(${cod
   const path = codec.path.encode(req.params)
 
   if (!await readPath.exists(path)) {
-    return createHttpError.NotFound('Data Not Found')
+    throw createHttpError.NotFound('Data Not Found')
   }
 
-  if (!codec.for(req.params.format)) {
-    return createHttpError.NotFound(`Format ${req.params.format} not available`)
+  if (!codec.for(`.${req.params.format}`)) {
+    throw createHttpError.NotFound(`Format ${req.params.format} not available`)
   }
 
   res.attachment(`export-${req.params.name.replace(/[^a-zA-Z0-9-_]+/g, '_')}-${req.params.format}.zip`)
@@ -173,8 +175,8 @@ router.get('/:source(datasets|lenses|meta)/:user\\::name/event-stream', expresse
   })
 })
 
-router.get(`/:source(datasets|lenses|meta)/:user\\::name/records/:recordID/raw.:format(${codec.exts.join('|')})?`, async (req, res) => {
-  const encoder = codec.for(`.${req.params.format}`)
+router.get('/:source(datasets|lenses|meta)/:user\\::name/as/:format/:recordID', async (req, res) => {
+  const encoder = req.params.format.includes('/') ? codec.for(req.params.format) : codec.for(`.${req.params.format}`)
 
   for await (const { data } of readPath(codec.path.encode(req.params))) {
     if (typeof data === 'string' || Buffer.isBuffer(data)) {
