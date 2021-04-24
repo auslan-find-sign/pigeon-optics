@@ -214,7 +214,7 @@ describe('workers/environment.js', () => {
 
   it('ivm environment: JsonML.toHTML()', async () => {
     const document = { JsonML: ['root', {}, ['div', { id: 'yeah' }, 'no'], ['span', {}, 'cool']] }
-    const expected = '<root><div id=yeah>no</div><span>cool</span></root>'
+    const expected = '<!DOCTYPE html>\n<root><div id=yeah>no</div><span>cool</span></root>'
     const res = await worker.reduce('toHTML', [document])
     expect(res).to.deep.equal({ errors: [], logs: [], value: expected })
   })
