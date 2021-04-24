@@ -1,5 +1,23 @@
 const stringHyphenate = require('./hyphenate')
-const escapeAttribute = require('./escape-attribute')
+const assert = require('assert')
+
+const table = {
+  '&': '&amp;',
+  '"': '&#34;',
+  "'": '&#39;',
+  '<': '&lt;',
+  '>': '&gt;'
+}
+
+// returns number of occurances of a search character within string
+function countChars (string, char) {
+  return Array.prototype.reduce.call(string, (prev, x) => x === char ? prev + 1 : prev, 0)
+}
+
+// escape text using a regexp to detect which characters need escaping
+function esc (str, regexp) {
+  return `${str}`.replace(regexp, char => table[char])
+}
 
 /**
  * convert an object of attributes in to a stringified serialized version, starting with a space, for building tags
@@ -10,18 +28,28 @@ const escapeAttribute = require('./escape-attribute')
  * @returns {string}
  */
 module.exports = function toAttributes (attributes, { xml = false, hyphenate = false } = {}) {
-  return Object.entries(attributes).map(([key, value]) => {
-    if (hyphenate) key = stringHyphenate(`${key}`)
+  return Object.entries(attributes).map(([name, value]) => {
+    if (hyphenate) name = stringHyphenate(`${name}`)
+    // other than controls, U+0020 SPACE, U+0022 ("), U+0027 ('), U+003E (>), U+002F (/), U+003D (=), and noncharacters.
+    assert(name.match(/^[^ "'>/=\0\cA-\cZ\u007F-\u009F]+$/), 'invalid attribute name')
+
     if (value === false) {
       return ''
-    } else if (value === true && xml !== true) {
-      return ` ${escapeAttribute(`${key}`)}`
+    } else if (value === true && !xml) {
+      return ` ${name}`
     } else {
       if (typeof value === 'function') value = value()
       if (typeof value !== 'string') value = JSON.stringify(value)
-      value = escapeAttribute(`${value}`)
-      if (xml === true || !value.match(/^[^ "'`=<>]+$/mg)) value = `"${value}"`
-      return ` ${escapeAttribute(`${key}`)}=${value}`
+
+      if (xml || !value.match(/^[^ "'`=<>]+$/mg)) {
+        if (countChars(value, '"') > countChars(value, "'")) {
+          return ` ${name}='${esc(value, /['&>]/g)}'`
+        } else {
+          return ` ${name}="${esc(value, /["&>]/g)}"`
+        }
+      } else {
+        return ` ${name}=${esc(value, /["'&<>]/g)}`
+      }
     }
   }).join('')
 }

@@ -5,9 +5,9 @@
 const SelfClosingTags = new Set(require('html-tags/void'))
 const Tags = new Set(require('html-tags'))
 const { PassThrough } = require('stream')
+const assert = require('assert')
 
 const hyphenate = require('./hyphenate')
-const escapeAttribute = require('./escape-attribute')
 const escapeText = require('./escape-text')
 const toAttributes = require('./to-attributes')
 
@@ -136,6 +136,9 @@ class VibeBuilder {
    * @param {function} block - function which builds internal tags indented inside this one, can be async, but if it is, be careful to await tag
    */
   async tag (tagName, ...args) {
+    assert(typeof tagName === 'string', 'tag name must be a string')
+    assert(tagName.match(/^[a-zA-Z0-9]+$/), 'tag name must be alphanumeric')
+
     const block = args.find(x => typeof x === 'function')
     const attribs = Object.fromEntries(
       args.filter(x => typeof x === 'object' && x !== null /* I hate you */)
@@ -146,7 +149,7 @@ class VibeBuilder {
     // emit opening tag
     const attribsString = this._attributeStringFromArgs(tagName, ...args)
 
-    this._rawText(`<${escapeAttribute(tagName)}${attribsString}>`)
+    this._rawText(`<${tagName}${attribsString}>`)
 
     if (attribs && attribs.innerHTML) this._rawText(attribs.innerHTML)
     if (stringContents) this.text(stringContents)
@@ -159,7 +162,7 @@ class VibeBuilder {
     }
 
     // emit closing tag if needed
-    if (!selfClosing) this._rawText(`</${escapeAttribute(tagName)}>`)
+    if (!selfClosing) this._rawText(`</${tagName}>`)
   }
 
   /**
@@ -187,7 +190,7 @@ class VibeBuilder {
   }
 
   doctype (typeString = 'html') {
-    this._rawText(`<!DOCTYPE ${escapeAttribute(typeString)}>\n`)
+    this._rawText(`<!DOCTYPE ${typeString}>\n`)
   }
 
   // defaults to do nothing, but can be useful for streaming output
