@@ -19,6 +19,67 @@ function expandElement (element) {
   }
 }
 
+// returns number of occurances of a search character within string
+function countChars (string, char) {
+  return Array.prototype.reduce.call(string, (prev, x) => x === char ? prev + 1 : prev, 0)
+}
+
+// does html encoding escaping to strings
+function esc (string, replaceList) {
+  const table = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }
+  return string.replace(/[&<>"']/g, char => replaceList.includes(char) ? table[char] : char)
+}
+
+function * buildXML (element) {
+  if (typeof element === 'object' && Array.isArray(element)) {
+    // tag
+    const [tag, ...more] = element
+    const attribs = more[0] && typeof more[0] === 'object' && !Array.isArray(more[0]) ? more.shift() : {}
+
+    if (tag === '#comment') {
+      // comment
+      yield `<!-- ${more.filter(x => typeof x === 'string').join('').replace('--', '-')} -->`
+    } else if (tag === '#document-fragment' || tag === '#document') {
+      // fragment, collection of multiple child tags
+      for (const child of more) yield * buildXML(child)
+    } else if (tag === '#cdata-section') {
+      yield `<![CDATA[${more.join('')}]]>`
+    } else if (tag.startsWith('?')) {
+      // processing instruction, like ?xml or ?xml-stylesheet
+      yield `<${tag}${[...buildXML(attribs)].join('')}?>`
+    } else {
+      if (more.length > 0) {
+        yield `<${tag}${[...buildXML(attribs)].join('')}>`
+        for (const child of more) {
+          yield * buildXML(child)
+        }
+        yield `</${tag}>`
+      } else {
+        yield `<${tag}${[...buildXML(attribs)].join('')}/>`
+      }
+    }
+  } else if (typeof element === 'object' && 'JsonML' in element) {
+    // document root
+    yield * buildXML(element.JsonML)
+  } else if (typeof element === 'object') {
+    // attributes
+    for (const [name, value] of Object.entries(element)) {
+      const singleQuoteCount = countChars(value, "'")
+      const doubleQuoteCount = countChars(value, '"')
+      if (doubleQuoteCount > singleQuoteCount) {
+        yield ` ${name}='${esc(value, "<&'")}'`
+      } else {
+        yield ` ${name}="${esc(value, '<&"')}"`
+      }
+    }
+  } else if (typeof element === 'string') {
+    // text node
+    yield esc(element, '&<')
+  } else {
+    throw new Error('Unsupported content ' + JSON.stringify(element))
+  }
+}
+
 function isJsonML (doc) {
   return doc && typeof doc === 'object' && !Array.isArray(doc) && doc.JsonML
 }
@@ -86,11 +147,11 @@ Object.assign(exports, {
 
   encode (obj) {
     if (obj && typeof obj === 'object' && !Array.isArray(obj) && ('JsonML' in obj) && Array.isArray(obj.JsonML)) {
-      return onml.stringify(obj.JsonML)
+      return [...buildXML(obj)].join('')
     } else {
       const arbitrary = expandElement(this.arbitraryObjectToJsonML(obj))
       arbitrary[1].xmlns = arbitraryNS
-      return onml.stringify(arbitrary)
+      return [...buildXML(arbitrary)].join('')
     }
   },
 

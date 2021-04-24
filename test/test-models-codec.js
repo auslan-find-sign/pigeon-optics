@@ -153,6 +153,20 @@ describe('models/codec.xml', function () {
     ]
     expect(output).to.equal(expected.join(''))
   })
+
+  it('behaves as expected', async function () {
+    const tests = {
+      '<tag attr="\'&quot;\'"/>': { JsonML: ['tag', { attr: "'\"'" }] },
+      '<tag attr=\'"&apos;"\'/>': { JsonML: ['tag', { attr: '"\'"' }] },
+      '<tag>foo</tag>': { JsonML: ['tag', 'foo'] },
+      '<tag/>': { JsonML: ['tag'] },
+      '<!-- this is a comment -->': { JsonML: ['#comment', 'this ', 'is', ' a comment'] },
+      '<![CDATA[Hello]]>': { JsonML: ['#cdata-section', 'Hello'] }
+    }
+    for (const [expected, input] of Object.entries(tests)) {
+      expect(codec.xml.encode(input)).to.equal(expected)
+    }
+  })
 })
 
 describe('models/codec.html', () => {
@@ -160,7 +174,7 @@ describe('models/codec.html', () => {
     const testPage = [
       '<!DOCTYPE html>',
       '<html><head><title>Hello World</title></head>',
-      '<body><p id="universe">how you doing??</p><!-- comments get stripped --></body>',
+      '<body><p id="universe">how you doing??</p><!-- comments are preserved --></body>',
       '</html>'
     ].join('\n')
 
@@ -171,7 +185,7 @@ describe('models/codec.html', () => {
     expect(dec).to.deep.equal({
       JsonML: ['html',
         ['head', ['title', 'Hello World']],
-        ['body', ['p', { id: 'universe' }, 'how you doing??']]
+        ['body', ['p', { id: 'universe' }, 'how you doing??'], ['#comment', ' comments are preserved ']]
       ]
     })
   })
