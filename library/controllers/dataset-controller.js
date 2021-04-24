@@ -235,30 +235,50 @@ router.all('/datasets/:user\\::name/records/:recordID', multipartFiles, async (r
 })
 
 // import individual json, yaml, cbor, or xml files as individual records named from their filename
-router.all('/datasets/:user\\::name/import/files', auth.ownerRequired, multipartFiles, async (req, res) => {
-  const state = {}
+router.all('/datasets/:user\\::name/import', auth.ownerRequired, multipartFiles, async (req, res) => {
+  const state = { mode: req.body.mode || 'files', overwrite: req.body.overwrite === 'true' }
 
-  console.log('dataset-import-files method', req.method)
   if (req.method === 'PUT') {
-    console.log('file import request starting')
     state.wroteCount = 0
     async function * generator () {
-      for (const filename in req.filesByName) {
-        const fileCodec = codec.for(filename.toLowerCase())
-        if (fileCodec) {
-          console.log('importing', filename)
-          const ext = fileCodec.extensions.find(x => filename.endsWith(`.${x}`))
-          const recordID = filename.slice(0, filename.length - (ext.length + 1))
-          const recordData = fileCodec.decode(await req.filesByName[filename].read())
-          const recordPath = codec.path.encode('datasets', req.params.user, req.params.name, recordID)
-          yield [recordID, await autoImport(req, recordPath, recordData)]
+      if (state.mode === 'files') {
+        // import files by filename
+        for (const filename in req.filesByName) {
+          const fileCodec = codec.for(filename.toLowerCase())
+          if (fileCodec) {
+            console.log('importing', filename)
+            const ext = fileCodec.extensions.find(x => filename.endsWith(`.${x}`))
+            const recordID = filename.slice(0, filename.length - (ext.length + 1))
+            const recordData = fileCodec.decode(await req.filesByName[filename].read())
+            const recordPath = codec.path.encode('datasets', req.params.user, req.params.name, recordID)
+            yield [recordID, await autoImport(req, recordPath, recordData)]
+            state.wroteCount += 1
+          }
+        }
+      } else {
+        // import a single file using streaming decoding
+        const file = req.filesByField.file[0]
+        if (!file) throw new Error('No file provided')
+
+        const fileCodec = codec.for(file.filename.toLowerCase()) || codec.for(file.type)
+        if (!fileCodec) throw new Error('Unsupported file type')
+
+        for (const entry of (await file.readStream()).pipe(fileCodec.decoder())) {
+          if (Array.isArray(entry)) {
+            if (entry.length !== 2) throw new Error('entries style array bodies must have two elements, id and data')
+            yield entry
+          } else if (typeof entry === 'object') {
+            if (typeof entry.id !== 'string') throw new Error('object style bodies must have a string id property')
+            if (!('data' in entry)) throw new Error('object style bodies must have a data property containing record data')
+            yield [entry.id, entry.data]
+          }
           state.wroteCount += 1
         }
       }
     }
 
-    await dataset.writeEntries(req.params.user, req.params.name, generator(), { overwrite: req.query.overwrite === 'true' })
+    await dataset.writeEntries(req.params.user, req.params.name, generator(), { overwrite: state.overwrite })
   }
 
-  res.sendVibe('dataset-import-files', 'Import Files', state)
+  res.sendVibe('dataset-import', 'Import Files', state)
 })
