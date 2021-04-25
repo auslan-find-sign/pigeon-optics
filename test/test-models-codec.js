@@ -3,6 +3,18 @@ const { expect } = require('chai')
 const { Readable } = require('stream')
 const asyncIterableToArray = require('../library/utility/async-iterable-to-array')
 
+const unicodeStrings = [
+  'بِسْمِ ٱللّٰهِ ٱلرَّحْمـَبنِ ٱلرَّحِيمِ', // arabic
+  'ஸ்றீனிவாஸ ராமானுஜன் ஐயங்கார்', // tamil
+  '子曰：「學而時習之，不亦說乎？有朋自遠方來，不亦樂乎？', // chinese
+  'पशुपतिरपि तान्यहानि कृच्छ्राद् ', // sanskrit
+  'Ἰοὺ ἰού· τὰ πάντʼ ἂν ἐξήκοι σαφῆ. ', // greek
+  'По оживлённым берегам ', // russian
+  '♖ ♘ ♗ ♕ ♔ ♗ ♘ ♖', // chess
+  '👋🤚🖐✋🖖👌🤌🤏🤞🤟🤘🤙👈👉👆🖕👇👍👎✊👊🤛🤜👏🙌👐🤲🤝', // plain emoji
+  '👋🏽🤚🏽🖐🏽✋🏽🖖🏽👌🏽🤌🏽🤏🏽✌🏽🤞🏽🤟🏽🤘🏽🤙🏽👈🏽👉🏽👆🏽🖕🏽👇🏽' // skin tone emoji
+]
+
 const tests = [
   true,
   false,
@@ -25,7 +37,8 @@ const tests = [
     buffery: Buffer.from('hello world')
   },
   ['element', { name: 'foo' }, 'text node', ['subel', { name: 'bar' }], 'after text node'],
-  { JsonML: ['element', { name: 'foo' }, 'text node', ['subel', { name: 'bar' }], 'after text node'] }
+  { JsonML: ['element', { name: 'foo' }, 'text node', ['subel', { name: 'bar' }], 'after text node'] },
+  ...unicodeStrings
 ]
 
 describe('models/codec.json', function () {
@@ -167,27 +180,69 @@ describe('models/codec.xml', function () {
       expect(codec.xml.encode(input)).to.equal(expected)
     }
   })
+
+  it('handles unicode', () => {
+    for (const string of unicodeStrings) {
+      expect(codec.xml.decode(codec.xml.encode(string))).to.equal(string)
+      expect(codec.xml.encode(codec.xml.decode(`<root>${string}</root>`))).to.equal(`<root>${string}</root>`)
+    }
+  })
 })
 
 describe('models/codec.html', () => {
-  it('can encode and decode a simple page', () => {
-    const testPage = [
-      '<!DOCTYPE html>',
-      '<html><head><title>Hello World</title></head>',
-      '<body><p id="universe">how you doing??</p><!-- comments are preserved --></body>',
-      '</html>'
-    ].join('\n')
+  const testPage = [
+    '<!DOCTYPE html>\n',
+    '<html><head><title>Hello World</title></head>',
+    '<body><p id="universe">how you doing??</p><!-- comments are preserved --></body>',
+    '</html>'
+  ].join('')
 
+  it('can decode a simple html page', () => {
     const dec = codec.html.decode(testPage)
-    const enc = codec.html.encode(dec)
-    const roundtrip = codec.html.decode(enc)
-    expect(dec).to.deep.equal(roundtrip)
     expect(dec).to.deep.equal({
       JsonML: ['html',
         ['head', ['title', 'Hello World']],
         ['body', ['p', { id: 'universe' }, 'how you doing??'], ['#comment', ' comments are preserved ']]
       ]
     })
+  })
+
+  it('encodes reasonable structures accurately', () => {
+    expect(codec.html.encode(['#comment', ' hello '])).to.equal('<!-- hello -->')
+    expect(codec.html.encode(['#document-fragment', ['br'], ['br']])).to.equal('<br><br>')
+    expect(codec.html.encode('foo')).to.equal('foo')
+    expect(codec.html.encode('&amp;')).to.equal('&amp;amp;')
+    expect(codec.html.encode('<tag>')).to.equal('&lt;tag>')
+    expect(codec.html.encode({ id: 'bar' })).to.equal(' id=bar')
+    expect(codec.html.encode(['#cdata-section', 'testing & stuff'])).to.equal('<![CDATA[testing & stuff]]>')
+  })
+
+  it('decodes the core types correctly', () => {
+    expect(codec.html.decode('<!-- hello -->')).to.deep.equal(['#comment', ' hello '])
+    expect(codec.html.decode('<br><br>')).to.deep.equal(['#document-fragment', ['br'], ['br']])
+    expect(codec.html.decode('foo')).to.deep.equal('foo')
+    expect(codec.html.decode('&amp;amp;')).to.deep.equal('&amp;')
+    expect(codec.html.decode('&lt;tag>')).to.deep.equal('<tag>')
+    expect(codec.html.decode('<![CDATA[testing & stuff]]>')).to.deep.equal(['#cdata-section', 'testing & stuff'])
+    expect(codec.html.decode('<tag name=yehaw></tag>')).to.deep.equal(['tag', { name: 'yehaw' }])
+  })
+
+  it('roundtrips well', () => {
+    const dec = codec.html.decode(testPage)
+    const enc = codec.html.encode(dec)
+    const roundtrip = codec.html.decode(enc)
+    expect(dec).to.deep.equal(roundtrip)
+  })
+
+  it('handles unicode', () => {
+    for (const string of unicodeStrings) {
+      expect(codec.html.encode(string)).to.equal(string)
+      expect(codec.html.encode(['tag', string])).to.equal(`<tag>${string}</tag>`)
+      expect(codec.html.encode(['img', { title: ' ' + string }])).to.equal(`<img title=" ${string}">`)
+      expect(codec.html.decode(string)).to.equal(string)
+      expect(codec.html.decode(`<tag>${string}</tag>`)).to.deep.equal(['tag', string])
+      expect(codec.html.decode(`<img title="${string}">`)).to.deep.equal(['img', { title: string }])
+    }
   })
 })
 

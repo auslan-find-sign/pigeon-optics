@@ -6,7 +6,7 @@
   "repo": "https://github.com/auslan-find-sign/pigeon-optics.git",
   "homepage": "https://github.com/auslan-find-sign/pigeon-optics/",
   "scripts": {
-    "test": "mocha --exit --trace-warnings",
+    "test": "npm run build; mocha --exit --trace-warnings",
     "build": "browserify library/workers/environment.js/index.js --full-paths -o library/workers/environment.js/build.js"
   },
   "keywords": [
@@ -37,6 +37,7 @@
     "h.js": "^5.1.0",
     "hash-through": "^0.1.16",
     "html-tags": "^3.1.0",
+    "htmlparser2": "^6.1.0",
     "http-errors": "^1.8.0",
     "isolated-vm": "^3.3.10",
     "it-multipart": "^1.0.9",
@@ -48,7 +49,6 @@
     "object-hash": "^2.1.1",
     "on-finished": "^2.3.0",
     "onml": "^2.1.0",
-    "parse5": "^6.0.1",
     "path-to-regexp": "^6.2.0",
     "stacktracey": "^2.0.18",
     "string-natural-compare": "^3.0.1",

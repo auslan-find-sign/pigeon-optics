@@ -4,7 +4,7 @@ const esc = require('./escape')
 const countChars = require('../xml/count-chars')
 
 module.exports = function * buildHTML (element) {
-  if (typeof element === 'object' && Array.isArray(element)) {
+  if (Array.isArray(element)) {
     // tag
     const [tag, ...more] = element
     const attribs = more[0] && typeof more[0] === 'object' && !Array.isArray(more[0]) ? more.shift() : {}
