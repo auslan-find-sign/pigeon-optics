@@ -1,7 +1,6 @@
 // given an express request, if the body is multipart/form-data, streams attachments in to the attachment store
 // and copies the cbor/json data in to req.body
 // const settings = require('../models/settings')
-const createHttpError = require('http-errors')
 const crypto = require('crypto')
 const codec = require('../models/codec')
 // const xbytes = require('xbytes')
@@ -12,6 +11,7 @@ const { Readable } = require('stream')
 const ctype = require('content-type')
 const cdisp = require('content-disposition')
 const asyncIterableToArray = require('./async-iterable-to-array')
+const { resolveContentIDs } = require('./record-structure')
 
 // const maxAttachment = xbytes.parseSize(settings.maxAttachmentSize)
 // const maxRecord = xbytes.parseSize(settings.maxRecordSize)
@@ -59,25 +59,30 @@ module.exports = async function (req, res, next) {
         req.files.push(file)
         req.filesByHash[hash.toString('hex')] = file
         req.filesByName[filename] = file
+        if (['content-id'] in headers) req.filesByName[headers['content-id']] = file
         req.filesByField[name] = (req.filesByField[name] || [])
         req.filesByField[name].push(file)
-      } else if (contentType.type === 'text/plain') {
-        // it's probably a form field? parse it in to req.body's properties
-        req.body[name] = Buffer.concat(await asyncIterableToArray(body)).toString(encoding || 'utf-8')
       } else {
+        let value
         const encoder = codec.for(contentType.type)
         if (encoder && encoder.decode) {
-          const value = encoder.decode(Buffer.concat(await asyncIterableToArray(body)))
-          if (name === 'body') {
-            req.body = value
-          } else {
-            req.body[name] = value
-          }
+          value = encoder.decode(Buffer.concat(await asyncIterableToArray(body)))
+        } else if (contentType.type === 'text/plain') {
+          value = Buffer.concat(await asyncIterableToArray(body)).toString(encoding || 'utf-8')
         } else {
-          return next(createHttpError.BadRequest(`Form data field ${name} is not a file (doesn't have filename in content-disposition) and is not parseable with any codec on server. Unacceptable.`))
+          value = Buffer.concat(await asyncIterableToArray(body))
+        }
+
+        if (name === 'body' && encoder && encoder.decode) {
+          req.body = value
+        } else {
+          req.body[name] = value
         }
       }
     }
+
+    // resolve any cid: URLs in the body data structure
+    req.body = resolveContentIDs(req.body, req.filesByName)
 
     finished(res, () => {
       storage.delete()

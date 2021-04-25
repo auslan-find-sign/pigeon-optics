@@ -82,24 +82,25 @@ describe('utility/record-structure.listHashURLs', function () {
   })
 })
 
-describe('utility/record-structure.resolveFileURLs', function () {
+describe('utility/record-structure.resolveContentIDs', function () {
   it('converts the document', function () {
-    const attachedFilesByName = {
-      'foo.txt': { path: '/tmp/foo-123.txt', hash: crypto.randomBytes(32), type: 'text/plain' },
-      'bar.bin': { path: '/tmp/bar-xyz.bin', hash: crypto.randomBytes(32), type: 'application/octet-stream' }
+    const files = {
+      'foo.txt': { hash: crypto.randomBytes(32), type: 'text/plain' },
+      'bar.bin': { hash: crypto.randomBytes(32), type: 'application/octet-stream' }
     }
+    const hash = Object.fromEntries(Object.entries(files).map(([k, v]) => [k, makehash(v.hash, v.type)]))
 
     const input = {
-      hey: 'file:///foo.txt',
-      cool: ['yes', 'file:///bar.bin', 'no'],
-      'file:///foo.txt': 6
+      hey: 'cid:foo.txt',
+      cool: ['yes', 'cid:bar.bin', 'no'],
+      'cid:foo.txt': 6
     }
     const expected = {
-      hey: makehash(attachedFilesByName['foo.txt'].hash, attachedFilesByName['foo.txt'].type),
-      cool: ['yes', makehash(attachedFilesByName['bar.bin'].hash, attachedFilesByName['bar.bin'].type), 'no'],
-      [makehash(attachedFilesByName['foo.txt'].hash, attachedFilesByName['foo.txt'].type)]: 6
+      hey: hash['foo.txt'],
+      cool: ['yes', hash['bar.bin'], 'no'],
+      [hash['foo.txt']]: 6
     }
-    const output = recStruc.resolveFileURLs(input, attachedFilesByName)
+    const output = recStruc.resolveContentIDs(input, files)
     expect(output).to.deep.equal(expected)
   })
 })
