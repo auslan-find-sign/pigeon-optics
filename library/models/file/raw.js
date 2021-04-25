@@ -157,16 +157,21 @@ exports.writeStream = async function (dataPath, stream) {
 
   const rand = `${Math.round(Math.random() * 0xFFFFFF)}-${Math.round(Math.random() * 0xFFFFFF)}`
   const tempPath = path.join(os.tmpdir(), `pigeon-optics-writing-${rand}${this.extension}`)
-  await event(stream.pipe(fs.createWriteStream(tempPath)), 'finish')
 
-  // update backup with a copy of what was here previously if something old exists
-  if (await fs.pathExists(path1)) {
-    await fs.remove(path2)
-    await fs.move(path1, path2)
+  try {
+    await event(stream.pipe(fs.createWriteStream(tempPath)), 'finish')
+
+    // update backup with a copy of what was here previously if something old exists
+    if (await fs.pathExists(path1)) {
+      await fs.remove(path2)
+      await fs.move(path1, path2)
+    }
+
+    await fs.move(tempPath, path1)
+    await fs.remove(path2) // everything succeeded, we can erase the backup
+  } finally {
+    await fs.remove(tempPath)
   }
-
-  await fs.move(tempPath, path1)
-  await fs.remove(path2) // everything succeeded, we can erase the backup
 }
 
 /**
