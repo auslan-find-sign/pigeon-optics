@@ -1,180 +1,4 @@
-(function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({"/Users/phx/GitHub/pigeon-optics/library/models/codec/html/build-html.js":[function(require,module,exports){
-const assert = require('assert')
-const selfClosingTags = new Set(require('html-tags/void'))
-const esc = require('./escape')
-const countChars = require('../xml/count-chars')
-
-module.exports = function * buildHTML (element) {
-  if (Array.isArray(element)) {
-    // tag
-    const [tag, ...more] = element
-    const attribs = more[0] && typeof more[0] === 'object' && !Array.isArray(more[0]) ? more.shift() : {}
-    assert(typeof tag === 'string', 'tag name must be a string')
-
-    if (tag === '#comment') {
-      // comment
-      yield `<!--${more.join('')}-->`
-    } else if (tag === '#document-fragment') {
-      // fragment, collection of multiple child tags
-      for (const child of more) yield * buildHTML(child)
-    } else if (tag === '#document') {
-      yield '<!DOCTYPE html>\n'
-      for (const child of more) yield * buildHTML(child)
-    } else if (tag === '#cdata-section') {
-      yield '<![CDATA['
-      for (const child of more) yield * buildHTML(child)
-      yield ']]>'
-    } else if (tag.startsWith('?')) {
-      // processing instruction, like ?xml or ?xml-stylesheet
-      yield `<${tag}${[...buildHTML(attribs)].join('')}?>`
-    } else {
-      const isSelfClosing = selfClosingTags.has(tag.toLowerCase())
-      assert(tag.match(/^[a-zA-Z0-9]+$/), 'tag name must be alphanumeric')
-
-      if (isSelfClosing) {
-        yield `<${tag}${[...buildHTML(attribs)].join('')}>`
-        if (more.length > 0) throw new Error(`<${tag}> html element cannot contain child nodes`)
-      } else {
-        yield `<${tag}${[...buildHTML(attribs)].join('')}>`
-        for (const child of more) {
-          yield * buildHTML(child)
-        }
-        yield `</${tag}>`
-      }
-    }
-  } else if (typeof element === 'object') {
-    // attributes
-    for (const [name, value] of Object.entries(element)) {
-      assert(name.match(/^[^ "'>/=\0\cA-\cZ\u007F-\u009F]+$/), 'invalid attribute name')
-
-      if (value === true) {
-        yield ` ${name}`
-      } else if (value === false) {
-        continue
-      } else if (typeof value === 'string') {
-        if (value.match(/^[^ "'`=<>]+$/mg)) {
-          // no quotes needed
-          yield ` ${name}=${esc(value, '"\'&<>')}`
-        } else {
-          const singleQuoteCount = countChars(value, "'")
-          const doubleQuoteCount = countChars(value, '"')
-          if (doubleQuoteCount > singleQuoteCount) {
-            yield ` ${name}='${esc(value, "<&'")}'`
-          } else {
-            yield ` ${name}="${esc(value, '<&"')}"`
-          }
-        }
-      }
-    }
-  } else if (typeof element === 'string') {
-    // text node
-    yield esc(element, '&<')
-  } else {
-    throw new Error('Unsupported content ' + JSON.stringify(element))
-  }
-}
-
-},{"../xml/count-chars":"/Users/phx/GitHub/pigeon-optics/library/models/codec/xml/count-chars.js","./escape":"/Users/phx/GitHub/pigeon-optics/library/models/codec/html/escape.js","assert":"/Users/phx/GitHub/pigeon-optics/node_modules/assert/assert.js","html-tags/void":"/Users/phx/GitHub/pigeon-optics/node_modules/html-tags/void.js"}],"/Users/phx/GitHub/pigeon-optics/library/models/codec/html/encode.js":[function(require,module,exports){
-const buildHTML = require('./build-html')
-
-/**
- * Given a JsonML element, or a string, render it to a HTML string, suitably escaped and structured
- * @param {string|Array} element
- * @returns {string}
- */
-module.exports = function encode (element) {
-  if (typeof element === 'object' && !Array.isArray(element) && 'JsonML' in element) {
-    element = ['#document', element.JsonML]
-  }
-
-  return [...buildHTML(element)].join('')
-}
-
-},{"./build-html":"/Users/phx/GitHub/pigeon-optics/library/models/codec/html/build-html.js"}],"/Users/phx/GitHub/pigeon-optics/library/models/codec/html/escape.js":[function(require,module,exports){
-// does html encoding escaping to strings in the most minimally invasive way possible, including ambiguous ampersand logic
-module.exports = function esc (string, replaceList) {
-  const table = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }
-  return string.replace(/(&[#a-zA-Z0-9][a-zA-Z0-9]*;|[<>"'])/g, match => {
-    const char = match[0]
-    return (replaceList.includes(char) ? table[char] : char) + match.slice(1)
-  })
-}
-
-},{}],"/Users/phx/GitHub/pigeon-optics/library/models/codec/xml/build-xml.js":[function(require,module,exports){
-const assert = require('assert')
-const countChars = require('./count-chars')
-const esc = require('./escape')
-
-module.exports = function * buildXML (element) {
-  if (Array.isArray(element)) {
-    // tag
-    const [tag, ...more] = element
-    const attribs = more[0] && typeof more[0] === 'object' && !Array.isArray(more[0]) ? more.shift() : {}
-    assert(typeof tag === 'string', 'tag name must be a string')
-    assert(tag.length > 0, 'tag must not be an empty string')
-
-    if (tag === '#comment') {
-      // comment
-      yield `<!-- ${more.filter(x => typeof x === 'string').join('').replace('--', '-')} -->`
-    } else if (tag === '#document-fragment' || tag === '#document') {
-      // fragment, collection of multiple child tags
-      for (const child of more) yield * buildXML(child)
-    } else if (tag === '#cdata-section') {
-      yield `<![CDATA[${more.join('')}]]>`
-    } else if (tag.startsWith('?')) {
-      // processing instruction, like ?xml or ?xml-stylesheet
-      yield `<${tag}${[...buildXML(attribs)].join('')}?>`
-    } else {
-      if (more.length > 0) {
-        yield `<${tag}${[...buildXML(attribs)].join('')}>`
-        for (const child of more) {
-          yield * buildXML(child)
-        }
-        yield `</${tag}>`
-      } else {
-        yield `<${tag}${[...buildXML(attribs)].join('')}/>`
-      }
-    }
-  } else if (typeof element === 'object' && 'JsonML' in element) {
-    // document root
-    yield * buildXML(element.JsonML)
-  } else if (typeof element === 'object') {
-    // attributes
-    for (const [name, value] of Object.entries(element)) {
-      assert(typeof name === 'string')
-      assert(name.length > 0)
-      assert(typeof value === 'string')
-
-      const singleQuoteCount = countChars(value, "'")
-      const doubleQuoteCount = countChars(value, '"')
-      if (doubleQuoteCount > singleQuoteCount) {
-        yield ` ${name}='${esc(value, "<&'")}'`
-      } else {
-        yield ` ${name}="${esc(value, '<&"')}"`
-      }
-    }
-  } else if (typeof element === 'string') {
-    // text node
-    yield esc(element, '&<')
-  } else {
-    assert.fail('Unsupported content ' + JSON.stringify(element))
-  }
-}
-
-},{"./count-chars":"/Users/phx/GitHub/pigeon-optics/library/models/codec/xml/count-chars.js","./escape":"/Users/phx/GitHub/pigeon-optics/library/models/codec/xml/escape.js","assert":"/Users/phx/GitHub/pigeon-optics/node_modules/assert/assert.js"}],"/Users/phx/GitHub/pigeon-optics/library/models/codec/xml/count-chars.js":[function(require,module,exports){
-// returns number of occurances of a search character within string
-module.exports = function countChars (string, char) {
-  return Array.prototype.reduce.call(string, (prev, x) => x === char ? prev + 1 : prev, 0)
-}
-
-},{}],"/Users/phx/GitHub/pigeon-optics/library/models/codec/xml/escape.js":[function(require,module,exports){
-// does html encoding escaping to strings
-module.exports = function esc (string, replaceList) {
-  const table = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }
-  return string.replace(/[&<>"']/g, char => replaceList.includes(char) ? table[char] : char)
-}
-
-},{}],"/Users/phx/GitHub/pigeon-optics/library/workers/environment.js/index.js":[function(require,module,exports){
+(function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({"/Users/phx/GitHub/pigeon-optics/library/workers/environment.js/index.js":[function(require,module,exports){
 (function (global){(function (){
 // Environment script, establishes any APIs available inside of the javascript lens virtual machine
 // This script is run through browserify to embed libraries like css-select
@@ -182,47 +6,15 @@ Math.random = function () {
   throw new Error('Math.random() is unavailable. Lenses must be deterministic, not random')
 }
 
-global.JsonML = require('./jsonml')
+global.Markup = require('./markup')
 
 }).call(this)}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./jsonml":"/Users/phx/GitHub/pigeon-optics/library/workers/environment.js/jsonml.js"}],"/Users/phx/GitHub/pigeon-optics/library/workers/environment.js/jsonml.js":[function(require,module,exports){
-const elParents = new WeakMap()
+},{"./markup":"/Users/phx/GitHub/pigeon-optics/library/workers/environment.js/markup.js"}],"/Users/phx/GitHub/pigeon-optics/library/workers/environment.js/markup.js":[function(require,module,exports){
 const treeSelector = require('tree-selector')
+const treeAdapter = require('pigeonmark-utils/library/tree-selector-adapter')
+const utils = require('pigeonmark-utils')
 
-const adapter = {
-  tag (node) { return node[0] || '' },
-  id (node) { return this.attr(node, 'id') || '' },
-  className (node) { return this.attr(node, 'class') || '' },
-  parent (node) { return elParents.get(node) },
-  children (node) {
-    return node.filter((v, i) => i >= 1 && this.isTag(v))
-  },
-  attr (node, attr) {
-    return node[1] && node[1][attr]
-  },
-
-  // ducktype a JsonML tag
-  isTag (node) {
-    return Array.isArray(node) && typeof node[0] === 'string'
-  },
-
-  // like Element#textContents textContent dom api
-  contents (node) {
-    if (typeof node === 'string') {
-      return node
-    } else if (this.isTag(node)) {
-      if (node[0] === '#comment') {
-        return ''
-      } else {
-        return node.filter((v, i) => i >= 1 && (adapter.isTag(v) || typeof v === 'string')).map(x => this.contents(x)).join('')
-      }
-    } else {
-      throw new Error(`Unexpected data structure ${JSON.stringify(node)}`)
-    }
-  }
-}
-
-const querySelector = treeSelector.createQuerySelector(adapter)
+const querySelector = treeSelector.createQuerySelector(treeAdapter)
 /**
  * Query a JsonML xml document using a css selector string, get an array of results
  * @param {JsonMLElement} root - root element of the document, or an object with a JsonML property containing such
@@ -230,66 +22,30 @@ const querySelector = treeSelector.createQuerySelector(adapter)
  * @returns {JsonMLElement[]}
  */
 exports.select = function select (root, selector) {
-  // for docs wrapped in { JsonML: ... } unpack that firstly
-  if (root && typeof root === 'object' && adapter.isTag(root.JsonML)) root = root.JsonML
-  if (!adapter.isTag(root)) throw new Error('first argument to select must be a JsonML Element array')
-
-  // build parents metadata necessary to emulate dom api
-  function walk (node) {
-    if (adapter.isTag(node)) {
-      for (const child of adapter.children(node)) {
-        elParents.set(child, node)
-        walk(child, node)
-      }
-    }
-  }
-  walk(root)
-  elParents.delete(root)
-
+  // get treeAdapter to learn the child -> parent mapping, necessary for css selecting
+  treeAdapter.scan(root)
   return querySelector(selector, root)
 }
 
-/**
- * convert JsonML elements in to just their text content, like DOMElement#textContents
- * @param {JsonMLElement|JsonMLElement[]} element - JsonMLElement, which is an Array, or an array of those to concat
- * @returns {string}
- */
-exports.text = function textContents (element) {
-  if (element && Array.isArray(element) && element.every(x => adapter.isTag(x))) return element.map(x => adapter.contents(x)).join('')
-  if (element && typeof element === 'object' && Array.isArray(element.JsonML)) element = element.JsonML
-  return adapter.contents(element)
-}
-
-/**
- * read attribute value of a JsonML Element
- * @param {JsonMLElement} element - JsonMLElement, which is an Array
- * @param {string} attributeName
- * @returns {string}
- */
-exports.attr = function getAttribute (element, attributeName) {
-  if (adapter.isTag(element)) {
-    return adapter.attr(element, attributeName)
-  }
-}
+exports.get = utils.get
+exports.set = utils.set
+exports.isPigeonMark = utils.isPigeonMark
 
 /**
  * Given a JsonML element, or a string, render it to a HTML string, suitably escaped and structured
  * @param {string|Array} element
  * @returns {string}
  */
-exports.toHTML = require('../../models/codec/html/encode')
+exports.toHTML = require('pigeonmark-html/library/encode')
 
-const buildXML = require('../../models/codec/xml/build-xml')
 /**
  * Given a JsonML element, or a string, render it to a HTML string, suitably escaped and structured
  * @param {string|Array} element
  * @returns {string}
  */
-exports.toXML = function encode (element) {
-  return [...buildXML(element)].join('')
-}
+exports.toXML = require('pigeonmark-xml/library/encode')
 
-},{"../../models/codec/html/encode":"/Users/phx/GitHub/pigeon-optics/library/models/codec/html/encode.js","../../models/codec/xml/build-xml":"/Users/phx/GitHub/pigeon-optics/library/models/codec/xml/build-xml.js","tree-selector":"/Users/phx/GitHub/pigeon-optics/node_modules/tree-selector/lib/cjs/index.js"}],"/Users/phx/GitHub/pigeon-optics/node_modules/assert/assert.js":[function(require,module,exports){
+},{"pigeonmark-html/library/encode":"/Users/phx/GitHub/pigeon-optics/node_modules/pigeonmark-html/library/encode.js","pigeonmark-utils":"/Users/phx/GitHub/pigeon-optics/node_modules/pigeonmark-utils/library/index.js","pigeonmark-utils/library/tree-selector-adapter":"/Users/phx/GitHub/pigeon-optics/node_modules/pigeonmark-utils/library/tree-selector-adapter.js","pigeonmark-xml/library/encode":"/Users/phx/GitHub/pigeon-optics/node_modules/pigeonmark-xml/library/encode.js","tree-selector":"/Users/phx/GitHub/pigeon-optics/node_modules/tree-selector/lib/cjs/index.js"}],"/Users/phx/GitHub/pigeon-optics/node_modules/assert/assert.js":[function(require,module,exports){
 (function (global){(function (){
 'use strict';
 
@@ -1535,6 +1291,658 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
 
 	return to;
 };
+
+},{}],"/Users/phx/GitHub/pigeon-optics/node_modules/pigeonmark-html/library/build-html.js":[function(require,module,exports){
+const assert = require('assert')
+const selfClosingTags = new Set(require('html-tags/void'))
+const esc = require('./escape')
+const utils = require('pigeonmark-utils')
+
+function frequency (string, chars) {
+  const frequencies = Object.fromEntries([...chars].map(x => [x, 0]))
+  for (const char of `${string}`) {
+    if (typeof frequencies[char] === 'number') frequencies[char] += 1
+  }
+  return frequencies
+}
+
+const build = module.exports = {
+  * any (element) {
+    const type = utils.get.type(element)
+    const builder = build[type]
+    if (!builder) throw new Error(`Cannot encode type ${JSON.stringify(type)} for element ${JSON.stringify(element)}`)
+    yield * builder(element)
+  },
+
+  * tag (element) {
+    const tag = utils.get.name(element)
+    const hasAttribs = element[1] && typeof element[1] === 'object' && !Array.isArray(element[1])
+    const attribs = hasAttribs ? element[1] : undefined
+    assert(typeof tag === 'string', 'tag name must be a string')
+    assert(tag.match(/^[a-zA-Z0-9]+$/), 'tag name must be alphanumeric')
+
+    const isSelfClosing = selfClosingTags.has(tag.toLowerCase())
+    if (isSelfClosing) {
+      if (element.length > (hasAttribs ? 2 : 1)) throw new Error(`<${tag}> html element cannot contain child nodes`)
+      yield `<${tag}${[...build.attributes(attribs)].join('')}>`
+    } else {
+      yield `<${tag}${[...build.attributes(attribs)].join('')}>`
+      for (const child of element.slice(hasAttribs ? 2 : 1)) {
+        yield * build.any(child)
+      }
+      yield `</${tag}>`
+    }
+  },
+
+  * text (element) {
+    yield esc(element, '&<')
+  },
+
+  * attributes (element) {
+    for (const name in element) {
+      const value = `${element[name]}`
+      assert(!`${name}`.match(/[ "'>/=\0\cA-\cZ\u007F-\u009F]/), 'invalid attribute name')
+
+      if (value === true || value === '') {
+        yield ` ${name}`
+      } else if (!value) {
+        continue
+      } else if (typeof value === 'string') {
+        if (value.match(/[ "'`=<>]/)) {
+          const counts = frequency(value, '\'"')
+          if (counts['"'] > counts["'"]) {
+            yield ` ${name}='${esc(value, "&'")}'`
+          } else {
+            yield ` ${name}="${esc(value, '&"')}"`
+          }
+        } else {
+          // no quotes needed
+          yield ` ${name}=${esc(value, '"\'&<>')}`
+        }
+      }
+    }
+  },
+
+  * comment (element) {
+    yield `<!--${utils.get.text(element).replace('--', ' - -')}-->`
+  },
+
+  * fragment (element) {
+    for (const child of utils.get.childNodes(element)) {
+      yield * build.any(child)
+    }
+  },
+
+  * document (element) {
+    const doctype = utils.get.attribute(element, 'doctype')
+    if (typeof doctype === 'string') yield `<!DOCTYPE ${doctype}>\n`
+    for (const child of utils.get.childNodes(element)) {
+      yield * build.any(child)
+    }
+  },
+
+  * cdata (element) {
+    const text = utils.get.text(element)
+    assert(!text.includes(']]>'), 'CDATA cannot contain the literal text ]]>')
+    yield `<![CDATA[${text}]]>`
+  }
+}
+
+},{"./escape":"/Users/phx/GitHub/pigeon-optics/node_modules/pigeonmark-html/library/escape.js","assert":"/Users/phx/GitHub/pigeon-optics/node_modules/assert/assert.js","html-tags/void":"/Users/phx/GitHub/pigeon-optics/node_modules/html-tags/void.js","pigeonmark-utils":"/Users/phx/GitHub/pigeon-optics/node_modules/pigeonmark-utils/library/index.js"}],"/Users/phx/GitHub/pigeon-optics/node_modules/pigeonmark-html/library/encode.js":[function(require,module,exports){
+const build = require('./build-html')
+
+/**
+ * Given a JsonML element, or a string, render it to a HTML string, suitably escaped and structured
+ * @param {string|Array} element
+ * @returns {string}
+ */
+module.exports = function encode (element) {
+  return [...build.any(element)].join('')
+}
+
+},{"./build-html":"/Users/phx/GitHub/pigeon-optics/node_modules/pigeonmark-html/library/build-html.js"}],"/Users/phx/GitHub/pigeon-optics/node_modules/pigeonmark-html/library/escape.js":[function(require,module,exports){
+// legacy entities are ones which do not require a semicolon to be ambiguous
+const legacyEntities = [
+  'AElig', 'AMP', 'Aacute', 'Acirc', 'Agrave', 'Aring', 'Atilde', 'Auml', 'COPY', 'Ccedil', 'ETH',
+  'Eacute', 'Ecirc', 'Egrave', 'Euml', 'GT', 'Iacute', 'Icirc', 'Igrave', 'Iuml', 'LT', 'Ntilde',
+  'Oacute', 'Ocirc', 'Ograve', 'Oslash', 'Otilde', 'Ouml', 'QUOT', 'REG', 'THORN', 'Uacute',
+  'Ucir', 'Ugrave', 'Uuml', 'Yacute', 'aacute', 'acirc', 'acute', 'aelig', 'agrave', 'amp', 'aring',
+  'atilde', 'auml', 'brvbar', 'ccedil', 'cedil', 'cent', 'copy', 'curren', 'deg', 'divide', 'eacute',
+  'ecirc', 'egrave', 'eth', 'euml', 'frac12', 'frac14', 'frac34', 'gt', 'iacute', 'icirc', 'iexcl',
+  'igrave', 'iquest', 'iuml', 'laquo', 'lt', 'macr', 'micro', 'middot', 'nbsp', 'not', 'ntilde',
+  'oacute', 'ocirc', 'ograve', 'ordf', 'ordm', 'oslash', 'otilde', 'ouml', 'para', 'plusmn', 'pound',
+  'quot', 'raquo', 'reg', 'sect', 'shy', 'sup1', 'sup2', 'sup3', 'szlig', 'thorn', 'times', 'uacute',
+  'ucirc', 'ugrave', 'uml', 'uuml', 'yacute', 'yen', 'yuml'
+]
+
+// build a pattern which matches all ambiguous entities, as well as < > " ' chars
+const pattern = `([<>"']|&[#a-zA-Z0-9][a-zA-Z0-9]*;|&(${legacyEntities.join('|')}))`
+const regexp = new RegExp(pattern, 'g')
+
+// does html encoding escaping to strings in the most minimally invasive way possible, including ambiguous ampersand logic
+module.exports = function esc (string, replaceList) {
+  const table = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&#34;', "'": '&#39;' }
+  return string.replace(regexp, match => {
+    const char = match[0]
+    return (replaceList.includes(char) ? table[char] : char) + match.slice(1)
+  })
+}
+
+},{}],"/Users/phx/GitHub/pigeon-optics/node_modules/pigeonmark-utils/library/index.js":[function(require,module,exports){
+/**
+ * @typedef {Object} PMAttributes - xml tag attributes
+ * @typedef {[tag: string, ...children: PMChildNode[]]} PMTagWithoutAttributes - xml tag, without attributes
+ * @typedef {[tag: string, attrs: PMAttributes, ...children: PMChildNode[]]} PMTagWithAttributes - xml tag, with attributes
+ * @typedef {PMTagWithAttributes|PMTagWithoutAttributes} PMTag - xml tag, with or without attributes
+ * @typedef {string} PMText - xml text node
+ * @typedef {['#cdata-section', ...text: string[]]} PMCData - xml CDATA block
+ * @typedef {['#comment', ...text: string[]]} PMComment - xml comment
+ * @typedef {PMTag|PMCData|PMComment|PMText} PMChildNode - any type which can be a child of a tag, document, or fragment
+ * @typedef {[name: string, attrs: PMAttributes]} PMXMLPI - xml processing instruction
+ * @typedef {['#document', { doctype: string|undefined }, ...children: PMChildNode[]]} PMHTMLDocument - html root document container
+ * @typedef {['#document', { doctype: string|undefined, pi: PMXMLPI[]|undefined }, ...children: PMChildNode[]]} PMXMLDocument - html root document container
+ * @typedef {PMXMLDocument|PMHTMLDocument} PMDocument - either a html or xml document root
+ * @typedef {['#document-fragment', ...children: PMChildNode[]]} PMFragment - XML document fragment container, used to group several root level tags and texts together
+ * @typedef {PMTag|PMText|PMFragment|PMDocument} PMRootNode
+ * @typedef {PMTag|PMAttributes|PMText|PMCData|PMComment|PMXMLPI|PMHTMLDocument|PMFragment} PMNode
+ */
+
+const typeLabels = {
+  '#document': 'document',
+  '#cdata-section': 'cdata',
+  '#comment': 'comment',
+  '#document-fragment': 'fragment'
+}
+
+/**
+ * Check if an object is strictly plausibly an attributes object
+ * @param {PMAttributes|*} obj
+ * @returns {boolean}
+ */
+function isAttrs (obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false
+
+  for (const key in obj) {
+    if (typeof key !== 'string' || key.includes(' ')) return false
+    if (typeof obj[key] !== 'string') return false
+  }
+
+  return true
+}
+
+exports.get = {
+  /**
+   * given a node, returns type string, one of 'tag', 'cdata', 'comment', 'doctype', 'pi', 'text', 'document' or 'fragment'
+   * or returns undefined if the node doesn't seem to be interperable as PigeonMark
+   * @param {PMNode} node
+   * @returns {'tag'|'text'|'attributes'|'comment'|'cdata'|'pi'|'document'|'fragment'|undefined}
+   */
+  type (node) {
+    if (Array.isArray(node)) {
+      if (node.length > 0) {
+        if (typeof node[0] === 'string' && node[0].length > 0 && !node[0].includes(' ')) {
+          const name = node[0]
+          // handle special node types
+          if (name.startsWith('#')) return typeLabels[name] // it's a dom type
+          if (name.startsWith('?')) return 'pi' // it's one of those <?xml...?> sort of PIs
+
+          if (node.every((v, i) => Array.isArray(v) || typeof v === 'string' || (i === 1 && isAttrs(v)))) {
+            return 'tag'
+          }
+        }
+      }
+    } else if (typeof node === 'string') {
+      return 'text'
+    } else if (node && typeof node === 'object' && isAttrs(node)) {
+      return 'attributes'
+    }
+  },
+
+  /**
+   * returns the tag name of the node passed in, returns string if input type is supported, or undefined if it isn't
+   * @param {PMTag|PMXMLPI} node
+   * @returns {string|undefined}
+   */
+  name (node) {
+    const type = exports.get.type(node)
+    if (type === 'tag') {
+      return node[0]
+    } else if (type === 'pi') {
+      return node[0].slice(1)
+    }
+  },
+
+  /**
+   * get attribute value from tag node, or undefined if the attribute isn't set or the tag doesn't have attributes
+   * @param {PMTag|PMXMLPI} node - tag node
+   * @param {string} attributeName - string attribute name
+   * @returns {string|undefined}
+   */
+  attribute (node, attributeName) {
+    return exports.get.attributes(node)[attributeName]
+  },
+
+  /**
+   * get all the attributes of a tag or xmlpi, or an empty object if it doesn't have any
+   * @param {PMTag|PMXMLPI} node - tag node
+   * @returns {object}
+   */
+  attributes (node) {
+    if (Array.isArray(node) && typeof node[0] === 'string' && typeof node[1] === 'object' && !Array.isArray(node[1])) {
+      return node[1]
+    }
+    return {}
+  },
+
+  /**
+   * returns child elements or undefined if the input isn't a tag
+   * @param {PMRootNode} node
+   * @returns {PMTag[]|undefined}
+   */
+  children (node) {
+    if (['tag', 'document', 'fragment'].includes(exports.get.type(node))) {
+      return node.filter((value, index) => index > 0 && exports.get.type(value) === 'tag')
+    }
+  },
+
+  /**
+   * returns all child nodes of a tag, document, or fragment, or undefined if the input isn't a tag
+   * @param {PMTag|PMDocument|PMFragment} node
+   * @returns {PMChildNode[]}
+   */
+  childNodes (node) {
+    if (['tag', 'document', 'fragment'].includes(exports.get.type(node))) {
+      if (isAttrs(node[1])) return node.slice(2)
+      else return node.slice(1)
+    }
+  },
+
+  /**
+   * shortcut to read id attribute, always returns a string, empty if no id is set
+   * @param {PMTag} node
+   * @returns {string|undefined}
+   */
+  id (node) {
+    return exports.get.attribute(node, 'id')
+  },
+
+  /**
+   * shortcut to read class attribute, always returns a string, empty if no id is set
+   * @param {PMTag} node
+   * @returns {string}
+   */
+  classList (node) {
+    const string = exports.get.attribute(node, 'class') || ''
+    if (string.trim() === '') {
+      return []
+    } else {
+      return string.split(/ +/)
+    }
+  },
+
+  /**
+   * like WebAPI Element.textContent, returns a concatinated string of all the text and cdata nodes within this node
+   * @param {PMNode} node
+   * @returns {string}
+   */
+  text (node) {
+    const type = exports.get.type(node)
+
+    if (type === 'text') {
+      return node
+    } else if (type === 'cdata') {
+      return node.slice(1).join('')
+    } else if (type === 'comment') {
+      return node.slice(1).join('')
+    } else if (type === 'pi') {
+      return node.slice(1).join('')
+    } else {
+      function * iter (input) {
+        const kids = exports.get.childNodes(input)
+        for (const kid of (kids || [])) {
+          const kidType = exports.get.type(kid)
+          if (kidType === 'text') {
+            yield kid
+          } else if (kidType === 'cdata') {
+            yield * kid.slice(1)
+          } else {
+            yield * iter(kid)
+          }
+        }
+      }
+      return [...iter(node)].join('')
+    }
+  }
+}
+
+exports.set = {
+  /**
+   * sets the name of a tag or xmlpi
+   * @param {PMTag|PMXMLPI} node
+   * @returns {PMTag|PMXMLPI} - returns the same node for chaining
+   */
+  name (node, name) {
+    const type = exports.get.type(node)
+    if (type === 'tag') {
+      node[0] = name
+    } else if (type === 'pi') {
+      node[0] = `?${name}`
+    }
+    return node
+  },
+
+  /**
+   * sets attribute value from tag node, or undefined if the attribute isn't set or the tag doesn't have attributes
+   * @param {PMTag|PMXMLPI} node - tag node
+   * @param {string} attributeName - string attribute name
+   * @param {string} attributeValue - string value to set attribute to
+   * @returns {string|undefined}
+   */
+  attribute (node, attributeName, attributeValue) {
+    if (Array.isArray(node) && typeof node[0] === 'string') {
+      if (typeof node[1] === 'object' && !Array.isArray(node[1])) {
+        node[1][attributeName] = attributeValue
+      } else {
+        const name = node.shift()
+        const attrs = { [attributeName]: attributeValue }
+        node.unshift(name, attrs)
+      }
+    }
+    return node
+  },
+
+  /**
+   * sets all the attributes of a tag or xmlpi, or an empty object if it doesn't have any
+   * @param {PMTag|PMXMLPI} node - tag node
+   * @param {object} attributes - object of key-value pairs for attributes
+   * @returns {PMTag|PMXMLPI} - returns input node for chaining
+   */
+  attributes (node, object) {
+    if (Array.isArray(node) && typeof node[0] === 'string') {
+      if (typeof node[1] === 'object' && !Array.isArray(node[1])) {
+        node[1] = object
+      } else {
+        const name = node.shift()
+        node.unshift(name, object)
+      }
+    }
+    return node
+  },
+
+  /**
+   * replaces child nodes of tag with specified children
+   * @param {PMRootNode} node
+   * @param {PMChildNode[]} children
+   * @returns {PMRootNode} - same node, for chaining
+   */
+  children (node, children) {
+    return exports.set.childNodes(node, children)
+  },
+
+  /**
+   * replaces child nodes of tag with specified children
+   * @param {PMRootNode} node
+   * @param {PMChildNode[]} children
+   * @returns {PMRootNode} - same node, for chaining
+   */
+  childNodes (node, children) {
+    const type = exports.get.type(node)
+    if (!['tag', 'document', 'fragment'].includes(type)) throw new Error('can only set children on tag, document, and fragment nodes')
+
+    if (node[1] && typeof node[1] === 'object' && !Array.isArray(node[1])) {
+      // has attrs
+      node.length = 2
+      node.push(...children)
+    } else {
+      node.length = 1
+      node.push(...children)
+    }
+
+    return node
+  },
+
+  /**
+   * shortcut to set id attribute of a tag
+   * @param {PMTag} node
+   * @param {string} value
+   * @returns {string|undefined}
+   */
+  id (node, value) {
+    return exports.set.attribute(node, 'id', `${value}`)
+  },
+
+  /**
+   * shortcut to read class attribute, always returns a string, empty if no id is set
+   * @param {PMTag} node
+   * @param {string[]|string} classList - string or array of strings to form class list
+   * @returns {string}
+   */
+  classList (node, classList) {
+    if (Array.isArray(classList)) classList = classList.join(' ')
+    return exports.set.attribute(node, 'class', `${classList}`)
+  },
+
+  /**
+   * like WebAPI Element.textContent, replaces children of tag with a text node when set
+   * @param {PMNode} node
+   * @param {string} text
+   * @returns {string}
+   */
+  text (node, text) {
+    return exports.set.children(node, [`${text}`])
+  }
+}
+
+/**
+ * Test if an object is a valid PigeonMark or JsonML document
+ * @param {PMNode} node - node to test if it's a
+ * @returns {boolean}
+ */
+exports.isPigeonMark = function isPigeonMark (node) {
+  if (typeof node === 'string') {
+    return true
+  } else if (Array.isArray(node)) {
+    const name = node[0]
+    if (typeof name === 'string' && name.length > 0 && !name.includes(' ')) {
+      if (node.length === 1) return true
+      if (typeof node[1] === 'object' && !Array.isArray(node[1])) {
+        // has attribs, check attribute name validity
+        if (Object.keys(node[1]).some(attr => typeof attr !== 'string' || attr.match(/[ =]/))) return false // not a valid attribute name
+        // check all the child nodes
+        return node.every((child, index) => index <= 1 || isPigeonMark(child))
+      } else {
+        // no attributes object, so just check the children
+        return node.every((child, index) => index === 0 || isPigeonMark(child))
+      }
+    }
+  }
+  return false
+}
+
+},{}],"/Users/phx/GitHub/pigeon-optics/node_modules/pigeonmark-utils/library/tree-selector-adapter.js":[function(require,module,exports){
+/**
+ * Module providing interfaces necessary to use tree-selector
+ * package to navigate JsonML/PigeonMark structures
+ */
+const util = require('./index')
+
+/**
+ * Check if a node is a <tag>
+ * @param {util.PMNode} node
+ * @returns {boolean}
+ */
+exports.isTag = (node) => util.get.type(node) === 'tag'
+
+/**
+ * Get the string name of a tag like <img> returns 'img'
+ * @param {util.PMTag} node
+ * @returns {string|undefined}
+ */
+exports.tag = (node) => util.get.name(node) || ''
+
+/**
+ * Get the string id value of a tag, or an empty string if it
+ * doesn't have one
+ * @param {util.PMTag} node
+ * @returns {string}
+ */
+exports.id = (node) => util.get.id(node) || ''
+
+/**
+ * Get the space seperated string class list of a tag, or an empty
+ * string if it doesn't have one
+ * @param {util.PMTag} node
+ * @returns {string}
+ */
+exports.className = (node) => exports.attr(node, 'class') || ''
+
+/**
+ * Get the string value of a tag's attribute, or undefined if it
+ * isn't set
+ * @param {util.PMTag} node
+ * @param {string} attributeName
+ * @returns {string|undefined}
+ */
+exports.attr = (node, attributeName) => util.get.attribute(node, attributeName)
+
+/**
+ * Get the child tags of an input tag
+ * @param {util.PMRootNode} tag
+ * @returns {util.PMTag[]}
+ */
+exports.children = (tag) => util.get.children(tag)
+
+/**
+ * Get the text contents of a node, like WebAPI DOM's textContent property
+ * @param {util.PMNode} node
+ * @returns {string}
+ */
+exports.contents = (node) => util.get.text(node)
+
+const nodeParents = new WeakMap()
+
+/**
+ * Get the parent of a JsonML node. This only works if scan()
+ * has been called on an ancestoral parent of this node
+ * @param {util.PMNode} node
+ * @returns {util.PMNode|undefined}
+ */
+exports.parent = (node) => nodeParents.get(node)
+
+/**
+ * Map out the structure of a JsonML/PigeonMark document,
+ * allowing parent() to work correctly after
+ * @param {util.PMNode} node
+ */
+exports.scan = (node) => {
+  const kids = util.get.children(node)
+  if (kids && kids.length > 0) {
+    for (const kid of kids) {
+      if (!nodeParents.has(kid)) {
+        nodeParents.set(kid, node)
+        exports.scan(kid)
+      }
+    }
+  }
+}
+
+},{"./index":"/Users/phx/GitHub/pigeon-optics/node_modules/pigeonmark-utils/library/index.js"}],"/Users/phx/GitHub/pigeon-optics/node_modules/pigeonmark-xml/library/encode.js":[function(require,module,exports){
+const utils = require('pigeonmark-utils')
+const esc = require('./escape')
+const assert = require('assert')
+
+function frequency (string, chars) {
+  const frequencies = Object.fromEntries([...chars].map(x => [x, 0]))
+  for (const char of `${string}`) {
+    if (typeof frequencies[char] === 'number') frequencies[char] += 1
+  }
+  return frequencies
+}
+
+const builders = {
+  * text (element) {
+    yield esc(element, '<&')
+  },
+
+  * tag (element) {
+    const tag = utils.get.name(element)
+    const attrs = utils.get.attributes(element)
+    const kids = utils.get.childNodes(element)
+    assert(tag.match(/^[^\r\n\t. ?!#][^\r\n\t ?!#]*$/), 'tag name must not be empty, and cannot contain whitespace, ?, !, #, and cannot start with a period')
+
+    if (kids.length > 0) {
+      yield `<${tag}${[...builders.attributes(attrs)].join('')}>`
+      for (const kid of kids) yield * build(kid)
+      yield `</${tag}>`
+    } else {
+      yield `<${tag}${[...builders.attributes(attrs)].join('')}/>`
+    }
+  },
+
+  * attributes (attrs) {
+    for (const [name, value] of Object.entries(attrs)) {
+      assert(name.match(/^[^\r\n\t ?!=]+$/gm), 'attribute name cannot contain whitespace, question marks, explanation marks, and must not be empty')
+      const freq = frequency(value, '\'"')
+      if (freq['"'] <= freq["'"]) {
+        yield ` ${name}="${esc(value, '&>"')}"`
+      } else {
+        yield ` ${name}='${esc(value, "&>'")}'`
+      }
+    }
+  },
+
+  * comment (element) {
+    yield `<!--${utils.get.text(element)}-->`
+  },
+
+  * cdata (element) {
+    const text = utils.get.text(element)
+    if (text.includes(']]>')) throw new Error('Cannot encode cdata block containing string "]]>" safely.')
+    yield `<![CDATA[${text}]]>`
+  },
+
+  * document (element) {
+    const attrs = utils.get.attributes(element)
+    for (const pi of (attrs.xmlpi || [])) {
+      yield * builders.pi(pi)
+    }
+    if (attrs.doctype) yield `<!DOCTYPE ${attrs.doctype}>\n`
+    const children = utils.get.children(element)
+    if (children.length === 1) {
+      yield * builders.tag(children[0])
+    } else if (children.length > 1) {
+      throw new Error('XML documents cannot have multiple root tags')
+    }
+  },
+
+  * fragment (element) {
+    for (const childNode of utils.get.childNodes(element)) {
+      yield * build(childNode)
+    }
+  },
+
+  * pi (element) {
+    const name = utils.get.name(element)
+    const attrs = utils.get.attributes(element)
+    yield `<?${name}${[...builders.attributes(attrs)].join('')}?>\n`
+  }
+}
+
+function * build (element) {
+  const type = utils.get.type(element)
+  yield * builders[type](element)
+}
+
+module.exports = function encode (obj) {
+  return [...build(obj)].join('')
+}
+
+},{"./escape":"/Users/phx/GitHub/pigeon-optics/node_modules/pigeonmark-xml/library/escape.js","assert":"/Users/phx/GitHub/pigeon-optics/node_modules/assert/assert.js","pigeonmark-utils":"/Users/phx/GitHub/pigeon-optics/node_modules/pigeonmark-utils/library/index.js"}],"/Users/phx/GitHub/pigeon-optics/node_modules/pigeonmark-xml/library/escape.js":[function(require,module,exports){
+// does html encoding escaping to strings
+module.exports = function esc (string, replaceList) {
+  const table = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }
+  return string.replace(/[&<>"']/g, char => replaceList.includes(char) ? table[char] : char)
+}
 
 },{}],"/Users/phx/GitHub/pigeon-optics/node_modules/process/browser.js":[function(require,module,exports){
 // shim for using process in browser

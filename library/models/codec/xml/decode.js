@@ -1,13 +1,16 @@
-const onml = require('onml')
-const arbitraryNS = 'pigeon-optics:arbitrary'
-const jsonMLToArbitraryObject = require('./jsonml-to-arbitrary')
+const pxml = require('pigeonmark-xml')
+const parb = require('pigeonmark-arbitrary')
 
-module.exports = function decode (input) {
-  if (Buffer.isBuffer(input)) input = input.toString('utf-8')
-  const parsed = onml.parse(input)
-  if (Array.isArray(parsed) && parsed[1] && typeof parsed[1] === 'object' && parsed[1].xmlns === arbitraryNS) {
-    return jsonMLToArbitraryObject(parsed)
+/**
+ * decode a string, if it's arbitrary encoded, do that step too
+ * @param {string} string
+ * @returns {*}
+ */
+module.exports = function decode (string) {
+  const doc = pxml.decode(`${string}`)
+  if (parb.isArbitraryEncoded(doc)) {
+    return parb.decode(doc)
   } else {
-    return { JsonML: parsed }
+    return doc
   }
 }

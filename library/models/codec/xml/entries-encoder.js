@@ -1,9 +1,7 @@
 const streams = require('stream')
-const arbitraryNS = 'pigeon-optics:arbitrary'
-const expandElement = require('./expand-element')
-const isJsonML = require('./is-jsonml')
-const arbitraryObjectToJsonML = require('./arbitrary-to-jsonml')
-const encode = require('./encode')
+const xmlEnc = require('pigeonmark-xml/library/encode')
+const arbEnc = require('pigeonmark-arbitrary/library/encode')
+const pmark = require('pigeonmark-utils')
 
 // speciality encoder for building xml flat file exports
 module.exports = function entriesEncoder () {
@@ -14,14 +12,9 @@ module.exports = function entriesEncoder () {
     transform: (chunk, encoding, callback) => {
       try {
         let { id, data, hash, version } = chunk
-        if (!isJsonML(data)) {
-          data = expandElement(arbitraryObjectToJsonML(data))
-          data[1].xmlns = arbitraryNS
-        }
-        const entry = {
-          JsonML: ['record', { hash: hash.toString('hex'), version: version.toString(), id }, data]
-        }
-        const xmlString = encode(entry)
+        if (!pmark.isPigeonMark(data)) data = arbEnc(data)
+        const entry = ['record', { hash: hash.toString('hex'), version: version.toString(), id }, data]
+        const xmlString = xmlEnc(entry)
         if (first) {
           callback(null, Buffer.from(`<export xmlns="pigeon-optics:export">\n${xmlString}\n`, 'utf-8'))
           first = false

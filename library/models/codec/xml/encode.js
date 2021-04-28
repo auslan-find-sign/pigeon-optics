@@ -1,14 +1,24 @@
-const arbitraryNS = 'pigeon-optics:arbitrary'
-const expandElement = require('./expand-element')
-const buildXML = require('./build-xml')
-const arbitraryObjectToJsonML = require('./arbitrary-to-jsonml')
+const pxml = require('pigeonmark-xml')
+const parb = require('pigeonmark-arbitrary')
+const putils = require('pigeonmark-utils')
 
+/**
+ * Encode an object, will attempt to interpret it as PigeonMark/JsonML, and if that can't work, will use arbitrary encoding
+ * @param {putils.PMNode|*} obj - object, either PigeonMark/JsonML structure, or arbitrary data which gets pigeonmark:arbitrary encoded
+ * @returns {string}
+ */
 module.exports = function encode (obj) {
-  if (obj && typeof obj === 'object' && !Array.isArray(obj) && ('JsonML' in obj) && Array.isArray(obj.JsonML)) {
-    return [...buildXML(obj)].join('')
+  if (putils.isPigeonMark(obj)) {
+    try {
+      return pxml.encode(obj)
+    } catch (err) {
+      try {
+        return pxml.encode(parb.encode(obj))
+      } catch (err2) {
+        throw err
+      }
+    }
   } else {
-    const arbitrary = expandElement(arbitraryObjectToJsonML(obj))
-    arbitrary[1].xmlns = arbitraryNS
-    return [...buildXML(arbitrary)].join('')
+    return pxml.encode(parb.encode(obj))
   }
 }

@@ -1,5 +1,7 @@
-exports.handles = ['application/xml', 'text/xml', 'application/rdf+xml', 'application/rss+xml', 'application/atom+xml', 'text/xml', 'application/xhtml+xml']
-exports.extensions = ['xml', 'rss', 'atom', 'xhtml']
+const pxml = require('pigeonmark-xml')
+
+exports.handles = pxml.handles
+exports.extensions = pxml.extensions
 
 exports.encode = require('./encode')
 exports.decode = require('./decode')

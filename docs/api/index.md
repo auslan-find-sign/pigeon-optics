@@ -8,5 +8,12 @@ Clients can either use Basic http authentication, or use the /auth interface to 
 
 View documentation on some server paths:
 
+ * [/attachments/...](attachments.md)
  * [/datasets/...](datasets.md)
+ * [/lenses/...](lenses.md)
  * [/export/...](export.md)
+
+Background info:
+
+ * [General content types and encoding rules](content-types.md)
+ * [XML and HTML markup handling](markup.md)

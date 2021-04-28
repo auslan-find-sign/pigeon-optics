@@ -26,7 +26,7 @@ YAML is a common text-based data language, which is technically a superset of JS
 
 ### application/xml, text/xml, application/rdf+xml, application/rss+xml, application/atom+xml, text/xml
 
-XML uploaded to a dataset is always translated using [JsonML](http://www.jsonml.org) in to an object structure. JsonML is able to preserve most aspects of XML, including tag order and whitespace, and can be used to store things like xhtml. The record will be stored as an object containing one property, 'JsonML', which contains the JsonML structure.
+A superset of JsonML described in [markup.md](markup.md) is used to handle markup like xml and html. This format should preserve tag order, text nodes, comments, attributes, cdata, processing instructions, etc. Attribute order is not necessarily preserved, and details like the type of quoting around attribute strings and entity encoding may change when documents are roundtripped. The XML codec attempts to build concise XML and will use the shortest encoding available when there are multiple options.
 
 When requesting records in xml formats, records which contain at their root an object, containing one property, which is 'JsonML', will be encoded using JsonML and served up.
 
@@ -40,6 +40,7 @@ For records which aren't in this format, a translation of the raw object structu
  - `undefined` becomes `<undefined/>`
  - `[ arrays ]` and iterables become `<array>` and contain a sequence of tags without whitespace
  - `{ objects }` becomes `<object>` and contain a sequence of tags without whitespace, and each tag also gains a 'name' attribute with the property name
+ - Buffers become `<buffer encoding="base64|hex|utf-8">data...</buffer>`
 
 ### application/msgpack
 

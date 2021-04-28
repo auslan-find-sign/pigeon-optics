@@ -1,101 +1,121 @@
 const chai = require('chai')
 const { expect } = chai
 const codec = require('../library/models/codec')
-const JsonML = require('../library/workers/environment.js/jsonml')
+const Markup = require('../library/workers/environment.js/markup')
 
-const testDocument = codec.xml.decode(`<root>
-  <head><title>Wonderful World of Signs</title></head>
-  <body>
-    <div id="heading">
-      <a href="http://signs.com/">Signs Homepage</a>
-    </div>
-    <article>
-      <p>Hello there!</p>
-      <img src="foo.png"/>
-      <a href="/next">Next Page</a>
-    </article>
-  </body>
-</root>`)
+const testDocumentText = `<!DOCTYPE html>
+<html>
+<head><title>Wonderful World of Signs</title></head>
+<body>
+  <div id="heading">
+    <a href="http://signs.com/">Signs Homepage</a>
+  </div>
+  <article>
+    <p>Hello there!</p>
+    <img src="foo.png"/>
+    <a href="/next">Next Page</a>
+    <!-- just a silly comment -->
+  </article>
+</body>
+</html>`
 
-describe('JsonML.select()', () => {
-  it('selects <root>', () => {
-    expect(JsonML.select(testDocument, 'root')).to.be.an('array').that.deep.equals([
-      testDocument.JsonML
-    ], 'should find the <root> element')
+const testDocument = codec.html.decode(testDocumentText)
+
+describe('Markup.select()', () => {
+  it('selects <html>', () => {
+    expect(Markup.select(testDocument, 'html')).to.be.an('array').that.deep.equals([
+      testDocument[2]
+    ], 'should find the <html> element')
   })
 
   it('selects links', () => {
-    expect(JsonML.select(testDocument, 'a[href]')).to.be.an('array').that.deep.equals([
+    expect(Markup.select(testDocument, 'a[href]')).to.be.an('array').that.deep.equals([
       ['a', { href: 'http://signs.com/' }, 'Signs Homepage'],
       ['a', { href: '/next' }, 'Next Page']
     ], 'should find all the link elements')
   })
 
   it('selects with head > title', () => {
-    expect(JsonML.select(testDocument, 'head > title')).to.be.an('array').that.deep.equals([
-      ['title', { }, 'Wonderful World of Signs']
+    expect(Markup.select(testDocument, 'head > title')).to.be.an('array').that.deep.equals([
+      ['title', 'Wonderful World of Signs']
     ], 'should find the title')
   })
 })
 
-describe('JsonML.text()', () => {
+describe('Markup.get.text()', () => {
   it('concats the strings of the whole document', () => {
-    expect(JsonML.text(testDocument)).to.equal('Wonderful World of SignsSigns HomepageHello there!Next Page')
+    expect(Markup.get.text(testDocument)).to.equal([
+      '\nWonderful World of Signs\n\n',
+      '  \n',
+      '    Signs Homepage\n',
+      '  \n',
+      '  \n',
+      '    Hello there!\n',
+      '    \n',
+      '    Next Page\n',
+      '    \n',
+      '  \n',
+      '\n'
+    ].join(''))
   })
 
   it('can turn a selected node in to text', () => {
-    expect(JsonML.text(JsonML.select(testDocument, 'title'))).to.equal('Wonderful World of Signs')
+    expect(Markup.get.text(Markup.select(testDocument, 'title')[0])).to.equal('Wonderful World of Signs')
   })
 })
 
-describe('JsonML.attr()', () => {
+describe('Markup.get.attribute()', () => {
   it('reads attributes from elements returned by JsonML.select', () => {
-    expect(JsonML.attr(JsonML.select(testDocument, 'a')[0], 'href')).to.equal('http://signs.com/')
+    expect(Markup.get.attribute(Markup.select(testDocument, 'a')[0], 'href')).to.equal('http://signs.com/')
   })
 
   it('reads hand crafted elements attributes', () => {
     const el = ['test-element', { val: 'just a test' }]
-    expect(JsonML.attr(el, 'val')).to.equal('just a test')
+    expect(Markup.get.attribute(el, 'val')).to.equal('just a test')
   })
 })
 
-describe('JsonML.toHTML()', () => {
+describe('Markup.toHTML()', () => {
   it('serializes well', () => {
-    const output = JsonML.toHTML(testDocument)
+    const output = Markup.toHTML(testDocument)
     expect(output).to.equal([
       '<!DOCTYPE html>\n',
-      '<root><head><title>Wonderful World of Signs</title></head>',
-      '<body><div id=heading><a href=http://signs.com/>Signs Homepage</a></div>',
-      '<article><p>Hello there!</p><img src=foo.png><a href=/next>Next Page</a></article>',
-      '</body></root>'
+      '<html>\n',
+      '<head><title>Wonderful World of Signs</title></head>\n',
+      '<body>\n',
+      '  <div id=heading>\n',
+      '    <a href=http://signs.com/>Signs Homepage</a>\n',
+      '  </div>\n',
+      '  <article>\n',
+      '    <p>Hello there!</p>\n',
+      '    <img src=foo.png>\n',
+      '    <a href=/next>Next Page</a>\n',
+      '    <!-- just a silly comment -->\n',
+      '  </article>\n',
+      '</body>\n',
+      '</html>'
     ].join(''))
   })
 
   it('throws with bad JsonML structure', () => {
-    expect(() => JsonML.toHTML(false)).to.throw()
-    expect(() => JsonML.toHTML([1, 2, 3])).to.throw()
-    expect(() => JsonML.toHTML(['tag', [1, 2, 3]])).to.throw()
+    expect(() => Markup.toHTML(false)).to.throw()
+    expect(() => Markup.toHTML([1, 2, 3])).to.throw()
+    expect(() => Markup.toHTML(['tag', [1, 2, 3]])).to.throw()
   })
 
   it('throws with impossible html structures', () => {
-    expect(() => JsonML.toHTML(['img', { src: 'foo.jpg' }, ['child', {}]])).to.throw()
+    expect(() => Markup.toHTML(['img', { src: 'foo.jpg' }, ['child', {}]])).to.throw()
   })
 })
 
-describe('JsonML.toXML()', () => {
+describe('Markup.toXML()', () => {
   it('serializes well', () => {
-    const output = JsonML.toXML(testDocument)
-    expect(output).to.equal([
-      '<root><head><title>Wonderful World of Signs</title></head>',
-      '<body><div id="heading"><a href="http://signs.com/">Signs Homepage</a></div>',
-      '<article><p>Hello there!</p><img src="foo.png"/><a href="/next">Next Page</a></article>',
-      '</body></root>'
-    ].join(''))
+    expect(Markup.toXML(testDocument)).to.equal(testDocumentText)
   })
 
   it('throws with bad JsonML structure', () => {
-    expect(() => JsonML.toXML(false)).to.throw()
-    expect(() => JsonML.toXML([1, 2, 3])).to.throw()
-    expect(() => JsonML.toXML(['tag', [1, 2, 3]])).to.throw()
+    expect(() => Markup.toXML(false)).to.throw()
+    expect(() => Markup.toXML([1, 2, 3])).to.throw()
+    expect(() => Markup.toXML(['tag', [1, 2, 3]])).to.throw()
   })
 })

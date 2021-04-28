@@ -37,7 +37,6 @@ const tests = [
     buffery: Buffer.from('hello world')
   },
   ['element', { name: 'foo' }, 'text node', ['subel', { name: 'bar' }], 'after text node'],
-  { JsonML: ['element', { name: 'foo' }, 'text node', ['subel', { name: 'bar' }], 'after text node'] },
   ...unicodeStrings
 ]
 
@@ -108,7 +107,7 @@ describe('models/codec.xml', function () {
   it('encodes random weirdo objects fine', function () {
     const test = { foo: [5, '12', false, null, true], bar: 'no thanks' }
     const expected = [
-      '<object xmlns="pigeon-optics:arbitrary">',
+      '<object xmlns="pigeonmark:arbitrary">',
       '<array name="foo"><number>5</number><string>12</string><false/><null/><true/></array>',
       '<string name="bar">no thanks</string>',
       '</object>'
@@ -127,12 +126,12 @@ describe('models/codec.xml', function () {
 
   it('JsonML decodes xml well', function () {
     const tests = {
-      '<root><foo arg="1">msg</foo></root>': ['root', {}, ['foo', { arg: '1' }, 'msg']],
-      '<html><foo arg="twenty-three">msg</foo></html>': ['html', {}, ['foo', { arg: 'twenty-three' }, 'msg']],
-      '<football>\n  sport\n</football>\n': ['football', {}, '\n  sport\n']
+      '<root><foo arg="1">msg</foo></root>': ['root', ['foo', { arg: '1' }, 'msg']],
+      '<html><foo arg="twenty-three">msg</foo></html>': ['html', ['foo', { arg: 'twenty-three' }, 'msg']],
+      '<football>\n  sport\n</football>\n': ['#document', ['football', '\n  sport\n'], '\n']
     }
     for (const [xml, value] of Object.entries(tests)) {
-      expect(codec.xml.decode(xml)).to.deep.equal({ JsonML: value })
+      expect(codec.xml.decode(xml)).to.deep.equal(value)
     }
   })
 
@@ -153,14 +152,14 @@ describe('models/codec.xml', function () {
     const tests = [
       { foo: 'dingo', bar: 'yeah' },
       { catastrophe: { ooo: 'bingo', argue: 5 } },
-      { JsonML: ['root', {}, ['foo', { arg: '1' }, 'msg']] }
+      ['root', {}, ['foo', { arg: '1' }, 'msg']]
     ]
     const encoder = Readable.from(tests, { objectMode: true }).pipe(codec.xml.encoder())
     const output = Buffer.concat(await asyncIterableToArray(encoder)).toString('utf-8')
     const expected = [
       '<array>\n',
-      '<object xmlns="pigeon-optics:arbitrary"><string name="foo">dingo</string><string name="bar">yeah</string></object>\n',
-      '<object xmlns="pigeon-optics:arbitrary"><object name="catastrophe"><string name="ooo">bingo</string><number name="argue">5</number></object></object>\n',
+      '<object xmlns="pigeonmark:arbitrary"><string name="foo">dingo</string><string name="bar">yeah</string></object>\n',
+      '<object xmlns="pigeonmark:arbitrary"><object name="catastrophe"><string name="ooo">bingo</string><number name="argue">5</number></object></object>\n',
       '<root><foo arg="1">msg</foo></root>\n',
       '</array>\n'
     ]
@@ -169,12 +168,13 @@ describe('models/codec.xml', function () {
 
   it('behaves as expected', async function () {
     const tests = {
-      '<tag attr="\'&quot;\'"/>': { JsonML: ['tag', { attr: "'\"'" }] },
-      '<tag attr=\'"&apos;"\'/>': { JsonML: ['tag', { attr: '"\'"' }] },
-      '<tag>foo</tag>': { JsonML: ['tag', 'foo'] },
-      '<tag/>': { JsonML: ['tag'] },
-      '<!-- this is a comment -->': { JsonML: ['#comment', 'this ', 'is', ' a comment'] },
-      '<![CDATA[Hello]]>': { JsonML: ['#cdata-section', 'Hello'] }
+      '<tag attr="\'&quot;\'"/>': ['tag', { attr: "'\"'" }],
+      '<tag attr=\'"&apos;"\'/>': ['tag', { attr: '"\'"' }],
+      '<tag>foo</tag>': ['tag', 'foo'],
+      '<tag/>': ['tag'],
+      '<!--this is a comment-->': ['#comment', 'this ', 'is', ' a comment'],
+      '<![CDATA[Hello]]>': ['#cdata-section', 'Hello'],
+      'foo bar': ['#document-fragment', 'foo', ' ', 'bar']
     }
     for (const [expected, input] of Object.entries(tests)) {
       expect(codec.xml.encode(input)).to.equal(expected)
@@ -199,12 +199,13 @@ describe('models/codec.html', () => {
 
   it('can decode a simple html page', () => {
     const dec = codec.html.decode(testPage)
-    expect(dec).to.deep.equal({
-      JsonML: ['html',
+    expect(dec).to.deep.equal(['#document',
+      { doctype: 'html' },
+      ['html',
         ['head', ['title', 'Hello World']],
         ['body', ['p', { id: 'universe' }, 'how you doing??'], ['#comment', ' comments are preserved ']]
       ]
-    })
+    ])
   })
 
   it('encodes reasonable structures accurately', () => {

@@ -187,40 +187,40 @@ describe('workers/environment.js', () => {
     const startup = await worker.startup({
       mapType: 'javascript',
       mapCode: '// no thank you',
-      reduceCode: 'return JsonML[left](...right)'
+      reduceCode: "return left.split('.').reduce((a,b) => a[b], Markup)(...right)"
     })
 
     expect(startup.map.errors).is.an('array').and.is.empty
     expect(startup.reduce.errors).is.an('array').and.is.empty
   })
 
-  it('ivm environment: JsonML.select()', async () => {
+  it('ivm environment: Markup.select()', async () => {
     const document = codec.xml.decode('<root><div id="yeah">no</div><span>cool</span></root>')
     const result = await worker.reduce('select', [document, '#yeah'])
     expect(result).to.deep.equal({ logs: [], errors: [], value: [['div', { id: 'yeah' }, 'no']] })
   })
 
-  it('ivm environment: JsonML.text()', async () => {
-    const document = { JsonML: ['root', {}, ['div', { id: 'yeah' }, 'no'], ['span', {}, 'cool']] }
-    const res = await worker.reduce('text', [document])
+  it('ivm environment: Markup.get.text()', async () => {
+    const document = ['root', {}, ['div', { id: 'yeah' }, 'no'], ['span', {}, 'cool']]
+    const res = await worker.reduce('get.text', [document])
     expect(res).to.deep.equal({ errors: [], logs: [], value: 'nocool' })
   })
 
-  it('ivm environment: JsonML.attr()', async () => {
+  it('ivm environment: Markup.get.attribute()', async () => {
     const element = ['div', { id: 'yeah' }, 'no']
-    const res = await worker.reduce('attr', [element, 'id'])
+    const res = await worker.reduce('get.attribute', [element, 'id'])
     expect(res).to.deep.equal({ errors: [], logs: [], value: 'yeah' })
   })
 
-  it('ivm environment: JsonML.toHTML()', async () => {
-    const document = { JsonML: ['html', ['div', { id: 'yeah' }, 'no'], ['span', 'cool']] }
+  it('ivm environment: Markup.toHTML()', async () => {
+    const document = ['#document', { doctype: 'html' }, ['html', ['div', { id: 'yeah' }, 'no'], ['span', 'cool']]]
     const expected = '<!DOCTYPE html>\n<html><div id=yeah>no</div><span>cool</span></html>'
     const res = await worker.reduce('toHTML', [document])
     expect(res).to.deep.equal({ errors: [], logs: [], value: expected })
   })
 
-  it('ivm environment: JsonML.toXML()', async () => {
-    const document = { JsonML: ['root', ['div', { id: 'yeah' }, 'no'], ['span', 'cool']] }
+  it('ivm environment: Markup.toXML()', async () => {
+    const document = ['root', ['div', { id: 'yeah' }, 'no'], ['span', 'cool']]
     const expected = '<root><div id="yeah">no</div><span>cool</span></root>'
     const res = await worker.reduce('toXML', [document])
     expect(res).to.deep.equal({ errors: [], logs: [], value: expected })

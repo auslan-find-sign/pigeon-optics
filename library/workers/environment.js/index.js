@@ -4,4 +4,4 @@ Math.random = function () {
   throw new Error('Math.random() is unavailable. Lenses must be deterministic, not random')
 }
 
-global.JsonML = require('./jsonml')
+global.Markup = require('./markup')
