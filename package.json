@@ -7,7 +7,7 @@
   "homepage": "https://github.com/auslan-find-sign/pigeon-optics/",
   "scripts": {
     "test": "npm run build; mocha --exit --trace-warnings",
-    "build": "browserify library/workers/environment.js/index.js --full-paths -o library/workers/environment.js/build.js"
+    "build": "browserify -g uglifyify library/workers/environment.js/index.js -o library/workers/environment.js/bundle.min.js"
   },
   "keywords": [
     "auslan",
@@ -97,7 +97,8 @@
     "chai": "^4.3.4",
     "chai-as-promised": "^7.1.1",
     "mocha": "^8.3.2",
-    "standard": "^16.0.3"
+    "standard": "^16.0.3",
+    "uglifyify": "^5.0.2"
   },
   "standard": {
     "env": [

@@ -48,7 +48,7 @@ exports.startup = async function (config) {
   // TODO: consider removing this before user code runs? or freezing it?
   await context.global.set('global', context.global.derefInto())
   // load the codec library
-  const environmentIvmCode = await fs.promises.readFile(require.resolve('./environment.js/build.js'))
+  const environmentIvmCode = await fs.promises.readFile(require.resolve('./environment.js/bundle.min.js'))
   await context.eval(environmentIvmCode.toString('utf-8'))
 
   // setup safe logger console object
