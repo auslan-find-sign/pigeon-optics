@@ -4,7 +4,7 @@ const json = require('./json')
 
 Object.assign(exports, {
   handles: ['application/yaml', 'text/yaml', 'application/x-yaml', 'text/x-yaml'],
-  extensions: ['yaml'],
+  extensions: ['yaml', 'yml'],
 
   decode (yamlString) {
     if (Buffer.isBuffer(yamlString)) yamlString = yamlString.toString('utf-8')
