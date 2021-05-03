@@ -175,6 +175,7 @@ main {
 
 main > *:not(div.sidebar) {
   flex-grow: 100;
+  flex-shrink: 100;
 }
 
 div.sidebar {
@@ -185,6 +186,8 @@ div.sidebar {
   overflow: hidden;
   width: 13em;
   margin-right: 1em;
+  flex-shrink: 0;
+  flex-grow: 0;
 }
 
 @media screen and (max-width: 992px) {
