@@ -10,7 +10,7 @@ const recordStructure = require('./record-structure')
  * @returns {*} - recordData, with any file:/// urls transformed in to attachment hash:// links if possible
  */
 module.exports = async function autoImportAttachments (req, destination, recordData) {
-  const data = recordStructure.resolveFileURLs(recordData, req.filesByName)
+  const data = recordStructure.resolveContentIDs(recordData, req.filesByName)
   const links = recordStructure.listHashURLs(data)
   const missing = new Set()
 
