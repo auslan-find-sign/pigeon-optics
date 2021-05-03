@@ -84,7 +84,7 @@ module.exports = (req, data, error = null) => {
             v.button('Create', { type: 'submit' })
           } else {
             v.button('Save', { type: 'submit' })
-            v.button('Delete', { type: 'submit', formaction: 'DELETE' })
+            v.button('Delete', { type: 'submit', formaction: uri`/lenses/${req.params.user}:${req.params.name}/`, formmethod: 'DELETE' })
           }
         })
       })
