@@ -43,6 +43,14 @@ const iterators = {
   settings: async function () {
     const { title, lensTimeout, lensCodeSize, maxRecordSize, maxAttachmentSize } = require('./settings')
     return { title, lensTimeout, lensCodeSize, maxRecordSize, maxAttachmentSize }
+  },
+
+  formats: async function () {
+    const codecs = require('./codec')
+    return {
+      extensions: Object.keys(codecs.extensionHandlers),
+      mediaTypes: Object.keys(codecs.mediaTypeHandlers)
+    }
   }
 }
 
