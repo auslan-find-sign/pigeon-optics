@@ -1,3 +1,4 @@
+const createHttpError = require('http-errors')
 const streams = require('stream')
 const json = require('./json')
 
@@ -26,19 +27,29 @@ Object.assign(exports, {
     return input.split('\n').map(x => x.trim()).filter(x => x.length > 0).map(x => json.decode(x))
   },
 
-  // decodes a readable stream of json-lines data in to an object-mode stream
-  decoder () {
+  /**
+   * Create a transform stream which decodes jsonlines into objects
+   * @param {object} [options]
+   * @param {number} [options.maxSize] - max size in bytes of each line - otherwise throws a http 413 Payload size error
+   * @returns {streams.Transform}
+   */
+  decoder ({ maxSize = 32000000 } = {}) {
     /** @type {Buffer} */
     let buff = Buffer.from([])
     return new streams.Transform({
       readableObjectMode: true,
       transform (chunk, encoding, callback) {
+        if (buff.length + chunk.length > maxSize * 2) {
+          return callback(createHttpError(413, `JSON Lines parsing is limited to ${maxSize} per line`))
+        }
         buff = Buffer.concat([buff, chunk])
 
         while (true) {
           const nlIndex = buff.indexOf('\n')
           if (nlIndex >= 0) {
-            const jsonString = buff.slice(0, nlIndex).toString('utf-8')
+            const lineSlice = buff.slice(0, nlIndex)
+            if (lineSlice.length > maxSize) return callback(createHttpError(413, `JSON Lines parsing is limited to ${maxSize} per line`))
+            const jsonString = lineSlice.toString('utf-8')
             buff = buff.slice(nlIndex + 1)
             try {
               this.push(json.decode(jsonString))

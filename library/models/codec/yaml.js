@@ -1,6 +1,7 @@
 const yaml = require('yaml')
 const streams = require('stream')
 const json = require('./json')
+const createHttpError = require('http-errors')
 
 Object.assign(exports, {
   handles: ['application/yaml', 'text/yaml', 'application/x-yaml', 'text/x-yaml'],
@@ -15,14 +16,22 @@ Object.assign(exports, {
     return yaml.stringify(object)
   },
 
-  // a decoder stream which outputs objects for each document
-  decoder () {
+  /**
+   * Create a transform stream which decodes a stream of yaml documents into objects
+   * @param {object} [options]
+   * @param {number} [options.maxSize] - max size in bytes of each line - otherwise throws a http 413 Payload size error
+   * @returns {streams.Transform}
+   */
+  decoder ({ maxSize = 32000000 } = {}) {
     let buffer = Buffer.from([])
     const self = this
 
     return new streams.Transform({
       readableObjectMode: true,
       transform (chunk, encoding, callback) {
+        if (buffer.length + chunk.length > maxSize * 2) {
+          return callback(createHttpError(413, `JSON Lines parsing is limited to ${maxSize} per line`))
+        }
         buffer = Buffer.concat([buffer, chunk])
         while (true) {
           const offset = buffer.indexOf('\n...\n')
@@ -30,7 +39,9 @@ Object.assign(exports, {
             return callback(null)
           } else {
             // slice off the first document from the buffer
-            const docText = buffer.slice(0, offset + 1).toString('utf-8')
+            const lineSlice = buffer.slice(0, offset + 1)
+            if (lineSlice.length > maxSize) return callback(createHttpError(413, `JSON Lines parsing is limited to ${maxSize} per line`))
+            const docText = lineSlice.toString('utf-8')
             buffer = buffer.slice(offset + 5)
             try {
               this.push(self.decode(docText))
