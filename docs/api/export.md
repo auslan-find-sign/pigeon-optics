@@ -1,9 +1,9 @@
-## GET /(source)/(username):(collection-name)/export?encoding=(encoding-type)&after=(version)&at=(version)
+## GET /(source)/(author):(collection-name)/export?encoding=(encoding-type)&after=(version)&at=(version)
 
 Exports all the data in the specified collection, as a machine readable file
 
 * `(source)` must be one of `datasets` or `lenses`
-* `(username)` must be the resources owner username string, uri encoded
+* `(author)` must be the resources owner author string, uri encoded
 * `(collection-name)` must be the string name of the dataset or lens, uri encoded
 * `(encoding-type)` must be one of `cbor`, `json`, or `json-lines`
 
@@ -17,18 +17,18 @@ If `after` query string parameter is provided, export will only include records 
 
 If `at` query string paramater is provided, it behaves like `after` but includes entries with an equal version number, useful in combination with the event-stream api (see below)
 
-## GET /(source)/(username):(collection-name)/zip
+## GET /(source)/(author):(collection-name)/zip
 
 Exports all the data in the specified collection, as a zip file containing a json folder and a cbor folder, with each record
 contained in each format.
 
-The response will be a zip file, served with appropriate mime type. The zip is generated dynamically and streamed out to the user, so it may have poor compression, and does not support HTTP range requests or specify a Content Length as these are unknown at the start of the request.
+The response will be a zip file, served with appropriate mime type. The zip is generated dynamically and streamed out to the author, so it may have poor compression, and does not support HTTP range requests or specify a Content Length as these are unknown at the start of the request.
 
-## GET /(source)/(username):(collection-name)/zip?attachments=true
+## GET /(source)/(author):(collection-name)/zip?attachments=true
 
 As above, but also includes `/attachments/` folder containing the binary blobs of any attachments referenced in records that are in the cbor/json folders in the zip. The attachment filenames are just their hash, hex encoded, with no file extension. To determine file's mime type, search the json/cbor for attachment metadata.
 
-## GET /(source)/(username):(collection-name)/event-stream
+## GET /(source)/(author):(collection-name)/event-stream
 
 Responds with an event stream, which immediately outputs an event containing this object:
 
@@ -41,6 +41,6 @@ Responds with an event stream, which immediately outputs an event containing thi
 
 Which can be understood as meaning the current version of the dataset/lens is `123`, and `recordID1` was modified in the most recent update (it's value has changed, it has a different hash), `record-xyz` changed in the previous update, and `record-foo` changed in the third update, ages ago. There are no other records in the dataset.
 
-For efficient syncing, the best approach is to remove any records from your local copy whose ID's aren't included in the `"records"` property of the event, and to request `/(source)/(username):(collection-name)/export?at=(event.version)&encoding=(cbor|json|json-lines)` to load a stream of just records that have changed in the specified version or more recently.
+For efficient syncing, the best approach is to remove any records from your local copy whose ID's aren't included in the `"records"` property of the event, and to request `/(source)/(author):(collection-name)/export?at=(event.version)&encoding=(cbor|json|json-lines)` to load a stream of just records that have changed in the specified version or more recently.
 
 Note, this API always responds with JSON encoded events. It does not have a CBOR mode as event-stream is a text based format and doesn't efficiently support CBOR.

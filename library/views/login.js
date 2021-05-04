@@ -29,8 +29,8 @@ module.exports = (req, data, error = null) => {
         }
 
         v.dl(v => {
-          v.dt('Username')
-          v.dd(v => v.input({ name: 'username', value: data.username || '', minlength: 3, maxlength: 30, pattern: "[^!*'();:@&=+$,/?%#[\\]\\r\\n\\t\\0 ]+" }))
+          v.dt('Name')
+          v.dd(v => v.input({ name: 'name', value: data.name || '', minlength: 3, maxlength: 30, pattern: "[^!*'();:@&=+$,/?%#[\\]\\r\\n\\t\\0]+" }))
 
           v.dt('Password')
           v.dd(v => v.input({ name: 'password', value: data.password || '', type: 'password', minlength: 8, maxlength: 500 }))

@@ -11,9 +11,9 @@ Object.assign(exports, workerBase)
 
 let isolate // ivm isolate
 let context // ivm context
-let code // keep a copy of the user source code for generating good errors
-let mapFnReference // reference to user defined map function inside of the context
-let reduceFnReference // reference to user defined reduce function inside of the context
+let code // keep a copy of the lens author source code for generating good errors
+let mapFnReference // reference to lens author defined map function inside of the context
+let reduceFnReference // reference to lens author defined reduce function inside of the context
 let timeout
 let outputs
 let logs
@@ -22,7 +22,7 @@ let logs
 function transformVMError (error, file, source) {
   const trace = new StackTracey(error)
   const sourceLines = `${source}`.split(/\r?\n/gm)
-  // filter the stacktrace to just entries referencing user code, not anything around it (vm env code)
+  // filter the stacktrace to just entries referencing lens author code, not anything around it (vm env code)
   const filteredTrace = trace.filter(x => x.file === file && x.line >= 1 && x.line <= sourceLines.length)
   return {
     type: error.constructor.name,
@@ -45,7 +45,7 @@ exports.startup = async function (config) {
   context = await isolate.createContext()
 
   // make 'global' ref to global available
-  // TODO: consider removing this before user code runs? or freezing it?
+  // TODO: consider removing this before lens code runs? or freezing it?
   await context.global.set('global', context.global.derefInto())
   // load the codec library
   const environmentIvmCode = await fs.promises.readFile(require.resolve('./environment.js/bundle.min.js'))

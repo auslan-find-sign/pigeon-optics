@@ -9,7 +9,7 @@ const uri = require('encodeuricomponent-tag')
  */
 module.exports = (req, data, error = null) => {
   return layout(req, v => {
-    v.form({ class: 'simple-form', method: 'PUT', action: data.create ? '' : uri`/datasets/${req.params.user}:${req.params.name}/configuration` }, v => {
+    v.form({ class: 'simple-form', method: 'PUT', action: data.create ? '' : uri`/datasets/${req.params.author}:${req.params.name}/configuration` }, v => {
       v.panel(v => {
         v.header(v => {
           if (data.create) {
@@ -20,15 +20,15 @@ module.exports = (req, data, error = null) => {
           } else {
             v.breadcrumbs(v => {
               v.a('Datasets', { href: '/datasets/' })
-              v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}` })
-              v.iconLink('cassette', req.params.name, { href: uri`/datasets/${req.params.user}:${req.params.name}/` })
+              v.iconLink('user-circle', req.params.author, { href: uri`/authors/${req.params.author}` })
+              v.iconLink('cassette', req.params.name, { href: uri`/datasets/${req.params.author}:${req.params.name}/` })
             })
 
             v.panelTabs(
-              { label: 'View', href: uri`/datasets/${req.params.user}:${req.params.name}/` },
-              { label: 'Edit', href: uri`/datasets/${req.params.user}:${req.params.name}/configuration`, if: req.owner, current: true },
-              { label: 'Import', href: uri`/datasets/${req.params.user}:${req.params.name}/import`, if: req.owner },
-              { label: 'Export', href: uri`/datasets/${req.params.user}:${req.params.name}/export` }
+              { label: 'View', href: uri`/datasets/${req.params.author}:${req.params.name}/` },
+              { label: 'Edit', href: uri`/datasets/${req.params.author}:${req.params.name}/configuration`, if: req.owner, current: true },
+              { label: 'Import', href: uri`/datasets/${req.params.author}:${req.params.name}/import`, if: req.owner },
+              { label: 'Export', href: uri`/datasets/${req.params.author}:${req.params.name}/export` }
             )
           }
         })
@@ -56,7 +56,7 @@ module.exports = (req, data, error = null) => {
             v.button('Create', { type: 'submit' })
           } else {
             v.button('Save', { type: 'submit' })
-            v.button('Delete', { type: 'submit', formaction: uri`/datasets/${req.params.user}:${req.params.name}`, formmethod: 'DELETE' })
+            v.button('Delete', { type: 'submit', formaction: uri`/datasets/${req.params.author}:${req.params.name}`, formmethod: 'DELETE' })
           }
         })
       })

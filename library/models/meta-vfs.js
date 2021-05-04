@@ -6,14 +6,14 @@ const lenses = require('./lens')
 const itToArray = require('../utility/async-iterable-to-array')
 
 const iterators = {
-  users: auth.iterate,
+  authors: auth.iterate,
 
   datasets: async function * () {
-    for await (const user of iterators.users()) {
-      for await (const name of datasets.iterate(user)) {
+    for await (const author of iterators.authors()) {
+      for await (const name of datasets.iterate(author)) {
         yield {
-          path: `/datasets/${user}:${name}/`,
-          user,
+          path: `/datasets/${author}:${name}/`,
+          author,
           name
         }
       }
@@ -21,11 +21,11 @@ const iterators = {
   },
 
   lenses: async function * () {
-    for await (const user of iterators.users()) {
-      for await (const name of lenses.iterate(user)) {
+    for await (const author of iterators.authors()) {
+      for await (const name of lenses.iterate(author)) {
         yield {
-          path: `/lenses/${user}:${name}/`,
-          user,
+          path: `/lenses/${author}:${name}/`,
+          author,
           name
         }
       }
@@ -54,14 +54,14 @@ const iterators = {
   }
 }
 
-exports.exists = (user, name, record) => {
-  if (user !== 'system') return false
+exports.exists = (author, name, record) => {
+  if (author !== 'system') return false
   if (name !== 'system') return false
   return !!iterators[record]
 }
 
-exports.readEntry = (user, name, record) => {
-  if (user !== 'system') return undefined
+exports.readEntry = (author, name, record) => {
+  if (author !== 'system') return undefined
   if (name !== 'system') return undefined
   const output = iterators[record]()
   if (output.next) {
@@ -71,12 +71,12 @@ exports.readEntry = (user, name, record) => {
   }
 }
 
-exports.readEntryMeta = (user, name, record) => {
+exports.readEntryMeta = (author, name, record) => {
   return { version: 0, hash: Buffer.from(record) }
 }
 
-exports.readEntryByHash = (user, name, hash) => {
-  return exports.readEntry(user, name, hash.toString())
+exports.readEntryByHash = (author, name, hash) => {
+  return exports.readEntry(author, name, hash.toString())
 }
 
 exports.iterateEntries = async function * () {

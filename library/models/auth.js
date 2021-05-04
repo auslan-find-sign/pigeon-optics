@@ -18,16 +18,16 @@ exports.basicAuthMiddleware = async (req, res, next) => {
   if (req.get('Authorization')) {
     const [type, credsb64] = req.get('Authorization').split(' ', 2)
     if (type === 'Basic') {
-      const [user, pass] = Buffer.from(credsb64, 'base64').toString('utf-8').split(':', 2)
+      const [author, pass] = Buffer.from(credsb64, 'base64').toString('utf-8').split(':', 2)
       try {
-        Object.assign(req, await exports.login(user, pass))
+        Object.assign(req, await exports.login(author, pass))
       } catch (err) {
         throw createHttpError.BadRequest(`Invalid credentials supplied with Basic HTTP authentication: ${err.message}`)
       }
     }
   }
 
-  if (req.session && req.session.auth && req.session.auth.user) {
+  if (req.session && req.session.auth && req.session.auth.author) {
     Object.assign(req, req.session.auth)
   }
 
@@ -36,15 +36,15 @@ exports.basicAuthMiddleware = async (req, res, next) => {
 
 /** app.param handler to populate req.owner with a boolean for if this resource should be editable */
 exports.ownerParam = (req, res, next, value, id) => {
-  req.owner = req.auth && (req.user === req.params[id] || req.auth === 'admin')
+  req.owner = req.auth && (req.author === req.params[id] || req.auth === 'admin')
   next()
 }
 
 /**
- * Express middleware to require auth and redirect users to login
+ * Express middleware to require auth and redirect authors to login
  */
 exports.required = (req, res, next) => {
-  if (!req.auth || !req.user) {
+  if (!req.auth || !req.author) {
     if (req.accepts('html')) {
       res.redirect(303, uri`/auth?return=${req.originalUrl}`)
     } else {
@@ -73,149 +73,142 @@ exports.ownerRequired = (req, res, next) => {
   }
 }
 
-/** Helper function, returns directory inside cbor-file database, where user's folder is
- * @param {string} username
+/** Helper function, returns directory inside cbor-file database, where author's folder is
+ * @param {string} author
  * @returns {string}
 */
-exports.userFolder = function (username) {
-  return ['users', username]
+exports.authorFolder = function (author) {
+  return ['authors', author]
 }
 
-/** Helper function, path inside cbor-file database, where user's account is stored
- * @param {string} username
+/** Helper function, path inside cbor-file database, where author's account is stored
+ * @param {string} author
  * @returns {string}
 */
-exports.userAccountPath = function (username) {
-  return [...this.userFolder(username), 'account']
+exports.authorAccountPath = function (author) {
+  return [...this.authorFolder(author), 'account']
 }
 
-/** check a login attempt for a user account
- * @param {string} username
+/** check a login attempt for a author account
+ * @param {string} authorName
  * @param {string} password
- * @returns {object} - { user: "string username", auth: "string authorization level" }
+ * @returns {object} - { author: "string author", auth: "string authorization level" }
  */
-exports.login = async function (user, pass) {
+exports.login = async function (author, pass) {
   let account
 
   try {
-    account = await file.read(this.userAccountPath(user))
+    account = await file.read(this.authorAccountPath(author))
   } catch (err) {
     throw new Error('Account not found')
   }
 
   const hash = nacl.hash(Buffer.concat([account.passSalt, Buffer.from(`${pass}`), account.passSalt]))
 
-  if (account.user !== user) {
-    throw new Error("Corruption issue, user on account doesn't match user specified")
-  }
-
   if (!nacl.verify(hash, account.passHash)) {
     throw new Error('Password incorrect')
   }
 
-  return { user, auth: account.auth }
+  return { author, auth: account.auth }
 }
 
-/** Register a new user account - throws errors if unsuccessful
- * @param {string} username
+/** Register a new author account - throws errors if unsuccessful
+ * @param {string} author
  * @param {string} password
- * @returns {object} - { user: "string username", auth: "string authorization level" }
+ * @returns {object} - { author: "string author", auth: "string authorization level" }
  */
-exports.register = async function (user, pass, auth = 'user') {
-  const path = this.userAccountPath(user)
+exports.register = async function (author, pass, auth = 'regular') {
+  const path = this.authorAccountPath(author)
   const badChars = "!*'();:@&=+$,/?%#[]`“‘’’”".split('')
-  const userChars = user.split('')
+  const authorNameChars = author.split('')
 
-  assert(!await file.exists(path), 'This username is already in use')
-  assert(!badChars.some(char => user.includes(char)), `Username must not contain any of ${badChars.join(' ')}`)
-  assert(!userChars.some(x => unicodeSpaces[x.charCodeAt(0)]), 'Username must not contain spaces')
-  assert(!userChars.some(x => unicodeControl[x.charCodeAt(0)]), 'Username must not contain control characters')
-  assert(!userChars.some(x => unicodeFormat[x.charCodeAt(0)]), 'Username must not contain unicode format characters')
-  assert(!userChars.some(x => unicodeLineSep[x.charCodeAt(0)]), 'Username must not contain unicode line seperator characters')
-  assert(!userChars.some(x => unicodeParaSep[x.charCodeAt(0)]), 'Username must not contain unicode paragraph seperator characters')
+  assert(!await file.exists(path), 'Someone else is using this name already, pick a different one')
+  assert(!badChars.some(char => author.includes(char)), `Name must not contain any of ${badChars.join(' ')}`)
+  assert(!authorNameChars.some(x => x !== ' ' && unicodeSpaces[x.charCodeAt(0)]), 'Name must not contain whitespace other than regular spaces')
+  assert(!authorNameChars.some(x => unicodeControl[x.charCodeAt(0)]), 'Name must not contain control characters')
+  assert(!authorNameChars.some(x => unicodeFormat[x.charCodeAt(0)]), 'Name must not contain unicode format characters')
+  assert(!authorNameChars.some(x => unicodeLineSep[x.charCodeAt(0)]), 'Name must not contain unicode line seperator characters')
+  assert(!authorNameChars.some(x => unicodeParaSep[x.charCodeAt(0)]), 'Name must not contain unicode paragraph seperator characters')
 
-  assert(!settings.forbiddenUsernames.includes(user), 'Username is not allowed by site settings')
-  assert(user.length >= 3, 'Username must be at least 3 characters long')
-  assert(user.length <= 100, 'Username must not be longer than 100 characters')
+  assert(!settings.forbiddenAuthorNames.includes(author), 'Name is not allowed by site settings')
+  assert(author.length >= 3, 'Name must be at least 3 characters long')
+  assert(author.length <= 100, 'Name must not be longer than 100 characters')
   assert(pass.length >= 8, 'Password must be at least 8 characters long')
 
   const salt = Buffer.from(nacl.randomBytes(64))
-  const userData = {
-    user: `${user}`,
+  const authorData = {
     passSalt: salt,
     passHash: Buffer.from(nacl.hash(Buffer.concat([salt, Buffer.from(`${pass}`), salt]))),
     auth
   }
 
-  await file.write(path, userData)
+  await file.write(path, authorData)
 
-  process.nextTick(() => updateEvents.pathUpdated('/meta/system:system/users'))
+  process.nextTick(() => updateEvents.pathUpdated('/meta/system:system/authors'))
 
-  return { user, auth }
+  return { author, auth }
 }
 
-/** change the password on a user account
- * @param {string} username
+/** change the password on a author account
+ * @param {string} authorrName
  * @param {string} newPassword
  */
-exports.changePassword = async function (user, newPass) {
-  await file.update(this.userAccountPath(user), account => {
-    if (!account) throw new Error('User not found')
+exports.changePassword = async function (author, newPass) {
+  await file.update(this.authorAccountPath(author), account => {
+    if (!account) throw new Error('Author account name not found')
     account.passSalt = Buffer.from(nacl.randomBytes(64))
     account.passHash = Buffer.from(nacl.hash(Buffer.concat([account.passSalt, Buffer.from(`${newPass}`), account.passSalt])))
     return account
   })
 }
 
-/** Change authorization setting on a user account
- * @param {string} username
- * @param {string} authorization - default "user"
+/** Change authorization setting on a author account
+ * @param {string} authorName
+ * @param {"regular"|"admin"} authorization
  */
-exports.changeAuth = async function (user, auth) {
-  await file.update(this.userAccountPath(user), account => {
-    if (!account) throw new Error('User not found')
+exports.changeAuth = async function (author, auth) {
+  await file.update(this.authorAccountPath(author), account => {
+    if (!account) throw new Error('Author account name not found')
     account.auth = auth
     return account
   })
 }
 
-/** get a user's profile */
-exports.getProfile = async function (user) {
-  const account = await file.read(this.userAccountPath(user))
-  delete account.passHash
-  delete account.passSalt
-  return account
+/** get a author's profile */
+exports.getProfile = async function (author) {
+  const account = await file.read(this.authorAccountPath(author))
+  return { author, auth: account.auth }
 }
 
-/** delete a user
- * @param {string} username
+/** delete a author account
+ * @param {string} authorName
  */
-exports.delete = async function (user) {
-  await file.delete(this.userFolder(user))
-  process.nextTick(() => updateEvents.pathUpdated('/meta/system:system/users'))
+exports.delete = async function (author) {
+  await file.delete(this.authorFolder(author))
+  process.nextTick(() => updateEvents.pathUpdated('/meta/system:system/authors'))
 }
 
-/** check if user account exists
- * @param {string} username
+/** check if author account exists
+ * @param {string} authorName
  */
-exports.exists = async function (user) {
-  return await file.exists(this.userAccountPath(user))
+exports.exists = async function (author) {
+  return await file.exists(this.authorAccountPath(author))
 }
 
 /**
- * list all users known to the system
- * @yields {string} username
+ * list all authors known to the system
+ * @yields {string} authorName
  */
 exports.iterate = async function * () {
-  for await (const user of file.iterateFolders(['users'])) {
-    if (!settings.forbiddenUsernames.includes(user)) {
-      yield user
+  for await (const author of file.iterateFolders(['authors'])) {
+    if (!settings.forbiddenAuthorNames.includes(author)) {
+      yield author
     }
   }
 }
 
 /**
- * return an array of all users known to the system
+ * return an array of all authors known to the system
  * @returns {string[]}
  */
 exports.list = async function () {

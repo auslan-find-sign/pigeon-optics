@@ -14,15 +14,15 @@ module.exports = (req, state) => {
         v.header(v => {
           v.breadcrumbs(v => {
             v.a('Datasets', { href: '/datasets/' })
-            v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}` })
-            v.iconLink('cassette', req.params.name, { href: uri`/datasets/${req.params.user}:${req.params.name}/` })
+            v.iconLink('user-circle', req.params.author, { href: uri`/author/${req.params.author}` })
+            v.iconLink('cassette', req.params.name, { href: uri`/datasets/${req.params.author}:${req.params.name}/` })
           })
 
           v.panelTabs(
-            { label: 'View', href: uri`/datasets/${req.params.user}:${req.params.name}/` },
-            { label: 'Edit', href: uri`/datasets/${req.params.user}:${req.params.name}/configuration`, if: req.owner },
-            { label: 'Import', href: uri`/datasets/${req.params.user}:${req.params.name}/import`, current: true, if: req.owner },
-            { label: 'Export', href: uri`/datasets/${req.params.user}:${req.params.name}/export` }
+            { label: 'View', href: uri`/datasets/${req.params.author}:${req.params.name}/` },
+            { label: 'Edit', href: uri`/datasets/${req.params.author}:${req.params.name}/configuration`, if: req.owner },
+            { label: 'Import', href: uri`/datasets/${req.params.author}:${req.params.name}/import`, current: true, if: req.owner },
+            { label: 'Export', href: uri`/datasets/${req.params.author}:${req.params.name}/export` }
           )
         })
 
@@ -42,6 +42,11 @@ module.exports = (req, state) => {
           v.dd(v => {
             v.input({ name: 'overwrite', value: 'true', type: 'checkbox', id: 'overwrite-check', checked: state.overwrite })
             v.label(' Replace existing entries, removing anything not in this file', { for: 'overwrite-check' })
+          })
+          v.dt('Flat File')
+          v.dd(v => {
+            v.input({ name: 'mode', value: 'file', type: 'checkbox', id: 'mode-check', checked: state.overwrite })
+            v.label(' Data is contained in a single file', { for: 'mode-check' })
           })
         })
 

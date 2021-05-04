@@ -10,12 +10,12 @@ const router = express.Router()
 
 router.all('/auth', async (req, res) => {
   let error = false
-  if (req.method === 'POST' && req.body && req.body.username && req.body.password) {
+  if (req.method === 'POST' && req.body && req.body.name && req.body.password) {
     try {
       if (req.body.register) {
-        req.session.auth = await auth.register(req.body.username, req.body.password)
+        req.session.auth = await auth.register(req.body.name, req.body.password)
       } else {
-        req.session.auth = await auth.login(req.body.username, req.body.password)
+        req.session.auth = await auth.login(req.body.name, req.body.password)
       }
       return res.redirect(303, req.body.return)
     } catch (err) {
@@ -35,21 +35,21 @@ router.get('/auth/logout', (req, res) => {
   res.redirect(303, req.query.return || req.get('Referrer') || '/')
 })
 
-router.get('/users/', async (req, res) => {
+router.get('/authors/', async (req, res) => {
   if (req.accepts('html')) {
-    res.sendVibe('user-list', 'Users', { list: auth.iterate() })
+    res.sendVibe('author-list', 'Authors', { list: auth.iterate() })
   } else {
     codec.respond(req, res, auth.iterate())
   }
 })
 
-router.get('/users/:user/', async (req, res) => {
-  const profile = await auth.getProfile(req.params.user)
-  const datasets = await dataset.list(req.params.user)
-  const lenses = await lens.list(req.params.user)
+router.get('/authors/:author/', async (req, res) => {
+  const profile = await auth.getProfile(req.params.author)
+  const datasets = await dataset.list(req.params.author)
+  const lenses = await lens.list(req.params.author)
 
   if (req.accepts('html')) {
-    res.sendVibe('user-profile', `${req.params.user}’s Profile`, profile, datasets, lenses)
+    res.sendVibe('author-profile', `${req.params.author}’s Profile`, profile, datasets, lenses)
   } else {
     codec.respond(req, res, {
       auth: profile.auth,

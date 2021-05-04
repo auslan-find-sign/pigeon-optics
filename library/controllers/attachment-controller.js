@@ -3,7 +3,7 @@ const router = express.Router()
 const attachments = require('../models/attachments')
 const codec = require('../models/codec')
 
-// get a list of datasets owned by a specific user
+// stream the contents of an attachment by it's content hash
 router.get('/attachments/:hash([0-9A-Fa-f]{64})', async (req, res) => {
   const release = attachments.hold(req.params.hash)
   res.sendFile(attachments.getPath(req.params.hash), {

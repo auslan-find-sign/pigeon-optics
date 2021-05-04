@@ -1,7 +1,7 @@
 const uri = require('encodeuricomponent-tag')
 const ptr = require('path-to-regexp')
 
-const datasetPath = '/:source(lenses|datasets|meta)/:user\\::name'
+const datasetPath = '/:source(lenses|datasets|meta)/:author\\::name'
 const datasetMatch = ptr.match(datasetPath)
 // const datasetCompile = ptr.compile(datasetPath)
 const recordPath = `${datasetPath}/records/:recordID`
@@ -18,17 +18,17 @@ Object.assign(exports, {
     }
   },
 
-  encode (source, user, name, recordID = undefined) {
+  encode (source, author, name, recordID = undefined) {
     if (typeof source === 'object') {
-      return this.encode(source.source, source.user, source.name, source.recordID)
+      return this.encode(source.source, source.author, source.name, source.recordID)
     }
 
     if (!['lenses', 'datasets', 'meta'].includes(source)) throw new Error('Unknown source')
 
     if (typeof recordID === 'string') {
-      return uri`/${source}/${user}:${name}/records/${recordID}` // recordCompile({ source, user, name, recordID })
+      return uri`/${source}/${author}:${name}/records/${recordID}` // recordCompile({ source, author, name, recordID })
     } else {
-      return uri`/${source}/${user}:${name}` // datasetCompile({ source, user, name })
+      return uri`/${source}/${author}:${name}` // datasetCompile({ source, author, name })
     }
   }
 })

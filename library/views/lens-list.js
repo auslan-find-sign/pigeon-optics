@@ -8,14 +8,14 @@ module.exports = (req, { list }) => {
         v.breadcrumbs(v => v.a('Lenses', { href: '/lenses/' }))
       })
 
-      for (const [user, tapes] of Object.entries(list)) {
+      for (const [author, tapes] of Object.entries(list)) {
         v.heading({ level: 3 }, v => {
-          v.iconLink('user-circle', user, { href: uri`/users/${user}/` })
+          v.iconLink('user-circle', author, { href: uri`/authors/${author}/` })
           v.text(':')
         })
         v.ul(v => {
           for (const tape of tapes) {
-            v.li(v => v.iconLink('3dglasses', tape, { href: uri`/lenses/${user}:${tape}/` }))
+            v.li(v => v.iconLink('3dglasses', tape, { href: uri`/lenses/${author}:${tape}/` }))
           }
         })
       }

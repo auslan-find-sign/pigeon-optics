@@ -6,9 +6,9 @@ Pigeon Optics is a little webapp for having fun with data and collaborating on c
 
 With Pigeon Optics, anyone can make an account, create datasets, upload records to those datasets, create lenses to transform datasets in to new formats.
 
-Users can subscribe with event stream, or pull updates whenever they please, and get data in the formats they want quickly and without too much hassle.
+Remote apps can subscribe with event stream, or pull updates whenever they please, and get data in the formats they want quickly and without too much hassle.
 
-The app server is designed to be very gentle with your RAM. It aims to be small enough to happily cohabitate with a bunch of other webapps on the cheapest smallest tiniest cloud instance money can buy.
+The app server is designed to be very gentle with your RAM. It aims to be small enough to happily cohabitate with a bunch of other webapps on the cheapest smallest tiniest cloud instance money can buy. Where possible, data is processed piece by piece, and not as huge buffers in memory. The loose goal of the project is that under normal usage it shouldn't run well with 128mb of ram or less.
 
 Lenses are defined as normal javascript code, which is executed in a sandboxed V8 instance (using isolated-vm) in a temporary subprocess, whenever lenses need to rebuild their output. Thinking about supporting Ruby and maybe Python for lens code too! What do you think?
 
@@ -16,7 +16,7 @@ Pigeon Optics is built to serve as the eventual backend of [Auslan Find Sign](ht
 
 The server handles all your objects (as JSON or CBOR) and can efficiently export out your data. It's scalable to large amounts of data on disk, by storing things in the regular filesystem, and using streams where possible to process information. Even HTML views are built and streamed out to clients to avoid needing to buffer large webpages totally in to server memory.
 
-A simple restful interface allows read access to everything on Pigeon Optics, as well as ephemeral (temporary) lenses. For logged in users, they can also save and edit lens code, and write to their own datasets.
+A simple restful interface allows read access to everything on Pigeon Optics, as well as ephemeral (temporary) lenses. For logged in people, they can also save and edit lens code, and write to their own datasets.
 
 ### Radically unscalable?
 

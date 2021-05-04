@@ -1,10 +1,10 @@
 ## GET /datasets/
 
-returns a Map/Hash/Object keyed with string usernames, and each value is an array of dataset names that user has created.
+returns a Map/Hash/Object keyed with string authors, and each value is an array of dataset names that author has created.
 
-## GET /datasets/username:
+## GET /datasets/author:
 
-returns an array of dataset names this user owns
+returns an array of dataset names this author owns
 
 ```json
 [
@@ -13,13 +13,13 @@ returns an array of dataset names this user owns
 ]
 ```
 
-## GET /datasets/username:dataset-name/
+## GET /datasets/author:dataset-name/
 
 returns an object with dataset configuration, and a list of records in the dataset and their versions.
 
 ```js
 {
-  "user": "username",
+  "author": "author-profile-name"
   "name": "dataset-name",
   "version": 8,
   "config": { "memo": "Free text describing the dataset" },
@@ -30,7 +30,7 @@ returns an object with dataset configuration, and a list of records in the datas
 }
 ```
 
-## GET /datasets/username:dataset-name/records/
+## GET /datasets/author:dataset-name/records/
 
 returns a Map/Hash/Object with string keys (recordIDs) and object values `{ version: "123" }`. `version` is a string which maybe a hash, an integer number, or something else. Compatible clients shouldn't try to parse it or manipulate it. Response also includes an `X-Version` header containing the current version of the dataset. This number might not match any version value of any particular record, if the most recent change to the dataset was deleting some records.
 
@@ -41,33 +41,33 @@ returns a Map/Hash/Object with string keys (recordIDs) and object values `{ vers
 }
 ```
 
-## POST /datasets/username:dataset-name/records/
+## POST /datasets/author:dataset-name/records/
 
 POST body must be a Map/Hash/Object with recordID string keys, and any values. `undefined` or `null` values will cause that record to be deleted in the underlying dataset, if it exists. Any other values will be stored as the record's value, overwriting or creating records as needed. Any recordIDs that are not present in the body map will be left as is and inherited in the new version.
 
-## PUT /datasets/username:dataset-name/records/
+## PUT /datasets/author:dataset-name/records/
 
 PUT body must be in the same format as the POST verb, but any unspecified recordIDs will be deleted, not inherited from previous versions.
 
-## DELETE /datasets/username:dataset-name/
+## DELETE /datasets/author:dataset-name/
 
 Delete the entire dataset. Including all versions.
 
-## GET /datasets/username:dataset-name/records/recordID
+## GET /datasets/author:dataset-name/records/recordID
 
 returns the value of the record, as an arbitrary object, and the X-Version header specifying it's current version number.
 
-## GET /datasets/username:dataset-name/as/format/recordID/
+## GET /datasets/author:dataset-name/as/format/recordID/
 
 Format may be one of json, cbor, msgpack, yaml, xml, html, jsonl, or a suitably encoded mime type for any of these formats. If a record contains a string or a buffer as it's root object, format maybe any mime type or file extension string, and the server will attempt to serve the content directly.
 
 Note, sandbox http headers will generally prevent scripts from executing in resources directly loaded from this interface. This might impact html and svgs.
 
-## PUT /datasets/username:dataset-name/records/recordID
+## PUT /datasets/author:dataset-name/records/recordID
 
 A new version of the dataset is created, changing the value of this record to whatever object is provided as the POST body.
 
-## DELETE /datasets/username:dataset-name/records/recordID
+## DELETE /datasets/author:dataset-name/records/recordID
 
 A new version of the dataset is created, removing this recordID from the collection.
 
@@ -85,4 +85,4 @@ Uploaded attachments will only be retained by the server while they are referenc
 
 ## A note on lenses
 
-Lenses support this API as well (but at the /lenses/ path) with the GET verb, in exactly the same way. Lenses are not able to be written using any PUT/POST/DELETE verbs, because lens content is always derived from the output of user configured javascript map/reduce functions running server side. If you are building a derived dataset outside of Pigeon Optics lenses, you should use the [export.md](export.md) interface's event-stream to watch for changes in underlying datasets, and upload a resulting dataset through this API. A reasonable approach is to watch for changes, and whenever the X-Version of a record changes, reprocess it and upload your response to an output dataset.
+Lenses support this API as well (but at the /lenses/ path) with the GET verb, in exactly the same way. Lenses are not able to be written using any PUT/POST/DELETE verbs, because lens content is always derived from the output of configured javascript map/reduce functions running server side. If you are building a derived dataset outside of Pigeon Optics lenses, you should use the [export.md](export.md) interface's event-stream to watch for changes in underlying datasets, and upload a resulting dataset through this API. A reasonable approach is to watch for changes, and whenever the X-Version of a record changes, reprocess it and upload your response to an output dataset.

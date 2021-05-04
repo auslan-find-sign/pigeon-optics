@@ -50,6 +50,11 @@ Object.assign(exports, {
   },
 
   /**
+   * nullSymbol is a placeholder to represent null as a value in json streams with encoder/decoder functions
+   */
+  nullSymbol: Symbol('JSON Null Token'),
+
+  /**
    * Create a transform stream, which takes in objects, and encodes them in to a streaming json array
    * @returns {streams.Transform}
    */
@@ -90,7 +95,9 @@ Object.assign(exports, {
 
     return chain([
       function checkSize (input) {
-        if (size + input.length > maxSize + (1024 * 64)) throw createHttpError(413, 'array entry is too large to parse')
+        if (size + input.length > maxSize + (1024 * 64)) {
+          throw createHttpError(413, `Each ${started} value must be no larger than ${maxSize} bytes`)
+        }
         size += input.length
         return input
       },

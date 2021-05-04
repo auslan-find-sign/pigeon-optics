@@ -12,8 +12,8 @@ Object.assign(exports, require('./base-data-model'))
 exports.source = 'datasets'
 
 // generates a path to data in dataset
-exports.path = function (user, ...path) {
-  return [...auth.userFolder(user), 'datasets', ...path]
+exports.path = function (author, ...path) {
+  return [...auth.authorFolder(author), 'datasets', ...path]
 }
 
 // validate a record is acceptable
@@ -27,7 +27,7 @@ exports.validateRecord = function (id, data) {
 /** validates config object for dataset/lens is valid
  * @returns {boolean}
  */
-exports.validateConfig = async function (user, name, config) {
+exports.validateConfig = async function (author, name, config) {
   const badChars = "!*'();:@&=+$,/?%#[]".split('')
   assert(!badChars.some(char => name.includes(char)), `Name must not contain any of ${badChars.join(' ')}`)
   assert(name.length >= 1, 'Name cannot be empty')

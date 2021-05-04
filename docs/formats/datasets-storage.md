@@ -1,6 +1,6 @@
 Datasets are stored as a folder, by default under ./.data (for happy Glitch compatability!)
 
-The path is ./.data/users/(owner-username)/datasets/(dataset-name)
+The path is ./.data/authors/(owner-name)/datasets/(dataset-name)
 
 the dataset folder contains two things usually, a `meta.cbor` file and an `objects` folder.
 

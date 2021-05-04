@@ -1,10 +1,10 @@
 ## GET /lenses/
 
-returns a Map/Hash/Object keyed with string usernames, and each value is an array of lens names that user owns
+returns a Map/Hash/Object keyed with string authors, and each value is an array of lens names that author owns
 
-## GET /lenses/username:
+## GET /lenses/author:
 
-returns an array of lens names this user owns
+returns an array of lens names this author owns
 
 ```json
 [
@@ -13,20 +13,20 @@ returns an array of lens names this user owns
 ]
 ```
 
-## GET /lenses/username:lens-name/
+## GET /lenses/author:lens-name/
 
 returns an object with lens configuration, and a list of records in the dataset and their versions.
 
 ```js
 {
-  "user": "username",
+  "author": "author-profile-name",
   "name": "lens-name",
   "version": 39,
   "config": {
     "memo": "Free text describing the dataset",
     "mapCode": "js source code",
     "reduceCode": "js source code",
-    "inputs": ["/datasets/user:name/", "/lenses/user:name/"],
+    "inputs": ["/datasets/author:name/", "/lenses/author:name/"],
   },
   "records": {
     "name-of-record": { "version": 14, "hash": Buffer[32], "links": [] },
@@ -35,7 +35,7 @@ returns an object with lens configuration, and a list of records in the dataset 
 }
 ```
 
-## GET /lenses/username:lens-name/configuration
+## GET /lenses/author:lens-name/configuration
 
 returns the config of this lens
 
@@ -44,23 +44,23 @@ returns the config of this lens
   "memo": "Free text describing the dataset",
   "mapCode": "js source code",
   "reduceCode": "js source code",
-  "inputs": ["/datasets/user:name/", "/lenses/user:name/"],
+  "inputs": ["/datasets/author:name/", "/lenses/author:name/"],
 }
 ```
 
-## PUT /lenses/username:lens-name/configuration
+## PUT /lenses/author:lens-name/configuration
 
 set the configuration of this lens, triggering a rebuild. On success returns HTTP 204.
 
-## GET /lenses/username:lens-name/configuration/map
+## GET /lenses/author:lens-name/configuration/map
 
 returns the map function as javascript
 
-## GET /lenses/username:lens-name/configuration/reduce
+## GET /lenses/author:lens-name/configuration/reduce
 
 returns the reduce function as javascript
 
-## GET /lenses/username:lens-name/records/
+## GET /lenses/author:lens-name/records/
 
 returns a Map/Hash/Object with string keys (recordIDs) and object values `{ version: "123", hash: Buffer[32] }`. `version` maybe a string or integer number. Compatible clients shouldn't try to parse it or manipulate it. Response also includes an `X-Version` header containing the current version of the lens output. This number might not match any version value of any particular record, if the most recent change to the lens output was deleting some records.
 
@@ -71,42 +71,52 @@ returns a Map/Hash/Object with string keys (recordIDs) and object values `{ vers
 }
 ```
 
-## DELETE /lenses/username:lens-name/
+## DELETE /lenses/author:lens-name/
 
 Delete the entire lens. Including all versions.
 
-## GET /lenses/username:lens-name/records/recordID
+## GET /lenses/author:lens-name/records/recordID
 
 returns the value of the record, as an arbitrary object, and the X-Version header specifying it's current version number.
 
 ## POST /lenses/ephemeral
 
-accepts the same object as `/lenses/username:lens-name/configuration`, containing at least:
+accepts the same object as `/lenses/author:lens-name/configuration`, containing at least:
 
 ```json
 {
   "mapType": "javascript",
   "mapCode": "javascript code string",
   "reduceCode": "javascript code string",
-  "inputs": ["/datasets/user:dataset-name/", "/lenses/user:lens-name/"]
+  "inputs": ["/datasets/author:dataset-name/", "/lenses/author:lens-name/"]
 }
 ```
 
-The API will generate and build a temporary lens, then returns a JSON/CBOR array (or JSON objects on lines if requested with `?encoding=json-lines` query string options). Each array entry will be one of:
+The API will generate and build a temporary lens, then stream out the entire output of the lens in whichever supported format requested via `Accept` http header
 
-```js
+```jsonc
 {
-  log: {
-    input: 'dataPath to record which was input to map function',
-    function: "/lenses/user:lens-name/configuration/map.js", // or reduce.js
-    error: { // or error will be set to "false" if no errors were thrown
-
+  "log": {
+    "input": "dataPath to record which was input to map function",
+    "function": "/lenses/author:lens-name/configuration/map.js", // or reduce.js
+    "error": { // or error will be set to "false" if no errors were thrown
+      "type": "Error", // or another error constructor name
+      "message": "string error message",
+      "stack": [
+        {
+          "code": "throw new Error('string error message')",
+          "line": 3, // line, 1 based
+          "column": 0, // column, 0 based
+          "filename": "map.js" // or reduce.js, normally
+        }
+        // ... possibly more entries
+      ]
     },
-    logs: [
+    "logs": [
       {
-        type: 'log', // or "warn" or "info" or "error"
-        timestamp: 1234, // epoch milliseconds timestamp when log was emitted
-        args: ['parameters', 'sent', 'to', 'console.log()', 'or whatever']
+        "type": "log", // or "warn" or "info" or "error"
+        "timestamp": 1234, // epoch milliseconds timestamp when log was emitted
+        "args": ["arguments", "sent", "to", "console.log()", "or whatever"]
       }
     ]
   }
@@ -117,11 +127,11 @@ or:
 
 ```js
 {
-  record: {
-    id: 'recordID-goes-here',
-    hash: Buffer[32], // some kind of hash of the contents of data, to aid caching, kind of like an ETag
-    version: 5, // sequence ID number
-    data: /* whatever reduce function returns is here */
+  "record": {
+    "id": 'recordID-goes-here',
+    "hash": Buffer[32], // some kind of hash of the contents of data, to aid caching, kind of like an ETag
+    "version": 5, // sequence ID number
+    "data": // whatever reduce function returns is here
   }
 }
 ```

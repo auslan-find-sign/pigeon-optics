@@ -31,7 +31,7 @@ HTML doesn't have an obvious way to translate JSON-like data structures in to ma
 
 The HTML codec will happily produce non-spec markup, like custom unspecced elements, but it does try to enforce against obviously unparseable markup, for example it will fail and error if JsonML structure tries to emit child nodes inside of an `<img>` tag.
 
-The HTML codec tries to always produce spec-compliant markup, and aggressively optimises for compactness. Attribute values are unquoted where ever possible, for example. The goal of the codec is to always produce valid parseable markup where possible, so users never need to think about how the html encoding works.
+The HTML codec tries to always produce spec-compliant markup, and aggressively optimises for compactness. Attribute values are unquoted where ever possible, for example. The goal of the codec is to always produce valid parseable markup where possible, so you never need to think about how the html encoding works.
 
 If you upload html to pigeon optics and then request it back as xml, you should recieve something that is basically xhtml, but likely missing a suitable doctype.
 

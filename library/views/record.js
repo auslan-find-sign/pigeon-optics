@@ -32,7 +32,7 @@ module.exports = (req, { path, record, sidebar }) => {
       v.header(v => {
         v.breadcrumbs(v => {
           v.a(capitalize(path.source), { href: uri`/${path.source}/` })
-          v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}` })
+          v.iconLink('user-circle', req.params.author, { href: uri`/authors/${req.params.author}` })
           v.iconLink('cassette', req.params.name, { href: codec.path.encode({ ...path, recordID: undefined }) })
           v.iconLink('newspaper', req.params.recordID, { href: codec.path.encode(path) })
         })

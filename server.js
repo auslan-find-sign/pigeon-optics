@@ -47,7 +47,7 @@ app.use((req, res, next) => {
   next()
 })
 
-// Give the users a crypto signed cookie, to store session information
+// Give the logged in people a crypto signed cookie, to store session information
 // If you'd like your cookies to keep working between app edits, make sure to check out the .env file!
 app.use(cookieSession({
   secret: process.env.SECRET || crypto.randomBytes(64).toString('base64')

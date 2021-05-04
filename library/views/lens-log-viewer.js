@@ -7,16 +7,16 @@ module.exports = (req, { mapOutputs }) => {
       v.header(v => {
         v.breadcrumbs(v => {
           v.a('Lenses', { href: '/lenses/' })
-          v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}/` })
-          v.iconLink('3dglasses', req.params.name, { href: uri`/lenses/${req.params.user}:${req.params.name}/` })
-          v.a('Lens Build Logs', { href: uri`/lenses/${req.params.user}:${req.params.name}/logs` })
+          v.iconLink('user-circle', req.params.author, { href: uri`/authors/${req.params.author}/` })
+          v.iconLink('3dglasses', req.params.name, { href: uri`/lenses/${req.params.author}:${req.params.name}/` })
+          v.a('Lens Build Logs', { href: uri`/lenses/${req.params.author}:${req.params.name}/logs` })
         })
 
         v.panelTabs(
-          { label: 'Lens', href: uri`/lenses/${req.params.user}:${req.params.name}/` },
-          { label: 'Edit', href: uri`/lenses/${req.params.user}:${req.params.name}/configuration`, if: req.owner },
-          { label: 'Logs', href: uri`/lenses/${req.params.user}:${req.params.name}/logs`, current: true },
-          { label: 'Export', href: uri`/lenses/${req.params.user}:${req.params.name}/export` }
+          { label: 'Lens', href: uri`/lenses/${req.params.author}:${req.params.name}/` },
+          { label: 'Edit', href: uri`/lenses/${req.params.author}:${req.params.name}/configuration`, if: req.owner },
+          { label: 'Logs', href: uri`/lenses/${req.params.author}:${req.params.name}/logs`, current: true },
+          { label: 'Export', href: uri`/lenses/${req.params.author}:${req.params.name}/export` }
         )
       })
 

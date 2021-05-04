@@ -14,15 +14,15 @@ module.exports = (req, state) => {
       v.header(v => {
         v.breadcrumbs(v => {
           v.a('Datasets', { href: '/datasets/' })
-          v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}` })
-          v.iconLink('cassette', req.params.name, { href: uri`/datasets/${req.params.user}:${req.params.name}/` })
+          v.iconLink('user-circle', req.params.author, { href: uri`/authors/${req.params.author}` })
+          v.iconLink('cassette', req.params.name, { href: uri`/datasets/${req.params.author}:${req.params.name}/` })
         })
 
         v.panelTabs(
-          { label: 'View', href: uri`/datasets/${req.params.user}:${req.params.name}/` },
-          { label: 'Edit', href: uri`/datasets/${req.params.user}:${req.params.name}/configuration`, if: req.owner },
-          { label: 'Import', href: uri`/datasets/${req.params.user}:${req.params.name}/import`, if: req.owner },
-          { label: 'Export', href: uri`/datasets/${req.params.user}:${req.params.name}/export`, current: true }
+          { label: 'View', href: uri`/datasets/${req.params.author}:${req.params.name}/` },
+          { label: 'Edit', href: uri`/datasets/${req.params.author}:${req.params.name}/configuration`, if: req.owner },
+          { label: 'Import', href: uri`/datasets/${req.params.author}:${req.params.name}/import`, if: req.owner },
+          { label: 'Export', href: uri`/datasets/${req.params.author}:${req.params.name}/export`, current: true }
         )
       })
 

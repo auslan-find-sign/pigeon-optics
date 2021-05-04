@@ -17,17 +17,17 @@ module.exports = (req, data, error = null) => {
             if (data.create) {
               v.a('Create Lens', { href: '/lenses/create' })
             } else {
-              v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}/` })
-              v.iconLink('3dglasses', req.params.name, { href: uri`/lenses/${req.params.user}:${req.params.name}/` })
+              v.iconLink('user-circle', req.params.author, { href: uri`/authors/${req.params.author}/` })
+              v.iconLink('3dglasses', req.params.name, { href: uri`/lenses/${req.params.author}:${req.params.name}/` })
             }
           })
 
           if (!data.create) {
             v.panelTabs(
-              { label: 'Lens', href: uri`/lenses/${req.params.user}:${req.params.name}/` },
-              { label: 'Edit', href: uri`/lenses/${req.params.user}:${req.params.name}/configuration`, if: req.owner, current: true },
-              { label: 'Logs', href: uri`/lenses/${req.params.user}:${req.params.name}/logs` },
-              { label: 'Export', href: uri`/lenses/${req.params.user}:${req.params.name}/export` }
+              { label: 'Lens', href: uri`/lenses/${req.params.author}:${req.params.name}/` },
+              { label: 'Edit', href: uri`/lenses/${req.params.author}:${req.params.name}/configuration`, if: req.owner, current: true },
+              { label: 'Logs', href: uri`/lenses/${req.params.author}:${req.params.name}/logs` },
+              { label: 'Export', href: uri`/lenses/${req.params.author}:${req.params.name}/export` }
             )
           }
         })
@@ -37,7 +37,7 @@ module.exports = (req, data, error = null) => {
 
         if (error) v.p(v => { v.glitch('Error: '); v.pre(error) })
 
-        v.hiddenFormData({ owner: data.owner || req.session.auth.user })
+        v.hiddenFormData({ owner: data.owner || req.author })
         v.hiddenFormData({ mapType: data.mapType })
 
         v.dl(v => {
@@ -59,7 +59,7 @@ module.exports = (req, data, error = null) => {
           v.dd(v => {
             v.div({
               innerHTML: `Map function receives <code>path</code> and <code>data</code>. <code>path</code> is an object
-              containing <code>string</code> (full data path of input), and <code>source</code>, <code>user</code>,
+              containing <code>string</code> (full data path of input), and <code>source</code>, <code>author</code>,
               <code>name</code>, and <code>recordID</code> properties. data contains the value of the underlying
               dataset/lens output. Use <code>output(recordID, recordData)</code> to add an output to the lens.
               <code>console.log/warn/info/error()</code> is also available for debugging.`
@@ -84,7 +84,7 @@ module.exports = (req, data, error = null) => {
             v.button('Create', { type: 'submit' })
           } else {
             v.button('Save', { type: 'submit' })
-            v.button('Delete', { type: 'submit', formaction: uri`/lenses/${req.params.user}:${req.params.name}/`, formmethod: 'DELETE' })
+            v.button('Delete', { type: 'submit', formaction: uri`/lenses/${req.params.author}:${req.params.name}/`, formmethod: 'DELETE' })
           }
         })
       })

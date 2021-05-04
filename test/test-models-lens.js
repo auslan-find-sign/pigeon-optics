@@ -4,38 +4,38 @@ const { expect } = chai
 const codec = require('../library/models/codec')
 const dataset = require('../library/models/dataset')
 const lens = require('../library/models/lens')
-const user = 'system'
+const account = 'system'
 const datasetName = 'test-dataset'
 const lensName = 'test-lens'
 
 describe('models/lens', function () {
   before(async function () {
-    if (await dataset.exists(user, datasetName)) await dataset.delete(user, datasetName)
-    if (await lens.exists(user, lensName)) await lens.delete(user, lensName)
-    await dataset.create(user, datasetName, { memo: 'Test input data for testing lenses' })
-    await dataset.overwrite(user, datasetName, {
+    if (await dataset.exists(account, datasetName)) await dataset.delete(account, datasetName)
+    if (await lens.exists(account, lensName)) await lens.delete(account, lensName)
+    await dataset.create(account, datasetName, { memo: 'Test input data for testing lenses' })
+    await dataset.overwrite(account, datasetName, {
       abc: { tags: ['cat', 'dog'] },
       def: { tags: ['dog', 'mango'] },
       ghi: { tags: ['dog', 'cat'] }
     })
   })
 
-  it('lens.create(user, name) sets up a javascript lens', async function () {
-    await lens.create(user, lensName, {
+  it('lens.create(account, name) sets up a javascript lens', async function () {
+    await lens.create(account, lensName, {
       memo: 'Automated Unit Testing created this lens to verify internal models are working correctly',
       mapType: 'javascript',
       mapCode: 'for (const tag of data.tags) output(tag, [path.recordID])\n' +
       'if (data.log) console.log(data.log)\n' +
       'if (data.error) throw new Error(data.error)\n',
       reduceCode: 'return [...left, ...right].sort()',
-      inputs: [codec.path.encode('datasets', user, datasetName)]
+      inputs: [codec.path.encode('datasets', account, datasetName)]
     })
-    await expect(lens.readMeta(user, lensName)).eventually.is.an('object').with.property('memo').that.includes('Automated Unit Testing')
+    await expect(lens.readMeta(account, lensName)).eventually.is.an('object').with.property('memo').that.includes('Automated Unit Testing')
   })
 
-  it('lens.build(user, name) works', async function () {
-    await lens.build(user, lensName)
-    const list = await lens.list(user, lensName)
+  it('lens.build(account, name) works', async function () {
+    await lens.build(account, lensName)
+    const list = await lens.list(account, lensName)
 
     const data = {}
     for (const { id, read } of list) data[id] = await read()
@@ -46,13 +46,13 @@ describe('models/lens', function () {
     })
   })
 
-  it('lens.build(user, name) transfers logs correctly', async function () {
-    await dataset.write(user, datasetName, 'def', { tags: ['dog', 'mango'], log: 'log test' })
-    await dataset.write(user, datasetName, 'ghi', { tags: ['dog', 'cat'], error: 'error test' })
-    await lens.build(user, lensName)
+  it('lens.build(account, name) transfers logs correctly', async function () {
+    await dataset.write(account, datasetName, 'def', { tags: ['dog', 'mango'], log: 'log test' })
+    await dataset.write(account, datasetName, 'ghi', { tags: ['dog', 'cat'], error: 'error test' })
+    await lens.build(account, lensName)
 
     const logs = {}
-    for await (const log of lens.iterateLogs(user, lensName)) logs[codec.path.decode(log.input).recordID] = log
+    for await (const log of lens.iterateLogs(account, lensName)) logs[codec.path.decode(log.input).recordID] = log
 
     expect(logs.abc.logs).is.an('array').and.has.length(0)
     expect(logs.abc.errors).is.an('array').and.has.length(0)
@@ -66,12 +66,12 @@ describe('models/lens', function () {
     expect(logs.def.logs[0].args).is.an('array').and.deep.equals(['log test'])
   })
 
-  it('lens.delete(user, name) works', async function () {
-    await expect(lens.exists(user, lensName)).is.eventually.ok
-    await expect(lens.exists(user, lensName, 'cat')).is.eventually.ok
-    await lens.delete(user, lensName)
-    await expect(lens.exists(user, lensName)).is.eventually.not.ok
-    await expect(lens.exists(user, lensName, 'cat')).is.eventually.not.ok
-    await dataset.delete(user, datasetName)
+  it('lens.delete(account, name) works', async function () {
+    await expect(lens.exists(account, lensName)).is.eventually.ok
+    await expect(lens.exists(account, lensName, 'cat')).is.eventually.ok
+    await lens.delete(account, lensName)
+    await expect(lens.exists(account, lensName)).is.eventually.not.ok
+    await expect(lens.exists(account, lensName, 'cat')).is.eventually.not.ok
+    await dataset.delete(account, datasetName)
   })
 })

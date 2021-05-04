@@ -16,7 +16,7 @@ module.exports = (req, data, error = null) => {
         v.ul(v => {
           for (const recordID of data.sidebar.recordIDs) {
             const attribs = recordID === req.params.recordID ? { class: 'selected' } : {}
-            v.li(attribs, v => v.a(recordID, { href: uri`/datasets/${req.params.user}:${req.params.name}/records/${recordID}?edit=1` }))
+            v.li(attribs, v => v.a(recordID, { href: uri`/datasets/${req.params.author}:${req.params.name}/records/${recordID}?edit=1` }))
           }
         })
       })
@@ -27,19 +27,19 @@ module.exports = (req, data, error = null) => {
         v.header(v => {
           v.breadcrumbs(v => {
             v.a('Datasets', { href: '/datasets/' })
-            v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}` })
-            v.iconLink('cassette', req.params.name, { href: uri`/datasets/${req.params.user}:${req.params.name}/` })
+            v.iconLink('user-circle', req.params.author, { href: uri`/authors/${req.params.author}` })
+            v.iconLink('cassette', req.params.name, { href: uri`/datasets/${req.params.author}:${req.params.name}/` })
             if (data.create) {
-              v.iconLink('newspaper', 'Add Record', { href: uri`/datasets/${req.params.user}:${req.params.name}/create-record` })
+              v.iconLink('newspaper', 'Add Record', { href: uri`/datasets/${req.params.author}:${req.params.name}/create-record` })
             } else {
-              v.iconLink('newspaper', req.params.recordID, { href: uri`/datasets/${req.params.user}:${req.params.name}/records/${req.params.recordID}` })
+              v.iconLink('newspaper', req.params.recordID, { href: uri`/datasets/${req.params.author}:${req.params.name}/records/${req.params.recordID}` })
             }
           })
 
           if (req.owner && !data.create) {
             v.panelTabs(
-              { label: 'View', href: uri`/datasets/${req.params.user}:${req.params.name}/records/${req.params.recordID}` },
-              { label: 'Edit', href: uri`/datasets/${req.params.user}:${req.params.name}/records/${req.params.recordID}?edit=1`, current: true }
+              { label: 'View', href: uri`/datasets/${req.params.author}:${req.params.name}/records/${req.params.recordID}` },
+              { label: 'Edit', href: uri`/datasets/${req.params.author}:${req.params.name}/records/${req.params.recordID}?edit=1`, current: true }
             )
           }
         })
@@ -60,7 +60,7 @@ module.exports = (req, data, error = null) => {
         v.footer(v => {
           v.button('Save', { type: 'submit' })
           if (!data.create) {
-            v.button('Delete', { type: 'submit', formmethod: 'DELETE', formaction: uri`/datasets/${req.params.user}:${req.params.name}/records/${data.recordID}` })
+            v.button('Delete', { type: 'submit', formmethod: 'DELETE', formaction: uri`/datasets/${req.params.author}:${req.params.name}/records/${data.recordID}` })
           }
         })
       })

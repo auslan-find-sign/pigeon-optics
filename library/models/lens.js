@@ -23,12 +23,12 @@ Object.assign(exports, require('./base-data-model'))
 
 exports.source = 'lenses'
 
-// resolve path inside this - override with viewports path in user folder
-exports.path = function (user, ...path) {
-  return [...auth.userFolder(user), 'lenses', ...path]
+// resolve path inside this - override with viewports path in author account folder
+exports.path = function (author, ...path) {
+  return [...auth.authorFolder(author), 'lenses', ...path]
 }
 
-exports.validateConfig = async function (user, name, config) {
+exports.validateConfig = async function (author, name, config) {
   const badChars = "!*'();:@&=+$,/?%#[]".split('')
   assert(!badChars.some(char => name.includes(char)), `Name must not contain any of ${badChars.join(' ')}`)
   assert(name.length >= 1, 'Name cannot be empty')
@@ -60,17 +60,17 @@ exports.validateRecord = async function (id, data) {
   assert(data !== undefined, 'record data cannot be set to undefined, use delete operation instead')
 }
 
-// returns an object, with dataPath keys, and { user, name } values
+// returns an object, with dataPath keys, and { author, name } values
 exports.getInputs = async function () {
   // TODO: consider optimising/caching this somehow? seems expensive to do frequently
   const inputMap = {}
-  for await (const user of auth.iterate()) {
-    for await (const name of this.iterate(user)) {
-      const lensConfig = await this.readMeta(user, name)
+  for await (const author of auth.iterate()) {
+    for await (const name of this.iterate(author)) {
+      const lensConfig = await this.readMeta(author, name)
       for (const path of lensConfig.inputs) {
         const normalized = codec.path.encode(codec.path.decode(path))
         if (!Array.isArray(inputMap[normalized])) inputMap[normalized] = []
-        inputMap[normalized].push({ user, name })
+        inputMap[normalized].push({ author, name })
       }
     }
   }
@@ -82,19 +82,19 @@ exports.getInputs = async function () {
  *  path, error if any, and logs
  * @yields {object}
  */
-exports.iterateLogs = async function * (user, name) {
-  const file = this.getFileStore(user, name)
+exports.iterateLogs = async function * (author, name) {
+  const file = this.getFileStore(author, name)
   yield * await file.readStream(['build-logs'])
 }
 
-exports.build = async function (user, name) {
+exports.build = async function (author, name) {
   const readPath = require('./read-path')
   const worker = new LensWorker()
-  const objects = this.getObjectStore(user, name)
+  const objects = this.getObjectStore(author, name)
 
-  await this.updateMeta(user, name, async (meta) => {
+  await this.updateMeta(author, name, async (meta) => {
     const logStream = new PassThrough({ objectMode: true })
-    const logWriter = this.getFileStore(user, name).writeStream(['build-logs'], logStream)
+    const logWriter = this.getFileStore(author, name).writeStream(['build-logs'], logStream)
     const prevRecords = meta.records
     meta.records = {} // erase previous records
     await worker.startup(meta)
@@ -135,13 +135,13 @@ exports.build = async function (user, name) {
 }
 
 // setup listening for changes to inputs
-updateEvents.events.on('change', async ({ path, source, user, name, recordID }) => {
-  const matcher = codec.path.encode({ source, user, name })
+updateEvents.events.on('change', async ({ path, source, author, name, recordID }) => {
+  const matcher = codec.path.encode({ source, author, name })
   const inputs = await exports.getInputs()
   for (const [path, receivers] of Object.entries(inputs)) {
     if (path === matcher) {
-      for (const { user: lensUser, name: lensName } of receivers) {
-        await exports.build(lensUser, lensName)
+      for (const { author: lensAuthor, name: lensName } of receivers) {
+        await exports.build(lensAuthor, lensName)
       }
     }
   }

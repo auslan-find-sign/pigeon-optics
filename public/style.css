@@ -61,6 +61,11 @@ input, textarea {
   width: 100%;
 }
 
+input[type=checkbox], input[type=radio] {
+  display: inline;
+  width: auto;
+}
+
 button {
   border: none;
     margin: 0;
@@ -358,7 +363,7 @@ div.panel > dl > dd {
   padding: 0.5ex 1em 0.5ex 0.5ex;
   margin: 0;
 }
-div.panel > dl > dd > input, div.panel > dl > dd > textarea {
+div.panel > dl > dd > *:is(input, textarea) {
   display: block;
   margin: 0;
   background: none;
@@ -366,6 +371,11 @@ div.panel > dl > dd > input, div.panel > dl > dd > textarea {
   color: inherit;
   font-weight: normal;
   border-bottom: 2px solid currentColor;
+}
+
+div.panel > dl > dd > input:is([type=checkbox], [type=radio]) {
+  display: inline;
+  width: auto;
 }
 
 /* Source Code widget */

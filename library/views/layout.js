@@ -9,12 +9,12 @@ module.exports = (req, block) => {
       v.span({ style: { flexGrow: 1 } })
       v.iconButton('cassette', 'Datasets', { href: '/datasets/' })
       v.iconButton('3dglasses', 'Lenses', { href: '/lenses/' })
-      v.iconButton('users', 'Users', { href: '/users/' })
+      v.iconButton('users', 'Authors', { href: '/authors/' })
 
       v.span({ style: { flexGrow: 10 } })
       v.iconButton('magnifier', 'Search', { href: '/search' })
-      if (req.session && req.session.auth) {
-        v.iconButton('user-circle', req.session.auth.user, { href: uri`/users/${req.session.auth.user}/` })
+      if (req.author) {
+        v.iconButton('user-circle', req.author, { href: uri`/authors/${req.author}/` })
         v.iconButton('sign-out', 'Logout', { href: uri`/auth/logout` })
       } else {
         v.iconButton('user-circle', 'Login', { href: uri`/auth` })

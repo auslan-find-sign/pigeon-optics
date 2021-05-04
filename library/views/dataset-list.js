@@ -10,14 +10,14 @@ module.exports = (req, { list }) => {
         })
       })
 
-      for (const [user, tapes] of Object.entries(list)) {
+      for (const [author, tapes] of Object.entries(list)) {
         v.heading({ level: 3 }, v => {
-          v.iconLink('user-circle', user, { href: uri`/users/${user}` })
+          v.iconLink('user-circle', author, { href: uri`/authors/${author}` })
           v.text(':')
         })
         v.ul(v => {
           for (const tape of tapes) {
-            v.li(v => v.iconLink('cassette', tape, { href: uri`/datasets/${user}:${tape}/` }))
+            v.li(v => v.iconLink('cassette', tape, { href: uri`/datasets/${author}:${tape}/` }))
           }
         })
       }

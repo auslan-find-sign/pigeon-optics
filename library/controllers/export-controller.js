@@ -13,11 +13,11 @@ const expresse = require('@toverux/expresse')
 const onFinished = require('on-finished')
 const createHttpError = require('http-errors')
 
-router.param('user', require('../models/auth').ownerParam)
+router.param('author', require('../models/auth').ownerParam)
 
 /**
  * iterator which yields chunks of text or buffer in whichever encoding is requested
- * @param {string} path - path in form '/realm/user:name'
+ * @param {string} path - path in form '/realm/author:name'
  * @param {object} opts - query string options
  * @param {string|number} [opts.at] - version number, records with a lower number than this will output a stub without a data field
  * @yields {string|Buffer}
@@ -90,7 +90,7 @@ function streamArchive (dataPath, archiveType, encoder, includeAttachments) {
   return zip
 }
 
-router.get('/:source(datasets|lenses)/:user\\::name/export', async (req, res) => {
+router.get('/:source(datasets|lenses)/:author\\::name/export', async (req, res) => {
   if (req.params.source === 'datasets') {
     return res.sendVibe('dataset-export', 'Export Dataset', {})
   } else if (req.params.source === 'lenses') {
@@ -106,7 +106,7 @@ router.get('/:source(datasets|lenses)/:user\\::name/export', async (req, res) =>
  * ?at=(number) subsets the response to omit data field on any entries whose version number is less than the number
  * provided, allowing for more efficient pull syncing
  */
-router.get(`/:source(datasets|lenses)/:user\\::name/export/flat-file.:format(${codec.exts.join('|')})?`, async (req, res) => {
+router.get(`/:source(datasets|lenses)/:author\\::name/export/flat-file.:format(${codec.exts.join('|')})?`, async (req, res) => {
   const path = codec.path.encode(req.params)
 
   if (!await readPath.exists(path)) {
@@ -132,7 +132,7 @@ router.get(`/:source(datasets|lenses)/:user\\::name/export/flat-file.:format(${c
 /**
  * export a dataset/viewport output as a zip file
  */
-router.get(`/:source(datasets|lenses)/:user\\::name/export/archive.:format(${codec.exts.join('|')}).zip`, async (req, res) => {
+router.get(`/:source(datasets|lenses)/:author\\::name/export/archive.:format(${codec.exts.join('|')}).zip`, async (req, res) => {
   const path = codec.path.encode(req.params)
 
   if (!await readPath.exists(path)) {
@@ -150,7 +150,7 @@ router.get(`/:source(datasets|lenses)/:user\\::name/export/archive.:format(${cod
 /**
  * stream out changes to a lens or dataset's contents
  */
-router.get('/:source(datasets|lenses|meta)/:user\\::name/event-stream', expresse.sse({ flushAfterWrite: true }), async (req, res) => {
+router.get('/:source(datasets|lenses|meta)/:author\\::name/event-stream', expresse.sse({ flushAfterWrite: true }), async (req, res) => {
   const sources = {
     datasets: require('../models/dataset'),
     lenses: require('../models/lens'),
@@ -163,10 +163,10 @@ router.get('/:source(datasets|lenses|meta)/:user\\::name/event-stream', expresse
 
   // send's current version of dataset
   const model = sources[req.params.source]
-  const version = (await model.readMeta(req.params.user, req.params.name)).version
-  const { source, user, name } = req.params
-  const path = codec.path.encode(req.params.source, req.params.user, req.params.name)
-  send({ path, source, user, name, version })
+  const version = (await model.readMeta(req.params.author, req.params.name)).version
+  const { source, author, name } = req.params
+  const path = codec.path.encode(req.params.source, req.params.author, req.params.name)
+  send({ path, source, author, name, version })
 
   // watch for further updates, until the response closes
   updateEvents.events.on('update', send)
@@ -175,7 +175,7 @@ router.get('/:source(datasets|lenses|meta)/:user\\::name/event-stream', expresse
   })
 })
 
-router.get('/:source(datasets|lenses|meta)/:user\\::name/as/:format/:recordID', async (req, res) => {
+router.get('/:source(datasets|lenses|meta)/:author\\::name/as/:format/:recordID', async (req, res) => {
   const encoder = req.params.format.includes('/') ? codec.for(req.params.format) : codec.for(`.${req.params.format}`)
 
   for await (const { data } of readPath(codec.path.encode(req.params))) {

@@ -49,20 +49,20 @@ readPath.meta = async function * readPathMeta (path) {
     if (source !== undefined) {
       if (params.recordID !== undefined) {
         // just yield the specific entry
-        if (await source.exists(params.user, params.name, params.recordID)) {
-          const meta = await source.readMeta(params.user, params.name)
+        if (await source.exists(params.author, params.name, params.recordID)) {
+          const meta = await source.readMeta(params.author, params.name)
           yield {
-            path: codec.path.encode(params.source, params.user, params.name, params.recordID),
+            path: codec.path.encode(params.source, params.author, params.name, params.recordID),
             ...meta.records[params.recordID],
-            read: () => source.read(params.user, params.name, params.recordID)
+            read: () => source.read(params.author, params.name, params.recordID)
           }
         }
       } else {
         // do the whole dataset
-        if (await source.exists(params.user, params.name)) {
-          for await (const meta of source.iterate(params.user, params.name)) {
+        if (await source.exists(params.author, params.name)) {
+          for await (const meta of source.iterate(params.author, params.name)) {
             yield {
-              path: codec.path.encode(params.source, params.user, params.name, meta.id),
+              path: codec.path.encode(params.source, params.author, params.name, meta.id),
               ...meta
             }
           }
@@ -92,9 +92,9 @@ readPath.exists = async function readPathExists (path) {
 
   const source = sources[params.source]
   if (source.recordID) {
-    return await source.exists(params.user, params.name, params.recordID)
+    return await source.exists(params.author, params.name, params.recordID)
   } else {
-    return await source.exists(params.user, params.name)
+    return await source.exists(params.author, params.name)
   }
 }
 

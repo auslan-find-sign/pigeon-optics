@@ -277,35 +277,35 @@ describe('models/codec streaming mode', function () {
 
 describe('models/codec.path', function () {
   it('encodes without a record ID', function () {
-    const opts = { source: 'datasets', user: 'user', name: 'name' }
-    expect(codec.path.encode(opts)).to.equal('/datasets/user:name')
+    const opts = { source: 'datasets', author: 'person', name: 'name' }
+    expect(codec.path.encode(opts)).to.equal('/datasets/person:name')
   })
 
   it('encodes with an undefined record ID', function () {
-    const opts = { source: 'datasets', user: 'user', name: 'name', recordID: undefined }
-    expect(codec.path.encode(opts)).to.equal('/datasets/user:name')
+    const opts = { source: 'datasets', author: 'person', name: 'name', recordID: undefined }
+    expect(codec.path.encode(opts)).to.equal('/datasets/person:name')
   })
 
   it('it refuses to encode from a made up fake source', function () {
-    const opts = { source: 'mooop', user: 'user', name: 'name' }
+    const opts = { source: 'mooop', author: 'person', name: 'name' }
     expect(() => codec.path.encode(opts)).to.throw()
   })
 
   it('roundtrips without a recordID well', function () {
-    const opts = { source: 'meta', user: 'bob', name: 'things-corp.exe' }
+    const opts = { source: 'meta', author: 'bob', name: 'things-corp.exe' }
     expect(codec.path.decode(codec.path.encode(opts))).to.deep.equal(opts)
   })
 
   it('works with recordIDs', function () {
     for (const recordID of ['quilts', 'delete.exe', '🍃', '日本語']) {
-      const opts = { source: 'datasets', user: 'freda', name: 'froglegs', recordID }
+      const opts = { source: 'datasets', author: 'freda', name: 'froglegs', recordID }
       const roundtrip = codec.path.decode(codec.path.encode(opts))
       expect(roundtrip).to.deep.equal(opts)
     }
   })
 
   it('encodes with arglist instead of object', function () {
-    const a = codec.path.encode({ source: 'datasets', user: 'bean', name: 'bags', recordID: 'shredded foam' })
+    const a = codec.path.encode({ source: 'datasets', author: 'bean', name: 'bags', recordID: 'shredded foam' })
     const b = codec.path.encode('datasets', 'bean', 'bags', 'shredded foam')
     expect(a).to.equal(b)
   })

@@ -1,7 +1,7 @@
 {
   "name": "pigeon-optics",
   "version": "0.2.0",
-  "description": "A radically low-performance unscaleable multiuser untrusted map/reducing database for tiny servers and community projects",
+  "description": "A radically low-performance unscaleable multiauthor untrusted map/reducing database for tiny servers and community projects",
   "main": "server.js",
   "repo": "https://github.com/auslan-find-sign/pigeon-optics.git",
   "homepage": "https://github.com/auslan-find-sign/pigeon-optics/",
@@ -75,12 +75,14 @@
     "lensCodeSize": "5 MB",
     "maxRecordSize": "20 MB",
     "maxAttachmentSize": "1 GB",
-    "forbiddenUsernames": [
+    "forbiddenAuthorNames": [
       "system",
       "admin",
       "owner",
       "root",
       "user",
+      "author",
+      "creator",
       "test",
       "support",
       "guest",

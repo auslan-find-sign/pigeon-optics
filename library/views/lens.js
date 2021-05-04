@@ -14,15 +14,15 @@ module.exports = (req, config) => {
       v.header(v => {
         v.breadcrumbs(v => {
           v.a('Lenses', { href: '/lenses/' })
-          v.iconLink('user-circle', req.params.user, { href: uri`/users/${req.params.user}/` })
-          v.iconLink('3dglasses', req.params.name, { href: uri`/lenses/${req.params.user}:${req.params.name}/` })
+          v.iconLink('user-circle', req.params.author, { href: uri`/authors/${req.params.author}/` })
+          v.iconLink('3dglasses', req.params.name, { href: uri`/lenses/${req.params.author}:${req.params.name}/` })
         })
 
         v.panelTabs(
-          { label: 'Lens', href: uri`/lenses/${req.params.user}:${req.params.name}/`, current: true },
-          { label: 'Edit', href: uri`/lenses/${req.params.user}:${req.params.name}/configuration`, if: req.owner },
-          { label: 'Logs', href: uri`/lenses/${req.params.user}:${req.params.name}/logs` },
-          { label: 'Export', href: uri`/lenses/${req.params.user}:${req.params.name}/export` }
+          { label: 'Lens', href: uri`/lenses/${req.params.author}:${req.params.name}/`, current: true },
+          { label: 'Edit', href: uri`/lenses/${req.params.author}:${req.params.name}/configuration`, if: req.owner },
+          { label: 'Logs', href: uri`/lenses/${req.params.author}:${req.params.name}/logs` },
+          { label: 'Export', href: uri`/lenses/${req.params.author}:${req.params.name}/export` }
         )
       })
 
@@ -47,11 +47,11 @@ module.exports = (req, config) => {
       v.sourceCode(config.reduceCode)
 
       v.heading('Records:', { level: 3 })
-      v.linkList(Object.keys(config.records).sort(naturalCompare), name => uri`/lenses/${req.params.user}:${req.params.name}/records/${name}`)
+      v.linkList(Object.keys(config.records).sort(naturalCompare), name => uri`/lenses/${req.params.author}:${req.params.name}/records/${name}`)
 
       if (req.session.auth) {
         v.footer(v => {
-          v.button('Clone', { href: uri`/lenses/create?clone=${req.params.user}:${req.params.name}` })
+          v.button('Clone', { href: uri`/lenses/create?clone=${req.params.author}:${req.params.name}` })
         })
       }
     })

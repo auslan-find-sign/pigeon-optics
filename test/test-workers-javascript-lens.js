@@ -90,7 +90,7 @@ describe('workers/interface.LensWorker#map', async function () {
 
   it('maps correctly', async function () {
     const result = await worker.map({
-      path: '/datasets/user:name/records/recordID',
+      path: '/datasets/author:name/records/recordID',
       data: { foo: 'bar', v: 'yehaw' }
     })
 
@@ -109,7 +109,7 @@ describe('workers/interface.LensWorker#map', async function () {
 
   it('logs from maps and catches throws', async function () {
     const result = await worker.map({
-      path: '/datasets/user:name/records/recordID',
+      path: '/datasets/author:name/records/recordID',
       data: { foo: 'bar', v: 'yehaw', plzthrow: 'nice', plzlog: 'hey' }
     })
 
