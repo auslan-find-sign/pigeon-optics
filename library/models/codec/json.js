@@ -75,7 +75,9 @@ Object.assign(exports, {
   },
 
   /**
-   * Create a transform stream which decodes a JSON in to a stream of objects, the root must be an Array
+   * Create a transform stream which decodes a JSON in to a stream of objects, the root must be an Array or an Object
+   * Root arrays will result in an array, root objects will result in entries-like outputs [key, value] as each root
+   * property is parsed
    * @param {object} [options]
    * @param {number} [options.maxSize] - max size in bytes of each line - otherwise throws a http 413 Payload size error
    * @returns {streams.Transform}
@@ -84,7 +86,7 @@ Object.assign(exports, {
     let size = 0
     let started = false
     const stack = []
-    let keyStack = []
+    const keyStack = []
 
     return chain([
       function checkSize (input) {
@@ -104,16 +106,23 @@ Object.assign(exports, {
               stack[0][keyStack.shift()] = value
             }
           } else {
-            this.push(value)
+            if (started === 'array') {
+              this.push(value)
+            } else {
+              this.push([keyStack.shift(), value])
+            }
           }
         }
 
         if (!started) {
           if (name === 'startArray') {
-            started = true
+            started = 'array'
+            return []
+          } else if (name === 'startObject') {
+            started = 'object'
             return []
           } else {
-            throw createHttpError(400, 'root object must be an Array')
+            throw createHttpError(400, 'root object must be an Array or Object')
           }
         } else {
           if (name === 'numberValue') {
@@ -131,11 +140,13 @@ Object.assign(exports, {
           } else if (name === 'startObject') {
             stack.unshift({})
           } else if (name === 'endObject') {
-            let obj = stack.shift()
-            if (obj.type === 'Buffer') {
-              obj = Buffer.from(obj)
+            if (stack.length > 0) {
+              let obj = stack.shift()
+              if (obj.type === 'Buffer') {
+                obj = Buffer.from(obj)
+              }
+              append(obj)
             }
-            append(obj)
           } else if (name === 'startArray') {
             stack.unshift([])
           } else if (name === 'endArray') {

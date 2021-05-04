@@ -263,6 +263,16 @@ describe('models/codec streaming mode', function () {
       expect(output).to.deep.equal(tests)
     })
   }
+
+  // test json's object root streaming decoder
+  it('codec.json.decoder() handles object at root well', async function () {
+    const entriesTest = tests.map((x, i) => [`prop-${i + 1}`, x])
+    const objTest = Object.fromEntries(entriesTest)
+    const decoder = codec.json.decoder()
+    const input = Readable.from([codec.json.encode(objTest)])
+    const output = await asyncIterableToArray(input.pipe(decoder))
+    expect(output).to.deep.equal(entriesTest)
+  })
 })
 
 describe('models/codec.path', function () {
