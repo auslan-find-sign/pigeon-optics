@@ -1,5 +1,8 @@
 const json5 = require('json5')
 const streams = require('stream')
+const streamJson = require('stream-json')
+const { chain } = require('stream-chain')
+const createHttpError = require('http-errors')
 
 Object.assign(exports, {
   handles: ['application/json', 'text/json', 'application/feed+json'],
@@ -47,7 +50,7 @@ Object.assign(exports, {
   },
 
   /**
-   * Create a transform stream, which takes objects, and encodes them in to a streaming json array
+   * Create a transform stream, which takes in objects, and encodes them in to a streaming json array
    * @returns {streams.Transform}
    */
   encoder () {
@@ -69,5 +72,79 @@ Object.assign(exports, {
         callback(null)
       }
     })
+  },
+
+  /**
+   * Create a transform stream which decodes a JSON in to a stream of objects, the root must be an Array
+   * @param {object} [options]
+   * @param {number} [options.maxSize] - max size in bytes of each line - otherwise throws a http 413 Payload size error
+   * @returns {streams.Transform}
+   */
+  decoder ({ maxSize = 32000000 } = {}) {
+    let size = 0
+    let started = false
+    const stack = []
+    let keyStack = []
+
+    return chain([
+      function checkSize (input) {
+        if (size + input.length > maxSize + (1024 * 64)) throw createHttpError(413, 'array entry is too large to parse')
+        size += input.length
+        return input
+      },
+      streamJson.parser({ packValues: true, streamValues: false }),
+      function structurize ({ name, value }) {
+        size = 0
+
+        const append = (value) => {
+          if (stack.length > 0) {
+            if (Array.isArray(stack[0])) {
+              stack[0].push(value)
+            } else {
+              stack[0][keyStack.shift()] = value
+            }
+          } else {
+            this.push(value)
+          }
+        }
+
+        if (!started) {
+          if (name === 'startArray') {
+            started = true
+            return []
+          } else {
+            throw createHttpError(400, 'root object must be an Array')
+          }
+        } else {
+          if (name === 'numberValue') {
+            append(JSON.parse(value))
+          } else if (name === 'stringValue') {
+            append(value)
+          } else if (name === 'trueValue') {
+            append(true)
+          } else if (name === 'falseValue') {
+            append(false)
+          } else if (name === 'nullValue') {
+            append(null)
+          } else if (name === 'keyValue') {
+            keyStack.unshift(value)
+          } else if (name === 'startObject') {
+            stack.unshift({})
+          } else if (name === 'endObject') {
+            let obj = stack.shift()
+            if (obj.type === 'Buffer') {
+              obj = Buffer.from(obj)
+            }
+            append(obj)
+          } else if (name === 'startArray') {
+            stack.unshift([])
+          } else if (name === 'endArray') {
+            if (stack.length > 0) {
+              append(stack.shift())
+            }
+          }
+        }
+      }
+    ])
   }
 })

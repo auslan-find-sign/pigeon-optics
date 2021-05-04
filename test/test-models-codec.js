@@ -37,6 +37,10 @@ const tests = [
     buffery: Buffer.from('hello world')
   },
   ['element', { name: 'foo' }, 'text node', ['subel', { name: 'bar' }], 'after text node'],
+  [
+    { a: 1, b: 2, c: { a: 'wep', b: false, g: { bar: 'recursive hell', f: [1, 2, [{ u: false, j: true }, 3, 4, 5]] } } },
+    [1, 2, 3, 4, 5, [1, 2, 3, 4, [9, 8, 7, 6], [2, 5, 6, 8, { a: true, b: false }]]]
+  ],
   ...unicodeStrings
 ]
 
@@ -248,19 +252,12 @@ describe('models/codec.html', () => {
 })
 
 describe('models/codec streaming mode', function () {
-  // json doesn't have a decoder currently, special case
-  it('codec.json.encoder() works', async function () {
-    const input = Readable.from(tests, { objectMode: true })
-    const encoder = input.pipe(codec.json.encoder())
-    const output = Buffer.concat(await asyncIterableToArray(encoder)).toString('utf-8')
-    expect(codec.json.decode(output)).to.deep.equal(tests)
-  })
-
   // check all the other's roundtrip the requests well
-  for (const encoder of [codec.jsonLines, codec.yaml, codec.cbor, codec.msgpack]) {
-    it(`codec.${Object.entries(codec).find(x => x[1] === encoder)[0]}.encoder() and .decoder() transform streams roundtrip data well`, async function () {
-      const encodeStream = encoder.encoder()
-      const decodeStream = encoder.decoder()
+  const implementers = Object.values(codec).filter(x => typeof x === 'object' && typeof x.encoder === 'function' && typeof x.decoder === 'function')
+  for (const format of implementers) {
+    it(`codec.${Object.entries(codec).find(x => x[1] === format)[0]}.encoder() and .decoder() transform streams roundtrip data well`, async function () {
+      const encodeStream = format.encoder()
+      const decodeStream = format.decoder()
       const input = Readable.from(tests, { objectMode: true })
       const output = await asyncIterableToArray(input.pipe(encodeStream).pipe(decodeStream))
       expect(output).to.deep.equal(tests)
