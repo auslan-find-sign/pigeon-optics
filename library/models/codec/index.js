@@ -34,12 +34,15 @@ exports.extensionHandlers = Object.fromEntries(Object.values(exports).flatMap(va
  * @returns {object|undefined}
  */
 exports.for = function (query) {
-  if (exports.mediaTypeHandlers[query]) {
+  query = `${query}`.toLowerCase()
+  if (exports.mediaTypeHandlers[query.split(';')[0]]) {
     return exports.mediaTypeHandlers[query]
   } else if (query.includes('.')) {
-    return Object.entries(exports.extensionHandlers).find(([key, value]) => {
-      return `${query}`.endsWith(key)
-    })[1]
+    for (const ext in exports.extensionHandlers) {
+      if (query.endsWith(`.${ext}`)) {
+        return exports.extensionHandlers[ext]
+      }
+    }
   }
 }
 
