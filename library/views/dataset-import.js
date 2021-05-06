@@ -14,7 +14,7 @@ module.exports = (req, state) => {
         v.header(v => {
           v.breadcrumbs(v => {
             v.a('Datasets', { href: '/datasets/' })
-            v.iconLink('user-circle', req.params.author, { href: uri`/author/${req.params.author}` })
+            v.iconLink('user-circle', req.params.author, { href: uri`/authors/${req.params.author}` })
             v.iconLink('cassette', req.params.name, { href: uri`/datasets/${req.params.author}:${req.params.name}/` })
           })
 
