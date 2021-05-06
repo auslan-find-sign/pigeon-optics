@@ -13,7 +13,7 @@ Object.assign(exports, {
   },
 
   encode (object) {
-    return yaml.stringify(object)
+    return yaml.stringify(object, json.replacer)
   },
 
   /**
