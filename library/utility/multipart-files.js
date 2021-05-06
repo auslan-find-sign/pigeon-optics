@@ -3,15 +3,16 @@
 // const settings = require('../models/settings')
 const crypto = require('crypto')
 const codec = require('../models/codec')
-// const xbytes = require('xbytes')
+const xbytes = require('xbytes')
+const settings = require('../models/settings')
 const finished = require('on-finished')
 const blob = require('../models/file/blob')
 const multipart = require('it-multipart')
 const { Readable } = require('stream')
 const ctype = require('content-type')
 const cdisp = require('content-disposition')
-const asyncIterableToArray = require('./async-iterable-to-array')
 const { resolveContentIDs } = require('./record-structure')
+const createHttpError = require('http-errors')
 
 // const maxAttachment = xbytes.parseSize(settings.maxAttachmentSize)
 // const maxRecord = xbytes.parseSize(settings.maxRecordSize)
@@ -38,16 +39,18 @@ module.exports = async function (req, res, next) {
   if (req.is('multipart/form-data')) {
     const randomID = crypto.randomBytes(32).toString('hex')
     const storage = blob.instance({ rootPath: ['uploads', randomID] })
+    const maxBodyLength = xbytes.parseSize(settings.maxRecordSize)
 
     req.on('error', () => {
       storage.delete()
     })
 
     for await (const { headers, body } of multipart(req)) {
-      const contentType = ctype.parse(headers['content-type'])
-      const { encoding } = contentType.parameters
-      const contentDisp = cdisp.parse(headers['content-disposition'])
-      const { name, filename } = contentDisp.parameters
+      const contentType = headers['content-type'] && ctype.parse(headers['content-type'])
+      const type = contentType ? contentType.type : 'text/plain'
+      const { encoding } = contentType ? contentType.parameters : {}
+      const contentDisp = headers['content-disposition'] && cdisp.parse(headers['content-disposition'])
+      const { name, filename } = contentDisp ? contentDisp.parameters : {}
 
       if (filename && name !== 'body') {
         // it's a file
@@ -55,7 +58,7 @@ module.exports = async function (req, res, next) {
 
         const read = storage.read.bind(storage, hash)
         const readStream = storage.readStream.bind(storage, hash)
-        const file = { hash, field: name, filename, storage, read, readStream, type: contentType.type, encoding }
+        const file = { hash, field: name, filename, storage, read, readStream, type, encoding }
         req.files.push(file)
         req.filesByHash[hash.toString('hex')] = file
         req.filesByName[filename] = file
@@ -63,14 +66,19 @@ module.exports = async function (req, res, next) {
         req.filesByField[name] = (req.filesByField[name] || [])
         req.filesByField[name].push(file)
       } else {
-        let value
-        const encoder = codec.for(contentType.type)
+        const chunks = []
+        let length = 0
+        for await (const chunk of body) {
+          chunks.push(chunk)
+          length += chunk.length
+          if (length > maxBodyLength) throw createHttpError(400, 'body field is too large, max size is ' + settings.maxRecordSize)
+        }
+        let value = Buffer.concat(chunks)
+        const encoder = codec.for(type)
         if (encoder && encoder.decode) {
-          value = encoder.decode(Buffer.concat(await asyncIterableToArray(body)))
-        } else if (contentType.type === 'text/plain') {
-          value = Buffer.concat(await asyncIterableToArray(body)).toString(encoding || 'utf-8')
-        } else {
-          value = Buffer.concat(await asyncIterableToArray(body))
+          value = encoder.decode(value)
+        } else if (type === 'text/plain') {
+          value = value.toString(encoding || 'utf-8')
         }
 
         if (name === 'body' && encoder && encoder.decode) {
