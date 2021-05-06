@@ -2,6 +2,7 @@ const codec = require('../library/models/codec')
 const { expect } = require('chai')
 const { Readable } = require('stream')
 const asyncIterableToArray = require('../library/utility/async-iterable-to-array')
+const typeDetect = require('type-detect')
 
 const unicodeStrings = [
   'بِسْمِ ٱللّٰهِ ٱلرَّحْمـَبنِ ٱلرَّحِيمِ', // arabic
@@ -26,6 +27,7 @@ const tests = [
   Buffer.from('hello world'),
   { a: 1, b: 2 },
   { 1: false, 2: true },
+  new Set([1, 2, 3, 'a', 'b', 'c']),
   {
     foo: [1, 2, 3, null, 5],
     bar: {
@@ -46,7 +48,7 @@ const tests = [
 
 describe('models/codec.json', function () {
   for (const obj of tests) {
-    it(`encodes type ${typeof obj} reversably`, function () {
+    it(`encodes type ${typeDetect(obj)} reversably`, function () {
       const roundtripped = codec.json.decode(codec.json.encode(obj))
       expect(roundtripped).to.deep.equal(obj)
     })
@@ -60,7 +62,7 @@ describe('models/codec.json', function () {
 
 describe('models/codec.cbor', function () {
   for (const obj of tests) {
-    it(`encodes type ${typeof obj} reversably`, function () {
+    it(`encodes type ${typeDetect(obj)} reversably`, function () {
       const roundtripped = codec.cbor.decode(codec.cbor.encode(obj))
       expect(roundtripped).to.deep.equal(obj)
     })
@@ -69,7 +71,7 @@ describe('models/codec.cbor', function () {
 
 describe('models/codec.yaml', function () {
   for (const obj of tests) {
-    it(`encodes type ${typeof obj} reversably`, function () {
+    it(`encodes type ${typeDetect(obj)} reversably`, function () {
       const roundtripped = codec.yaml.decode(codec.yaml.encode(obj))
       expect(roundtripped).to.deep.equal(obj)
     })
@@ -78,7 +80,7 @@ describe('models/codec.yaml', function () {
 
 describe('models/codec.msgpack', function () {
   for (const obj of tests) {
-    it(`encodes type ${typeof obj} reversably`, function () {
+    it(`encodes type ${typeDetect(obj)} reversably`, function () {
       const roundtripped = codec.msgpack.decode(codec.msgpack.encode(obj))
       expect(roundtripped).to.deep.equal(obj)
     })
@@ -121,7 +123,7 @@ describe('models/codec.xml', function () {
   })
 
   for (const obj of tests) {
-    it(`encodes type ${typeof obj} reversably`, function () {
+    it(`encodes type ${typeDetect(obj)} reversably`, function () {
       const encoded = codec.xml.encode(obj)
       const roundtripped = codec.xml.decode(encoded)
       expect(roundtripped).to.deep.equal(obj)
