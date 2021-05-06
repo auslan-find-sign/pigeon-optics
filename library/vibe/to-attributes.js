@@ -19,6 +19,9 @@ function esc (str, regexp) {
   return `${str}`.replace(regexp, char => table[char])
 }
 
+const validAttrRegexp = /^[^ "'>/=\0\cA-\cZ\u007F-\u009F]+$/gmi
+const validAttrUnquotedRegexp = /^[a-z0-9/?#%&_-]]+$/gmi
+
 /**
  * convert an object of attributes in to a stringified serialized version, starting with a space, for building tags
  * @param {object} attributes - object of attributes, like { id: "foo", class: "whatever" }
@@ -31,7 +34,7 @@ module.exports = function toAttributes (attributes, { xml = false, hyphenate = f
   return Object.entries(attributes).map(([name, value]) => {
     if (hyphenate) name = stringHyphenate(`${name}`)
     // other than controls, U+0020 SPACE, U+0022 ("), U+0027 ('), U+003E (>), U+002F (/), U+003D (=), and noncharacters.
-    assert(name.match(/^[^ "'>/=\0\cA-\cZ\u007F-\u009F]+$/), 'invalid attribute name')
+    assert(name.match(validAttrRegexp), 'invalid attribute name')
 
     if (value === false) {
       return ''
@@ -41,7 +44,7 @@ module.exports = function toAttributes (attributes, { xml = false, hyphenate = f
       if (typeof value === 'function') value = value()
       if (typeof value !== 'string') value = JSON.stringify(value)
 
-      if (xml || !value.match(/^[^ "'`=<>]+$/mg)) {
+      if (xml || !value.match(validAttrUnquotedRegexp)) {
         if (countChars(value, '"') > countChars(value, "'")) {
           return ` ${name}='${esc(value, /['&>]/g)}'`
         } else {
