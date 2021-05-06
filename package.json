@@ -62,6 +62,7 @@
     "tiny-function-queue": "^1.0.0",
     "tree-selector": "^2.1.1",
     "tweetnacl": "^1.0.3",
+    "type-detect": "^4.0.8",
     "unicode": "^13.0.0",
     "xbytes": "^1.7.0",
     "yaml": "^2.0.0-4",
