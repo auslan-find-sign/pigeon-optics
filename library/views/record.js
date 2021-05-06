@@ -22,7 +22,7 @@ module.exports = (req, { path, record, sidebar }) => {
         v.ul(v => {
           for (const recordID of sidebar.recordIDs.sort(naturalCompare)) {
             const attribs = recordID === req.params.recordID ? { class: 'selected' } : {}
-            v.li(attribs, v => v.a(recordID, { href: codec.path.encode({ ...path, recordID }) }))
+            v.li(attribs, v => v.a(recordID, { href: encodeURIComponent(recordID) }))
           }
         })
       })
@@ -50,7 +50,8 @@ module.exports = (req, { path, record, sidebar }) => {
         }
       })
 
-      v.sourceCode(codec.json.print(record), { class: 'expand' })
+      v.objectViewer(record, req.query.format || 'json', { class: 'expand' })
+      // v.sourceCode(codec.json.print(record), { class: 'expand' })
     })
   })
 }

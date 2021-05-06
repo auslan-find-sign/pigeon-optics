@@ -155,6 +155,23 @@ class RichVibeBuilder extends VibeBuilder {
     })
   }
 
+  objectViewer (object, format, ...args) {
+    const codec = require('../models/codec')
+    const fmt = codec[format]
+    try {
+      let text = typeof fmt.print === 'function' ? fmt.print(object) : fmt.encode(object)
+      if (Buffer.isBuffer(text)) text = text.toString('base64')
+
+      if (format === 'html') {
+        this.iframe({ srcdoc: text, sandbox: '', referrerpolicy: 'strict-origin-when-cross-origin', class: 'expand object-viewer', 'data-format': format })
+      } else {
+        this.sourceCode(text, { class: 'expand object-viewer', 'data-format': format })
+      }
+    } catch (err) {
+      this.sourceCode(`// View Error: ${err.message}`, { class: 'expand object-viewer' })
+    }
+  }
+
   // generates <input type="hidden"> tags to represent all the strings in an object like req.body
   hiddenFormData (data) {
     for (const [key, value] of Object.entries(data)) {
