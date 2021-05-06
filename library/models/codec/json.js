@@ -3,14 +3,27 @@ const streams = require('stream')
 const streamJson = require('stream-json')
 const { chain } = require('stream-chain')
 const createHttpError = require('http-errors')
+const type = require('type-detect')
 
 Object.assign(exports, {
   handles: ['application/json', 'text/json', 'application/feed+json'],
   extensions: ['json'],
 
   reviver (key, value) {
-    if (value && typeof value === 'object' && value.type === 'Buffer' && Array.isArray(value.data)) {
-      return Buffer.from(value)
+    if (value && typeof value === 'object' && Object.keys(value).sort().join(',') === 'data,type') {
+      if (value.type === 'Buffer' && Array.isArray(value.data) && value.data.every(x => typeof x === 'number' && x >= 0 && x <= 255)) {
+        return Buffer.from(value)
+      } else if (value.type === 'Set' && Array.isArray(value.data)) {
+        return new Set(value.data)
+      }
+    }
+    return value
+  },
+
+  replacer (key, value) {
+    const is = type(value)
+    if (is === 'Set') {
+      return { type: 'Set', data: [...value] }
     }
     return value
   },
@@ -36,7 +49,7 @@ Object.assign(exports, {
    * @returns {string} - json string containing object with attachments suitably encoded
    */
   encode (object, spaces = 0) {
-    return JSON.stringify(object, null, spaces)
+    return JSON.stringify(object, this.replacer, spaces)
   },
 
   /**
@@ -46,7 +59,7 @@ Object.assign(exports, {
    * @returns {string} - json string containing object with attachments suitably encoded
    */
   print (object, spaces = 2) {
-    return json5.stringify(object, null, spaces)
+    return json5.stringify(object, this.replacer, spaces)
   },
 
   /**
@@ -64,6 +77,7 @@ Object.assign(exports, {
       writableObjectMode: true,
       transform: (chunk, encoding, callback) => {
         try {
+          if (chunk === this.nullSymbol) chunk = null
           const json = this.encode(chunk)
           if (first) callback(null, Buffer.from(`[\n  ${json}`, 'utf-8'))
           else callback(null, Buffer.from(`,\n  ${json}`, 'utf-8'))
@@ -92,6 +106,7 @@ Object.assign(exports, {
     let started = false
     const stack = []
     const keyStack = []
+    const self = this
 
     return chain([
       function checkSize (input) {
@@ -106,6 +121,7 @@ Object.assign(exports, {
         size = 0
 
         const append = (value) => {
+          value = self.reviver('', value)
           if (stack.length > 0) {
             if (Array.isArray(stack[0])) {
               stack[0].push(value)
@@ -113,6 +129,7 @@ Object.assign(exports, {
               stack[0][keyStack.shift()] = value
             }
           } else {
+            if (value === null) value = this.nullSymbol
             if (started === 'array') {
               this.push(value)
             } else {
@@ -148,11 +165,7 @@ Object.assign(exports, {
             stack.unshift({})
           } else if (name === 'endObject') {
             if (stack.length > 0) {
-              let obj = stack.shift()
-              if (obj.type === 'Buffer') {
-                obj = Buffer.from(obj)
-              }
-              append(obj)
+              append(stack.shift())
             }
           } else if (name === 'startArray') {
             stack.unshift([])
