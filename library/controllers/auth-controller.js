@@ -5,10 +5,11 @@ const dataset = require('../models/dataset')
 const lens = require('../models/lens')
 
 const codec = require('../models/codec')
+const parse = require('../utility/parse-request-body')
 
 const router = express.Router()
 
-router.all('/auth', async (req, res) => {
+router.all('/auth', parse.body({ maxSize: 8192 }), async (req, res) => {
   let error = false
   if (req.method === 'POST' && req.body && req.body.name && req.body.password) {
     try {

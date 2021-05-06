@@ -6,9 +6,10 @@ const codec = require('../models/codec')
 const dataset = require('../models/dataset')
 const uri = require('encodeuricomponent-tag')
 const createError = require('http-errors')
-const assert = require('assert')
 const multipartFiles = require('../utility/multipart-files')
 const autoImport = require('../utility/auto-import-attachments')
+const parse = require('../utility/parse-request-body')
+const createHttpError = require('http-errors')
 
 // add req.owner boolean for any routes with a :author param
 router.param('author', auth.ownerParam)
@@ -42,7 +43,7 @@ router.get('/datasets/:author\\:', async (req, res) => {
 })
 
 // form for creating a new dataset
-router.all('/datasets/create', auth.required, async (req, res) => {
+router.all('/datasets/create', auth.required, parse.body(), async (req, res) => {
   const state = { name: '', memo: '', ...req.body || {}, create: true }
   let error = false
 
@@ -85,7 +86,7 @@ router.delete('/datasets/:author\\::name/', auth.ownerRequired, async (req, res)
   }
 })
 
-router.all('/datasets/:author\\::name/configuration', auth.ownerRequired, async (req, res) => {
+router.all('/datasets/:author\\::name/configuration', auth.ownerRequired, parse.body(), async (req, res) => {
   const config = await dataset.readMeta(req.params.author, req.params.name)
   let error = false
 
@@ -123,7 +124,7 @@ router.all('/datasets/:author\\::name/configuration', auth.ownerRequired, async 
 })
 
 // create a new record
-router.all('/datasets/:author\\::name/create-record', auth.ownerRequired, async (req, res) => {
+router.all('/datasets/:author\\::name/create-record', auth.ownerRequired, parse.body(), async (req, res) => {
   const title = `Creating a record inside ${req.params.author}:${req.params.name}`
   const state = {
     create: true,
@@ -146,41 +147,51 @@ router.all('/datasets/:author\\::name/create-record', auth.ownerRequired, async 
   res.sendVibe('dataset-record-editor', title, state, error)
 })
 
-// list records of dataset
-router.get('/datasets/:author\\::name/records/', async (req, res) => {
-  const config = await dataset.readMeta(req.params.author, req.params.name)
-  const records = await dataset.list(req.params.author, req.params.name)
-  res.set('X-Version', config.version)
-  res.set('ETag', `"${config.version}"`)
-  codec.respond(req, res, Object.fromEntries(records.map(({ id, version, hash }) => [id, { version, hash }])))
-})
+router.all('/datasets/:author\\::name/records/', multipartFiles, async (req, res) => {
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    const config = await dataset.readMeta(req.params.author, req.params.name)
+    const records = await dataset.list(req.params.author, req.params.name)
+    res.set('X-Version', config.version)
+    res.set('ETag', `"${config.version}"`)
+    codec.respond(req, res, Object.fromEntries(records.map(({ id, version, hash }) => [id, { version, hash }])))
+  } else {
+    if (!req.owner) throw createHttpError.Unauthorized()
+    if (!['POST', 'PUT'].includes(req.method)) throw createHttpError.MethodNotAllowed('GET, POST, PUT supported')
+    const overwrite = req.method === 'PUT'
+    const filesMode = req.files.length > 0
 
-router.post('/datasets/:author\\::name/records/', auth.ownerRequired, multipartFiles, async (req, res) => {
-  assert(req.body !== null, 'request body must not be null')
-  assert(typeof req.body === 'object', 'request body must be an object')
+    async function * filesIter () {
+      for (const filename in req.filesByName) {
+        const format = codec.for(filename)
+        if (format) {
+          const id = filename.split(/[\\/]/).slice(-1)[0].split('.').slice(0, -1).join('.')
+          const data = format.decode(await req.filesByName[filename].read())
+          yield [id, data]
+        }
+      }
+    }
+    async function * bodyIter () {
+      for await (const item of parse.iterate(req)) {
+        if (Array.isArray(item) && item.length === 2) {
+          const data = await autoImport(req, codec.path.encode('datasets', req.params.author, req.params.name, item[0]), item[1])
+          yield [`${item[0]}`, data]
+        } else if (typeof item === 'object' && Object.keys(item).length === 2) {
+          if (typeof item.id !== 'string') throw createHttpError(400, 'entry objects must contain string "id" field')
+          if (!('data' in item.data)) throw createHttpError(400, 'objects must contain "data" field')
+          const data = await autoImport(req, codec.path.encode('datasets', req.params.author, req.params.name, item.id), item.data)
+          yield [item.id, data]
+        }
+      }
+    }
 
-  for (const key in req.body) {
-    req.body[key] = await autoImport(req, codec.path.encode('datasets', req.params.author, req.params.name, key), req.body[key])
+    await dataset.writeEntries(req.params.author, req.params.name, filesMode ? filesIter() : bodyIter(), { overwrite })
+
+    return res.sendStatus(204)
   }
-
-  await dataset.merge(req.params.author, req.params.name, req.body)
-  return res.sendStatus(204)
-})
-
-router.put('/datasets/:author\\::name/records/', auth.ownerRequired, multipartFiles, async (req, res) => {
-  assert(req.body !== null, 'request body must not be null')
-  assert(typeof req.body === 'object', 'request body must be an object')
-
-  for (const key in req.body) {
-    req.body[key] = await autoImport(req, codec.path.encode('datasets', req.params.author, req.params.name, key), req.body[key])
-  }
-
-  await dataset.overwrite(req.params.author, req.params.name, req.body)
-  return res.sendStatus(204)
 })
 
 // get a record from a author's dataset
-router.all('/datasets/:author\\::name/records/:recordID', multipartFiles, async (req, res, next) => {
+router.all('/datasets/:author\\::name/records/:recordID', multipartFiles, parse.body(), async (req, res, next) => {
   let error
 
   if (req.method === 'PUT') {
@@ -270,7 +281,10 @@ router.all('/datasets/:author\\::name/import', auth.ownerRequired, multipartFile
           } else if (typeof entry === 'object') {
             if (typeof entry.id !== 'string') throw new Error('object style bodies must have a string id property')
             if (!('data' in entry)) throw new Error('object style bodies must have a data property containing record data')
-            yield [entry.id, entry.data]
+
+            const path = codec.path.encode('datasets', req.params.author, req.params.name, entry.id)
+            const data = await autoImport(req, path, entry.data)
+            yield [entry.id, data]
           }
           state.wroteCount += 1
         }

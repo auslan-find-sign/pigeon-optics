@@ -6,6 +6,7 @@ const codec = require('../models/codec')
 const lens = require('../models/lens')
 const uri = require('encodeuricomponent-tag')
 const itToArray = require('../utility/async-iterable-to-array')
+const parse = require('../utility/parse-request-body')
 
 // add req.owner boolean for any routes with a :author param
 router.param('author', auth.ownerParam)
@@ -19,7 +20,7 @@ output(recordID, {
 const reduceCodeExample = `// example, overlays the objects overwriting properties
 return { ...left, ...right }`
 
-router.all('/lenses/create', auth.required, async (req, res) => {
+router.all('/lenses/create', auth.required, parse.body({ maxSize: 3145728 }), async (req, res) => {
   const state = {
     create: true,
     name: '',
@@ -78,7 +79,7 @@ router.get('/lenses/:author\\::name/configuration', async (req, res) => {
   }
 })
 
-router.put('/lenses/:author\\::name/configuration', auth.ownerRequired, async (req, res) => {
+router.put('/lenses/:author\\::name/configuration', auth.ownerRequired, parse.body({ maxSize: 3145728 }), async (req, res) => {
   try {
     await lens.updateMeta(req.params.author, req.params.name, meta => {
       meta.memo = req.body.memo
@@ -199,7 +200,7 @@ router.get('/lenses/:author\\::name/records/:recordID', async (req, res) => {
 })
 
 // ephemeral lens runs once, exports, then is deleted
-router.post('/lenses/ephemeral', async (req, res) => {
+router.post('/lenses/ephemeral', parse.body({ maxSize: 3145728 }), async (req, res) => {
   const [author, name] = ['system', `ephemeral-${Date.now()}-${codec.objectHash(req.body).slice(0, 4).toString('hex')}`]
 
   try {
