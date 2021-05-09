@@ -30,7 +30,7 @@ Object.assign(exports, {
       readableObjectMode: true,
       transform (chunk, encoding, callback) {
         if (buffer.length + chunk.length > maxSize * 2) {
-          return callback(createHttpError(413, `JSON Lines parsing is limited to ${maxSize} per line`))
+          return callback(createHttpError(413, `Each yaml document cannot be larger than ${maxSize} bytes`))
         }
         buffer = Buffer.concat([buffer, chunk])
         while (true) {
@@ -40,7 +40,7 @@ Object.assign(exports, {
           } else {
             // slice off the first document from the buffer
             const lineSlice = buffer.slice(0, offset + 1)
-            if (lineSlice.length > maxSize) return callback(createHttpError(413, `JSON Lines parsing is limited to ${maxSize} per line`))
+            if (lineSlice.length > maxSize) return callback(createHttpError(413, `Each yaml document cannot be larger than ${maxSize} bytes`))
             const docText = lineSlice.toString('utf-8')
             buffer = buffer.slice(offset + 5)
             try {
