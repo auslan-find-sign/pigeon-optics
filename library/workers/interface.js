@@ -1,6 +1,15 @@
 const childProcess = require('child_process')
 
-exports.LensWorker = class LensWorker {
+class LensWorker {
+  constructor () {
+    this.started = false
+  }
+
+  /**
+   * Startup a lens worker, with a given configuration. Eventually resolves when the worker has fully booted up (~50ms)
+   * @param {object} config - lens configuration
+   * @returns {{ errors: import('./lens-worker-base').LensError[] }}
+   */
   async startup (config) {
     this.promises = {}
     this.seq = 0
@@ -14,9 +23,17 @@ exports.LensWorker = class LensWorker {
     this.worker.on('exit', () => {
       for (const { reject } of Object.values(this.promises)) reject(new Error('Disconnected'))
     })
-    return await this._rpc('startup', config)
+    const res = await this._rpc('startup', config)
+    this.started = true
+    return res
   }
 
+  /**
+   * Interal: Call a worker method through the IPC RPC channel
+   * @param {string} command - rpc command name
+   * @param  {...any} args - rpc command arguments
+   * @returns {any}
+   */
   async _rpc (command, ...args) {
     this.seq += 1
     const promise = new Promise((resolve, reject) => {
@@ -26,6 +43,11 @@ exports.LensWorker = class LensWorker {
     return await promise
   }
 
+  /**
+   * Run a user provided map function over a database document
+   * @param {{ path: any, data: any }} input - input record to run through the map function
+   * @returns {import('./lens-worker-base').MapOutput}
+   */
   async map (input) {
     return this._rpc('map', input)
   }
@@ -34,8 +56,13 @@ exports.LensWorker = class LensWorker {
     return this._rpc('reduce', left, right)
   }
 
+  /**
+   * Shutdown the lens worker, killing the subprocess, clearing memory.
+   */
   async shutdown () {
     await this._rpc('shutdown')
     if (this.worker.connected) this.worker.kill()
   }
 }
+
+exports.LensWorker = LensWorker
