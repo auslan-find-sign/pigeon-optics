@@ -18,7 +18,14 @@ let timeout
 let outputs
 let logs
 
-// take an error from a map or reduce function compile or run, and transform it to be cleaned up
+//
+/**
+ * take an error from a map or reduce function compile or run, and transform it to be cleaned up
+ * @param {Error} error
+ * @param {string} file
+ * @param {string} source
+ * @returns
+ */
 function transformVMError (error, file, source) {
   const trace = new StackTracey(error)
   const sourceLines = `${source}`.split(/\r?\n/gm)
@@ -31,7 +38,7 @@ function transformVMError (error, file, source) {
     code: sourceLines[x.line - 1]
   }))
 
-  if (stack.length === 0) {
+  if (!error.stack || !error.stack.includes('at (<isolated-vm boundary>)')) {
     // probably the error actually happened in this file, not in user code, so log it:
     console.error(error)
   }
