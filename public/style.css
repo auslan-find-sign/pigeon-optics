@@ -428,16 +428,15 @@ code.inline-source-code {
   padding-right: 1mm;
 }
 
-code .c /* comment */ { color: var(--comment) }
-code .d /* JSDoc tag (only in comment) */ { color: var(--jsdoc) }
-code .k /* keyword */ { color: var(--keyword) }
-code .v /* value (number literal, boolean and some constants) */ { color: var(--value) }
-code .s /* string literal (also means a template string) */ { color: var(--strlit) }
-code .i /* interpolation content (only in template string) */ { color: var(--template) }
-code .r /* regexp literal */ { color: var(--regexp) }
-code .o /* operator symbol */ { color: var(--operator) }
-code .p /* punctual symbol */ { color: var(--punctual) }
-code .f /* function name */ { color: var(--fn-name) }
+code span.token.comment { color: var(--comment) }
+code span.token.keyword { color: var(--keyword) }
+code span.token.number /* value (number literal, boolean and some constants) */ { color: var(--value) }
+code span.token.string, code span.token.template-string { color: var(--strlit) }
+code span.token.template-string .string { color: var(--template) }
+code span.token.regex { color: var(--regexp) }
+code span.token.operator { color: var(--operator) }
+code span.token.punctuation { color: var(--punctual) }
+code span.token.function { color: var(--fn-name) }
 
 
 .source-code code {
