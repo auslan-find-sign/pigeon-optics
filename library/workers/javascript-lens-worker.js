@@ -24,15 +24,22 @@ function transformVMError (error, file, source) {
   const sourceLines = `${source}`.split(/\r?\n/gm)
   // filter the stacktrace to just entries referencing lens author code, not anything around it (vm env code)
   const filteredTrace = trace.filter(x => x.file === file && x.line >= 1 && x.line <= sourceLines.length)
+  const stack = filteredTrace.items.map(x => ({
+    line: x.line,
+    column: x.column,
+    filename: x.fileName,
+    code: sourceLines[x.line - 1]
+  }))
+
+  if (stack.length === 0) {
+    // probably the error actually happened in this file, not in user code, so log it:
+    console.error(error)
+  }
+
   return {
     type: error.constructor.name,
     message: error.message,
-    stack: filteredTrace.items.map(x => ({
-      line: x.line,
-      column: x.column,
-      filename: x.fileName,
-      code: sourceLines[x.line - 1]
-    }))
+    stack
   }
 }
 
