@@ -5,7 +5,6 @@ const auth = require('../models/auth')
 const codec = require('../models/codec')
 const lens = require('../models/lens')
 const uri = require('encodeuricomponent-tag')
-const itToArray = require('../utility/async-iterable-to-array')
 const parse = require('../utility/parse-request-body')
 
 // add req.owner boolean for any routes with a :author param
@@ -118,7 +117,7 @@ router.get('/lenses/:author\\::name/logs', async (req, res) => {
   const logsIter = lens.iterateLogs(req.params.author, req.params.name)
 
   if (req.accepts('html')) {
-    res.sendVibe('lens-log-viewer', 'Lens Logs', { mapOutputs: await itToArray(logsIter) })
+    res.sendVibe('lens-log-viewer', 'Lens Logs', { logsIter })
   } else {
     codec.respond(req, res, logsIter)
   }

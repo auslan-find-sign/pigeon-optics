@@ -1,9 +1,9 @@
 const layout = require('./layout')
 const uri = require('encodeuricomponent-tag')
 
-module.exports = (req, { mapOutputs }) => {
-  return layout(req, v => {
-    v.panel(v => {
+module.exports = (req, { logsIter }) => {
+  return layout(req, async v => {
+    await v.panel(async v => {
       v.header(v => {
         v.breadcrumbs(v => {
           v.a('Lenses', { href: '/lenses/' })
@@ -20,7 +20,7 @@ module.exports = (req, { mapOutputs }) => {
         )
       })
 
-      for (const { input, errors, logs } of mapOutputs) {
+      for await (const { input, errors, logs } of logsIter) {
         v.heading({ level: 3 }, v => v.a(input, { href: input }))
 
         for (const error of errors) {
