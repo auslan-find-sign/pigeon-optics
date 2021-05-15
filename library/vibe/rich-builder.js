@@ -1,7 +1,10 @@
 const VibeBuilder = require('./builder')
-const highlight = require('h.js')
 const json5 = require('json5')
 const path = require('path')
+
+const prism = require('prismjs')
+const prismLoadLanguages = require('prismjs/components/')
+prismLoadLanguages(['yaml', 'markdown', 'json5', 'ruby', 'python'])
 
 /** gets or adds attributes object to args list when proxying calls to tag builder
  * note, this sometimes changes the args array to inject an object, beware side-effects
@@ -135,40 +138,156 @@ class RichVibeBuilder extends VibeBuilder {
     if (typeof code !== 'string') code = JSON.stringify(code)
     const options = getAttribs(args)
 
-    // syntax highlight the javascript/json
-    const lines = highlight(code).split('\n')
+    // syntax highlighting
+    const language = options.data && options.data.language ? options.data.language : 'javascript'
+    const grammars = {
+      json: prism.languages.json5,
+      jsonl: prism.languages.json,
+      javascript: prism.languages.js,
+      yaml: prism.languages.yaml,
+      xml: prism.languages.xml,
+      html: prism.languages.html,
+      ruby: prism.languages.ruby,
+      python: prism.languages.python,
+      markdown: prism.languages.markdown
+    }
+
+    const grammar = grammars[language]
+    const tokens = grammar ? prism.tokenize(code, grammar) : [code]
+
+    // converts prism token format to range objects in a flat array
+    function * tokensToRanges (tokens, inheritTypes = []) {
+      for (const token of tokens) {
+        if (typeof token === 'string') {
+          yield { text: token, types: inheritTypes }
+        } else if (token instanceof prism.Token) {
+          const content = Array.isArray(token.content) ? token.content : [token.content]
+          yield * tokensToRanges(content, [...inheritTypes, token.type])
+        }
+      }
+    }
+
+    const newline = Symbol('newline')
+    function * splitRangesOnLines (ranges) {
+      for (const range of ranges) {
+        if (range.text.includes('\n')) {
+          const sections = range.text.split('\n')
+          yield { text: sections.shift(), types: range.types }
+          while (sections.length > 0) {
+            yield newline
+            yield { text: sections.shift(), types: range.types }
+          }
+        } else {
+          yield range
+        }
+      }
+    }
+
+    // yield an array of all the tokens between each newline symbol
+    function * arrayify (ranges) {
+      let accumulator = []
+      for (const range of ranges) {
+        if (range === newline) {
+          yield accumulator
+          accumulator = []
+        } else {
+          accumulator.push(range)
+        }
+      }
+      if (accumulator.length > 0) {
+        yield accumulator
+      }
+    }
+
+    // when two tokens are butted up against each other, and of exactly the same type, combine them
+    function * stripRedundant (lines) {
+      for (const line of lines) {
+        if (line.length === 0) {
+          yield line
+        } else {
+          const out = line.slice(0, 1)
+          for (const piece of line.slice(1)) {
+            if (piece.types.join(' ') === out[out.length - 1].types.join(' ')) {
+              out[out.length - 1].text += piece.text
+            } else {
+              out.push(piece)
+            }
+          }
+          yield out
+        }
+      }
+    }
+
+    function * simplify (lines) {
+      for (const line of lines) {
+        const out = []
+        for (const token of line) {
+          if (token.text.match(/^[ \t\r\n]*$/)) {
+            out.push({ text: token.text, types: [] }) // simplify markup for whitespace content
+          } else {
+            out.push(token)
+          }
+        }
+        yield out
+      }
+    }
+
+    const lines = [...simplify(stripRedundant(arrayify(splitRangesOnLines(tokensToRanges(tokens)))))]
 
     appendClass(options, 'source-code')
     options.data = {
       ...(options.data || {}),
-      language: 'javascript'
+      language
     }
     options.style = {
       ...(options.style || {}),
       '--digits': lines.length.toString().length
     }
 
-    this.div(...args, v => {
-      for (const line of lines) {
-        v.code({ innerHTML: line })
+    this.pre(...args, v => {
+      for (const ranges of lines) {
+        v.code(v => {
+          for (const { text, types } of ranges) {
+            if (text.length > 0) {
+              if (types.length > 0) {
+                v.tag('p-t', { class: types }, text)
+              } else {
+                v.text(text)
+              }
+            }
+          }
+        })
       }
     })
   }
 
   objectViewer (object, format, ...args) {
-    const codec = require('../models/codec')
-    const fmt = codec[format]
     try {
-      let text = typeof fmt.print === 'function' ? fmt.print(object) : fmt.encode(object)
-      if (Buffer.isBuffer(text)) text = text.toString('base64')
+      const codec = require('../models/codec')
+      const fmt = codec.for(format)
+      let text = fmt ? (fmt.print ? fmt.print(object) : fmt.encode(object)) : `// error, unknown format ${format}`
+
+      if (Buffer.isBuffer(text)) {
+        format = 'hexdump'
+        const lineSize = 16
+        const out = []
+        for (let i = 0; i < text.length; i += lineSize) {
+          const line = text.slice(i, i + lineSize)
+          const printable = line.toString('ascii').replace(/[^ -~]+/g, '.')
+          const hex = idx => `0000${line.slice(idx * 2, (idx * 2) + 2).toString('hex')}`.slice(-4)
+          const location = `00000000${i.toString(16)}`.slice(-8)
+          out.push(`${location}: ${hex(0)} ${hex(1)} ${hex(2)} ${hex(3)} ${hex(4)} ${hex(5)} ${hex(6)} ${hex(7)}   ${printable}`)
+        }
+        text = out.join('\n')
+      }
 
       if (format === 'html') {
         this.iframe({ srcdoc: text, sandbox: '', referrerpolicy: 'strict-origin-when-cross-origin', class: 'expand object-viewer', 'data-format': format })
       } else {
-        this.sourceCode(text, { class: 'expand object-viewer', 'data-format': format })
+        this.sourceCode(text, { class: 'expand object-viewer', data: { language: format } })
       }
     } catch (err) {
-      this.sourceCode(`// View Error: ${err.message}`, { class: 'expand object-viewer' })
+      this.sourceCode(`/* View Error: ${err.message}\n${err.stack} */`, { class: 'expand object-viewer' })
     }
   }
 
@@ -323,7 +442,7 @@ class RichVibeBuilder extends VibeBuilder {
             v.span(`${item.filename}`, { class: 'filename' })
             v.span(`${item.line}`, { class: 'line' })
             v.span(`${item.column}`, { class: 'column' })
-            v.code({ class: 'inline-source-code', innerHTML: highlight(`${item.code}`) })
+            v.code({ class: 'inline-source-code', innerHTML: prism.highlight(`${item.code}`, prism.languages.javascript, 'javascript') })
           })
         }
       })
@@ -338,7 +457,7 @@ class RichVibeBuilder extends VibeBuilder {
           let first = true
           for (const arg of args) {
             if (!first) v.text(', ')
-            v.code({ innerHTML: highlight(json5.stringify(arg)), class: 'inline-source-code' })
+            v.code({ innerHTML: prism.highlight(json5.stringify(arg), prism.languages.json5, 'json5'), class: 'inline-source-code' })
             first = false
           }
           v.code(')')

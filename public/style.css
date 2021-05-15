@@ -416,6 +416,11 @@ div.panel > iframe.object-viewer {
   counter-reset: line-number;
   background-color: var(--background);
   color: var(--default);
+  hyphens: none;
+  tab-size: 2;
+  word-spacing: normal;
+	word-break: normal;
+	word-wrap: normal;
 }
 
 .stacktrace li > span::after {
@@ -428,16 +433,18 @@ code.inline-source-code {
   padding-right: 1mm;
 }
 
-code span.token.comment { color: var(--comment) }
-code span.token.keyword { color: var(--keyword) }
-code span.token.number /* value (number literal, boolean and some constants) */ { color: var(--value) }
-code span.token.string, code span.token.template-string { color: var(--strlit) }
-code span.token.template-string .string { color: var(--template) }
-code span.token.regex { color: var(--regexp) }
-code span.token.operator { color: var(--operator) }
-code span.token.punctuation { color: var(--punctual) }
-code span.token.function { color: var(--fn-name) }
+/* code span.token { white-space: pre-wrap; } */
+code > p-t:where(.comment, .prolog, .doctype, .cdata) { color: var(--comment) }
+code > p-t:where(.keyword, .key, .property) { color: var(--keyword) }
+code > p-t:where(.boolean, .number) { color: var(--value) }
+code > p-t:where(.selector, .attr-name, .string, .char, .builtin, .inserted) { color: var(--strlit) }
+code > p-t.template-string, code > p-t.tag:not(.punctuation, .attr-name, .attr-value) { color: var(--template) }
+code > p-t:where(.regex, .important) { color: var(--regexp) }
+code > p-t.operator { color: var(--operator) }
+code > p-t.punctuation { color: var(--punctual) }
+code > p-t:where(.atrule, .attr-value, .function, .class-name) { color: var(--fn-name) }
 
+[data-language=yaml] p-t.punctuation { color: var(--operator) }
 
 .source-code code {
   display: block;

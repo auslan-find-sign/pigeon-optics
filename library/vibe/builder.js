@@ -62,10 +62,10 @@ class VibeBuilder {
     const stream = new PassThrough()
 
     v._rawText = (html) => {
-      if (typeof html === 'string' && html.length > 0) {
-        stream.write(html)
+      if (typeof html === 'string') {
+        if (html.length > 0) stream.write(html)
       } else {
-        console.error('tried to push non-string to html stream output')
+        console.error(`tried to push ${typeof html} to html stream output, but only strings are acceptable`)
       }
     }
 
@@ -137,7 +137,7 @@ class VibeBuilder {
    */
   async tag (tagName, ...args) {
     assert(typeof tagName === 'string', 'tag name must be a string')
-    assert(tagName.match(/^[a-zA-Z0-9]+$/), 'tag name must be alphanumeric')
+    assert(tagName.match(/^[a-zA-Z0-9-]+$/), 'tag name must be alphanumeric')
 
     const block = args.find(x => typeof x === 'function')
     const attribs = Object.fromEntries(

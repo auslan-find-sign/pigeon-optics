@@ -19,8 +19,8 @@ function esc (str, regexp) {
   return `${str}`.replace(regexp, char => table[char])
 }
 
-const validAttrRegexp = /^[^ "'>/=\0\cA-\cZ\u007F-\u009F]+$/gmi
-const validAttrUnquotedRegexp = /^[a-z0-9/?#%&_-]]+$/gmi
+const validAttrRegexp = /^[^ "'>/=\0\cA-\cZ\u007F-\u009F]+$/gi
+const validAttrUnquotedRegexp = /^[a-z0-9:/.?#%&()[\]{}_-]+$/gi
 
 /**
  * convert an object of attributes in to a stringified serialized version, starting with a space, for building tags

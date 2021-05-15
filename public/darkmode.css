@@ -56,10 +56,10 @@ body > footer a {
   --jsdoc:    #5C6370;
   --keyword:  #e06c75;
   --value:    #d19a66;
-  --strlit:   #67a058;
+  --strlit:   #66ac53;
   --template: #e06c75;
   --regexp:   #57B6C2;
-  --operator: #abb2bf;
+  --operator: #bfdb72;
   --punctual: #ccc;
   --fn-name:  #3193c6;
 }
