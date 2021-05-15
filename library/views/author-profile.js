@@ -38,7 +38,7 @@ module.exports = (req, profile, datasets, lenses) => {
       if (req.params.author === req.author) {
         v.footer(v => {
           v.button('Create Dataset', { href: '/datasets/create' })
-          v.button('Create Lens', { href: '/datasets/create' })
+          v.button('Create Lens', { href: '/lenses/create' })
         })
       }
     })
