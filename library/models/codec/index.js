@@ -37,9 +37,9 @@ exports.for = function (query) {
   query = `${query}`.toLowerCase()
   if (exports.mediaTypeHandlers[query.split(';')[0]]) {
     return exports.mediaTypeHandlers[query]
-  } else if (query.includes('.')) {
+  } else {
     for (const ext in exports.extensionHandlers) {
-      if (query.endsWith(`.${ext}`)) {
+      if (query === ext || query.endsWith(`.${ext}`)) {
         return exports.extensionHandlers[ext]
       }
     }
