@@ -10,14 +10,12 @@ const parse = require('../utility/parse-request-body')
 // add req.owner boolean for any routes with a :author param
 router.param('author', auth.ownerParam)
 
-const mapCodeExample = `// example, simply copies the underlying dataset, but adds a property lensed: true
+const defaultCode = `// example, simply copies the underlying dataset, but adds a property lensed: true
 const [realm, store, recordID] = recordPath.slice(1).split('/').map(x => decodeURIComponent(x))
 output(recordID, {
   ...recordData,
   lensed: true
 })`
-const reduceCodeExample = `// example, overlays the objects overwriting properties
-return { ...left, ...right }`
 
 router.all('/lenses/create', auth.required, parse.body({ maxSize: 3145728 }), async (req, res) => {
   const state = {
@@ -26,13 +24,12 @@ router.all('/lenses/create', auth.required, parse.body({ maxSize: 3145728 }), as
     memo: '',
     inputs: ['/datasets/owner-author:dataset-name'],
     mapType: 'javascript',
-    mapCode: mapCodeExample,
-    reduceCode: reduceCodeExample
+    code: defaultCode
   }
 
   if (req.query.clone) {
     const [author, lensName] = `${req.query.clone}`.split(':')
-    Object.assign(state, await lens.readConfig(author, lensName))
+    Object.assign(state, await lens.readMeta(author, lensName))
     state.memo = `Cloned from /lenses/${req.query.clone}/: ${state.memo}`
   }
 
@@ -48,18 +45,17 @@ router.all('/lenses/create', auth.required, parse.body({ maxSize: 3145728 }), as
         memo: req.body.memo,
         inputs: req.body.inputs.split('\n').map(x => x.trim()).filter(x => !!x),
         mapType: req.body.mapType,
-        mapCode: req.body.mapCode,
-        reduceCode: req.body.reduceCode
+        code: req.body.code
       })
       // rebuild since settings may have changed
       await lens.build(req.author, req.body.name)
       return res.redirect(303, uri`/lenses/${req.author}:${req.body.name}/`)
     } catch (err) {
-      state.error = err.stack || err.message
+      state.error = err
     }
   }
 
-  res.sendVibe('lens-editor', 'Create a Lens', state, state.error)
+  res.sendVibe('lens-editor', 'Create a Lens', state)
 })
 
 router.get('/lenses/:author\\::name/configuration', async (req, res) => {
@@ -84,8 +80,7 @@ router.put('/lenses/:author\\::name/configuration', auth.ownerRequired, parse.bo
       meta.memo = req.body.memo
       meta.inputs = req.body.inputs.split(/\r?\n/m).map(x => x.trim()).filter(x => !!x)
       meta.mapType = req.body.mapType
-      meta.mapCode = req.body.mapCode
-      meta.reduceCode = req.body.reduceCode
+      meta.code = req.body.code
       return meta
     })
     // rebuild since settings may have changed
@@ -97,20 +92,14 @@ router.put('/lenses/:author\\::name/configuration', auth.ownerRequired, parse.bo
       return res.sendStatus(204)
     }
   } catch (err) {
-    const state = { ...req.body, create: false }
-    console.log(err.stack)
-    res.sendVibe('lens-editor', 'Edit a Lens', state, err.message)
+    const state = { ...req.body, create: false, error: err }
+    res.sendVibe('lens-editor', 'Edit a Lens', state)
   }
 })
 
 router.get('/lenses/:author\\::name/configuration/map', async (req, res) => {
   const meta = await lens.readMeta(req.params.author, req.params.name)
-  res.type(meta.mapType).set('X-Version', meta.version).send(meta.mapCode)
-})
-
-router.get('/lenses/:author\\::name/configuration/reduce', async (req, res) => {
-  const meta = await lens.readMeta(req.params.author, req.params.name)
-  res.type(meta.mapType).set('X-Version', meta.version).send(meta.reduceCode)
+  res.type(meta.mapType).set('X-Version', meta.version).send(meta.code)
 })
 
 router.get('/lenses/:author\\::name/logs', async (req, res) => {
@@ -207,8 +196,7 @@ router.post('/lenses/ephemeral', parse.body({ maxSize: 3145728 }), async (req, r
       memo: `Ephemeral Test Lens: ${req.body.memo}`,
       inputs: req.body.inputs.split('\n').map(x => x.trim()).filter(x => !!x),
       mapType: req.body.mapType,
-      mapCode: req.body.mapCode,
-      reduceCode: req.body.reduceCode,
+      code: req.body.code,
       garbageCollect: false
     })
 

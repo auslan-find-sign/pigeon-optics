@@ -20,14 +20,17 @@ describe('models/lens', function () {
     })
   })
 
+  after(async function () {
+    await dataset.delete(account, datasetName)
+  })
+
   it('lens.create(account, name) sets up a javascript lens', async function () {
     await lens.create(account, lensName, {
       memo: 'Automated Unit Testing created this lens to verify internal models are working correctly',
       mapType: 'javascript',
-      mapCode: 'for (const tag of data.tags) output(tag, [path.recordID])\n' +
+      code: 'for (const tag of data.tags) output(tag, new Set([path.recordID]))\n' +
       'if (data.log) console.log(data.log)\n' +
       'if (data.error) throw new Error(data.error)\n',
-      reduceCode: 'return [...left, ...right].sort()',
       inputs: [codec.path.encode('datasets', account, datasetName)]
     })
     await expect(lens.readMeta(account, lensName)).eventually.is.an('object').with.property('memo').that.includes('Automated Unit Testing')
@@ -35,11 +38,14 @@ describe('models/lens', function () {
 
   it('lens.build(account, name) works', async function () {
     await lens.build(account, lensName)
-    const list = await lens.list(account, lensName)
 
-    const data = {}
-    for (const { id, read } of list) data[id] = await read()
-    expect(data).does.deep.equal({
+    const records = {}
+    for await (const { id, read } of lens.iterate(account, lensName)) {
+      const data = await read()
+      records[id] = [...data]
+    }
+
+    expect(records).to.deep.equal({
       cat: ['abc', 'ghi'],
       dog: ['abc', 'def', 'ghi'],
       mango: ['def']
@@ -72,6 +78,5 @@ describe('models/lens', function () {
     await lens.delete(account, lensName)
     await expect(lens.exists(account, lensName)).is.eventually.not.ok
     await expect(lens.exists(account, lensName, 'cat')).is.eventually.not.ok
-    await dataset.delete(account, datasetName)
   })
 })

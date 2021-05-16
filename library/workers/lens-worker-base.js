@@ -1,6 +1,11 @@
 // default methods of a lens worker
 
 // called when the worker boots up to do some jobs on a specific lens
+/**
+ * Startup a lens worker
+ * @param {object} configuration
+ * @returns {{ errors: LensError[] }}
+ */
 exports.startup = async function (configuration) {
   console.log('no startup code defined')
 }
@@ -52,28 +57,6 @@ exports.map = async function (input) {
     logs: [],
     errors: [],
     outputs: []
-  }
-}
-
-/**
- * @typedef {object} ReduceOutput
- * @property {LensLog[]} logs
- * @property {LensError[]} errors
- * @property {*} value
- * @returns
- */
-
-/** For situations where multiple outputs have the same id string, reduce function handles merging
- * @param {LensOutput} left - left operand output of map function
- * @param {LensOutput} right - right operand output of map function
- * @returns {ReduceOutput}
- */
-exports.reduce = async function (left, right) {
-  console.log('no reduce function defined')
-  return {
-    logs: [],
-    errors: [],
-    value: undefined
   }
 }
 

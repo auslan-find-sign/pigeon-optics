@@ -36,15 +36,12 @@ module.exports = (req, config) => {
       })
 
       if (config.mapType === 'javascript') {
-        v.heading('Map Function:', { level: 3 })
-        v.sourceCode(config.mapCode)
+        v.heading('Lens Code:', { level: 3 })
+        v.sourceCode(config.code)
       } else if (config.mapType === 'webhook') {
         v.heading('Map Webhook:', { level: 3 })
-        v.p(v => v.a(config.mapCode, { href: config.mapCode }))
+        v.p(v => v.a(config.code, { href: config.code }))
       }
-
-      v.heading('Reduce Function:', { level: 3 })
-      v.sourceCode(config.reduceCode)
 
       v.heading('Records:', { level: 3 })
       v.linkList(Object.keys(config.records).sort(naturalCompare), name => uri`/lenses/${req.params.author}:${req.params.name}/records/${name}`)

@@ -52,10 +52,6 @@ class LensWorker {
     return this._rpc('map', input)
   }
 
-  async reduce (left, right) {
-    return this._rpc('reduce', left, right)
-  }
-
   /**
    * Shutdown the lens worker, killing the subprocess, clearing memory.
    */

@@ -1,13 +1,13 @@
 const layout = require('./layout')
 const uri = require('encodeuricomponent-tag')
+const { LensCodeError } = require('../models/lens')
 
 /**
  * block to build a dataset config editor form
  * @param {Request} req - express Request
  * @param {string} data - object with state info for the form
- * @param {null|string} error - null or a string with an error message
  */
-module.exports = (req, data, error = null) => {
+module.exports = (req, data) => {
   return layout(req, v => {
     v.form({ class: 'simple-form', method: 'PUT' }, v => {
       v.panel(v => {
@@ -35,7 +35,9 @@ module.exports = (req, data, error = null) => {
         if (data.create) v.heading('Create a Lens')
         else v.heading(`Editing Lens “${req.params.name}”`)
 
-        if (error) v.p(v => { v.glitch('Error: '); v.pre(error) })
+        if (data.error && !(data.error instanceof LensCodeError)) {
+          v.p(v => { v.glitch('Error: '); v.pre(data.error.message) })
+        }
 
         v.hiddenFormData({ owner: data.owner || req.author })
         v.hiddenFormData({ mapType: data.mapType })
@@ -55,7 +57,7 @@ module.exports = (req, data, error = null) => {
           v.dt('Inputs (one data path per line)')
           v.dd(v => v.textarea([data.inputs].flat().join('\n'), { name: 'inputs', spellcheck: 'false', wrap: 'off' }))
 
-          v.dt('Javascript Map Function')
+          v.dt('Javascript Function')
           v.dd(v => {
             v.div({
               innerHTML: `Map function receives <code>path</code> and <code>data</code>. <code>path</code> is an object
@@ -64,17 +66,17 @@ module.exports = (req, data, error = null) => {
               dataset/lens output. Use <code>output(recordID, recordData)</code> to add an output to the lens.
               <code>console.log/warn/info/error()</code> is also available for debugging.`
             })
-            v.sourceCodeEditor('mapCode', 'javascript', data.mapCode)
-          })
-
-          v.dt('Javascript Reduce Function')
-          v.dd(v => {
-            v.div({
-              innerHTML: `When map functions output the same recordID multiple times, this function
-              is called with <code>left</code> and <code>right</code> values. It should combine, and return
-              a single result.`
-            })
-            v.sourceCodeEditor('reduceCode', 'javascript', data.reduceCode)
+            const editorOpts = {}
+            const error = data.error
+            if (error instanceof LensCodeError) {
+              v.stacktrace(error.object)
+              const msgMatch = error.message.match(/.js:([0-9]+:[0-9]+)]$/)
+              if (msgMatch[1]) editorOpts.cursor = msgMatch[1]
+              if (error.stack.length > 0) {
+                editorOpts.cursor = `${error.stack[0].line}:${error.stack[0].column}`
+              }
+            }
+            v.sourceCodeEditor('code', 'javascript', data.code, editorOpts)
           })
         })
 

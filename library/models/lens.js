@@ -12,12 +12,14 @@
 const assert = require('assert')
 const codec = require('./codec')
 const settings = require('./settings')
+const cbor = require('./file/cbor')
 
 const auth = require('./auth')
 const xbytes = require('xbytes')
 const updateEvents = require('../utility/update-events')
 const { LensWorker } = require('../workers/interface')
-const { PassThrough } = require('stream')
+const reduce = require('../utility/reduce')
+const tfq = require('tiny-function-queue')
 
 Object.assign(exports, require('./base-data-model'))
 
@@ -40,11 +42,10 @@ exports.validateConfig = async function (author, name, config) {
 
   // assert(['webhook', 'javascript', 'remote'].includes(config.mapType), 'map type must be javascript, webhook, or remote')
   assert(config.mapType === 'javascript', 'map type must be "javascript"')
-  assert(typeof config.mapCode === 'string', 'map code must be a string')
-  assert(typeof config.reduceCode === 'string', 'reduce code must be a string')
+  assert(typeof config.code === 'string', 'map code must be a string')
   assert(Array.isArray(config.inputs), 'inputs must be an array')
   assert(config.inputs.every(x => typeof x === 'string'), 'inputs entries must be strings')
-  assert(config.mapCode.length + config.reduceCode.length < xbytes.parseSize(settings.lensCodeSize), `Lens code must be less than ${settings.lensCodeSize}`)
+  assert(config.code.length < xbytes.parseSize(settings.lensCodeSize), `Lens code must be less than ${settings.lensCodeSize}`)
 
   const readPath = require('./read-path') // break cyclic dependency
   for (const input of config.inputs) {
@@ -83,66 +84,150 @@ exports.getInputs = async function () {
  * @yields {object}
  */
 exports.iterateLogs = async function * (author, name) {
-  const file = this.getFileStore(author, name)
-  yield * await file.readStream(['build-logs'])
+  // const file = this.getFileStore(author, name)
+  // yield * await file.readStream(['build-logs'])
+  const ioCache = this.getIOCache(author, name)
+  for await (const ioID of ioCache.iterate([])) {
+    const { input, output } = await ioCache.read([ioID])
+    yield { input: input.path, errors: output.errors, logs: output.logs }
+  }
 }
 
+/**
+ * get an IO cache filesystem
+ * @param {string} author - name of owner authors
+ * @param {string} name - lens name
+ * @returns {import('./file/cbor')}
+ */
+exports.getIOCache = function (author, name) {
+  return cbor.instance({ rootPath: this.path(author, name, 'cache') })
+}
+
+/**
+ * rebuild the lens output, refreshing any outputs based on expired cached content
+ * @param {string} author - lens owner name
+ * @param {string} name - lens name
+ */
 exports.build = async function (author, name) {
   const readPath = require('./read-path')
   const worker = new LensWorker()
   const objects = this.getObjectStore(author, name)
+  const ioCache = this.getIOCache(author, name)
+  const usedIO = new Set()
+  const dirtyRecords = new Set()
+  const recordComposition = new Map()
 
-  await this.updateMeta(author, name, async (meta) => {
-    const logStream = new PassThrough({ objectMode: true })
-    const logWriter = this.getFileStore(author, name).writeStream(['build-logs'], logStream)
-    const prevRecords = meta.records
-    meta.records = {} // erase previous records
-    await worker.startup(meta)
+  await tfq.lockWhile(['lens build', author, name], async () => {
+    const meta = await this.readMeta(author, name)
 
-    for await (const recordMeta of readPath(meta.inputs)) {
-      const mapResult = await worker.map(recordMeta)
-
-      const logs = [...mapResult.logs]
-      const errors = [...mapResult.errors]
-
-      for (const { id, data } of mapResult.outputs) {
-        if (meta.records[id]) {
-          const reduceOutput = await worker.reduce(await objects.read(meta.records[id].hash), data)
-          if (reduceOutput.errors.length === 0) {
-            meta.records[id] = { hash: await objects.write(reduceOutput.value) }
-          } else {
-            errors.push(...reduceOutput.errors)
+    try {
+      // refresh io cache
+      for await (const recordMeta of readPath.meta(meta.inputs)) {
+        const ioID = `${recordMeta.path}@${codec.objectHash([recordMeta.hash, meta.code]).toString('hex')}`
+        usedIO.add(ioID)
+        if (!(await ioCache.exists([ioID]))) {
+          if (!worker.started) {
+            // start up a worker subprocess if we have something needing a fresh map
+            const startupResult = await worker.startup(meta)
+            if (startupResult.errors.length > 0) {
+              throw new exports.LensCodeError(startupResult.errors[0])
+            }
           }
-          if (reduceOutput.logs.length > 0) logs.push(...reduceOutput.logs)
+
+          const input = { path: recordMeta.path, version: recordMeta.version, hash: recordMeta.hash }
+          const output = await worker.map({ ...input, data: await recordMeta.read() })
+          await ioCache.write([ioID], { input, output })
+          for (const { id } of output.outputs) {
+            dirtyRecords.add(id)
+            if (!recordComposition.has(id)) recordComposition.set(id, [])
+            recordComposition.get(id).push(ioID)
+          }
         } else {
-          const hash = await objects.write(data)
-          if (prevRecords[id] && prevRecords[id].hash.equals(hash)) {
-            meta.records[id] = prevRecords[id]
-          } else {
-            meta.records[id] = { hash }
+          const { output } = await ioCache.read([ioID])
+          for (const { id } of output.outputs) {
+            dirtyRecords.add(id)
+            if (!recordComposition.has(id)) recordComposition.set(id, [])
+            recordComposition.get(id).push(ioID)
           }
         }
       }
-
-      logStream.write({ input: recordMeta.path, logs, errors })
+    } finally {
+      // shut down the worker, if it was started
+      if (worker.started) await worker.shutdown()
     }
 
-    logStream.end()
-    await logWriter
+    // take out the trash in the io cache
+    for await (const filename of ioCache.iterate([])) {
+      if (!await usedIO.has(filename)) {
+        await ioCache.delete([filename])
+      }
+    }
 
-    return meta
+    // build outputs
+    await this.updateMeta(author, name, async (meta) => {
+      // remove any records which aren't mentioned by any outputs in the current build
+      for (const recordID in meta.records) {
+        if (!recordComposition.has(recordID)) delete meta.records[recordID]
+      }
+
+      // dirty records are records which have changed in their composition, these need to be reduced and output
+      for (const recordID of dirtyRecords) {
+        const composition = recordComposition.get(recordID)
+        let value
+        let first = true
+        for (const ioID of composition) {
+          const { output } = await ioCache.read([ioID])
+          for (const { id, data } of output.outputs) {
+            if (id === recordID) {
+              if (first) {
+                value = data
+              } else {
+                value = reduce([value, data])
+              }
+              first = false
+            }
+          }
+        }
+        const hash = await objects.write(value)
+        meta.records[recordID] = { hash }
+      }
+
+      return meta
+    })
   })
+}
+
+exports.LensCodeError = class LensCodeError extends Error {
+  /**
+   * LensCodeError represents a bug in user supplied code
+   * @param {import('../workers/lens-worker-base').LensError} errorObject
+   */
+  constructor (errorObject) {
+    super(errorObject.message)
+    /** @type {string} */
+    this.type = errorObject.type
+    /** @type {import('../workers/lens-worker-base').StackEntry[]} */
+    this.stack = errorObject.stack
+    /** @type {import('../workers/lens-worker-base').LensError} */
+    this.object = errorObject
+  }
 }
 
 // setup listening for changes to inputs
 updateEvents.events.on('change', async ({ path, source, author, name, recordID }) => {
   const matcher = codec.path.encode({ source, author, name })
   const inputs = await exports.getInputs()
-  for (const [path, receivers] of Object.entries(inputs)) {
-    if (path === matcher) {
-      for (const { author: lensAuthor, name: lensName } of receivers) {
-        await exports.build(lensAuthor, lensName)
+  await tfq.lockWhile('lens background builds', async () => {
+    for (const [path, receivers] of Object.entries(inputs)) {
+      if (path === matcher) {
+        for (const { author: lensAuthor, name: lensName } of receivers) {
+          try {
+            await exports.build(lensAuthor, lensName)
+          } catch (err) {
+            console.error('background lens rebuild error', err)
+          }
+        }
       }
     }
-  }
+  })
 })

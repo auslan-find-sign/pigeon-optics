@@ -13,7 +13,6 @@ let isolate // ivm isolate
 let context // ivm context
 let code // keep a copy of the lens author source code for generating good errors
 let mapFnReference // reference to lens author defined map function inside of the context
-let reduceFnReference // reference to lens author defined reduce function inside of the context
 let timeout
 let outputs
 let logs
@@ -40,7 +39,7 @@ function transformVMError (error, file, source) {
 
   if (!error.stack || !error.stack.includes('at (<isolated-vm boundary>)')) {
     // probably the error actually happened in this file, not in user code, so log it:
-    console.error(error)
+    console.error('ivm error:', error)
   }
 
   return {
@@ -52,7 +51,7 @@ function transformVMError (error, file, source) {
 
 // compile all the scripts, set everything up, ready to blast through the data
 exports.startup = async function (config) {
-  const returnVal = { map: { errors: [] }, reduce: { errors: [] } }
+  const returnVal = { errors: [] }
   // Setup a VM for executing javascript lenses
   isolate = new ivm.Isolate({ memoryLimit: 256 })
   // Precompile the codec-lite.ivm init code
@@ -97,11 +96,11 @@ exports.startup = async function (config) {
   `, [context.global.derefInto(), ioFunctionRef], { filename: 'pigeon-optics-lens-api.js' })
 
   // keep the code around for debugging
-  code = { map: config.mapCode, reduce: config.reduceCode }
+  code = config.code
 
   // build precompiled map function
   try {
-    const snippet = `return function map (path, data) {\n${code.map}\n}`
+    const snippet = `return function map (path, data) {\n${code}\n}`
     const opts = {
       timeout,
       lineOffset: -1,
@@ -111,20 +110,7 @@ exports.startup = async function (config) {
     }
     mapFnReference = (await context.evalClosure(snippet, [], opts)).result
   } catch (err) {
-    returnVal.map.errors.push(transformVMError(err, 'map.js', code.map))
-  }
-
-  try {
-    const snippet = `return function reduce (left, right) {\n${code.reduce}\n}`
-    const opts = {
-      timeout,
-      lineOffset: -1,
-      filename: 'reduce.js',
-      result: { reference: true }
-    }
-    reduceFnReference = (await context.evalClosure(snippet, [], opts)).result
-  } catch (err) {
-    returnVal.reduce.errors.push(transformVMError(err, 'reduce.js', code.reduce))
+    returnVal.errors.push(transformVMError(err, 'map.js', code))
   }
 
   // parse current configured timeout
@@ -153,29 +139,8 @@ exports.map = async function (input) {
   } catch (err) {
     return {
       logs,
-      errors: [transformVMError(err, 'map.js', code.map)],
+      errors: [transformVMError(err, 'map.js', code)],
       outputs
-    }
-  }
-}
-
-exports.reduce = async function (left, right) {
-  logs = []
-  outputs = []
-
-  try {
-    const result = await reduceFnReference.apply(undefined, [left, right], {
-      timeout,
-      arguments: { copy: true },
-      result: { copy: true }
-    })
-
-    return { logs, errors: [], value: result }
-  } catch (err) {
-    return {
-      logs,
-      errors: [transformVMError(err, 'reduce.js', code.reduce)],
-      value: undefined
     }
   }
 }
@@ -185,7 +150,6 @@ exports.shutdown = async function () {
   logs = []
   outputs = []
   if (mapFnReference) mapFnReference.release()
-  if (reduceFnReference) reduceFnReference.release()
   if (context) context.release()
   if (isolate) isolate.dispose()
 }

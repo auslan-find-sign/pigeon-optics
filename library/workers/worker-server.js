@@ -16,10 +16,6 @@ const api = {
     return await worker.map(input)
   },
 
-  async reduce (left, right) {
-    return await worker.reduce(left, right)
-  },
-
   async shutdown () {
     await worker.shutdown()
     process.nextTick(x => process.exit())
