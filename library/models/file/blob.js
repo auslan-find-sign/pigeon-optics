@@ -1,6 +1,9 @@
 /**
  * blob store, stores buffers (or optionally encodeable objects) by their content hash
  * blob store is mainly used to store dataset objects, and attachments
+ * Data is also run through brotli compression, because this file io tends to be used for
+ * very compressable objects, resulting in a 2-5x storage saving. Hash is of the original
+ * uncompressed content
  * @module module:models/file/blob
  * @see module:models/file/raw
  */
@@ -10,17 +13,26 @@ const HashThrough = require('hash-through')
 const { PassThrough } = require('stream')
 const fs = require('fs').promises
 const crypto = require('crypto')
+const zlib = require('zlib')
+
+const BrotliOptions = {
+  chunkSize: 32 * 1024,
+  params: {
+    [zlib.constants.BROTLI_PARAM_QUALITY]: zlib.constants.BROTLI_MIN_QUALITY,
+    [zlib.constants.BROTLI_PARAM_MODE]: zlib.constants.BROTLI_MODE_GENERIC
+  }
+}
 
 // used to store attachments in attachment store
 exports.raw = require('./raw').instance({
-  extension: '.blob'
+  extension: '.blob.br'
 })
 
 // default codec just passes through buffers
 // but this could be set to codec.cbor, codec.jsonLines, etc
 exports.codec = {
-  encode: (buffer) => Buffer.from(buffer),
-  decode: (buffer) => Buffer.from(buffer),
+  encode: (buffer) => Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer),
+  decode: (buffer) => buffer,
   encoder: () => new PassThrough(),
   decoder: () => new PassThrough()
 }
@@ -41,7 +53,9 @@ exports.getPath = function (hash) {
  * @async
  */
 exports.read = async function (hash) {
-  const data = await this.raw.read([hash.toString('hex')])
+  const rawStream = await this.raw.readStream([hash.toString('hex')])
+  const decompressed = rawStream.pipe(zlib.createBrotliDecompress(BrotliOptions))
+  const data = Buffer.concat(await asyncIterableToArray(decompressed))
   return await this.codec.decode(data)
 }
 
@@ -58,13 +72,23 @@ exports.write = async function (data) {
   const dataPath = [hash.toString('hex')]
 
   if (!await this.raw.exists(dataPath)) {
-    await this.raw.write(dataPath, encoded)
+    const brotli = zlib.createBrotliCompress(BrotliOptions)
+    brotli.write(encoded)
+    brotli.end()
+    await this.raw.writeStream(dataPath, brotli)
   }
   return hash
 }
 
+/**
+ * get a read stream of the content of a blob, decompressed and run through any codecs
+ * @param {Buffer} hash - content hash
+ * @returns {any}
+ */
 exports.readStream = async function (hash) {
-  return (await this.raw.readStream([hash.toString('hex')])).pipe(this.codec.decoder())
+  const rawStream = await this.raw.readStream([hash.toString('hex')])
+  const decompress = rawStream.pipe(zlib.createBrotliDecompress(BrotliOptions))
+  return decompress.pipe(this.codec.decoder())
 }
 
 /**
@@ -76,7 +100,8 @@ exports.readStream = async function (hash) {
 exports.writeStream = async function (stream) {
   const tempPath = [`blob-write-stream-temporary-${crypto.randomBytes(20).toString('hex')}`]
   const hasher = new HashThrough(this.getHashObject)
-  await this.raw.writeStream(tempPath, stream.pipe(hasher))
+  const brotli = zlib.createBrotliCompress(BrotliOptions)
+  await this.raw.writeStream(tempPath, stream.pipe(hasher).pipe(brotli))
   const hash = hasher.digest()
   const dataPath = [hash.toString('hex')]
   try {
@@ -179,6 +204,6 @@ exports.instance = function ({
   return Object.assign(Object.create(exports), {
     codec,
     hash,
-    raw: require('./raw').instance({ rootPath, extension })
+    raw: require('./raw').instance({ rootPath, extension: `${extension}.br` })
   })
 }

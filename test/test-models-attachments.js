@@ -4,7 +4,6 @@ chai.use(require('chai-as-promised'))
 const { expect } = chai
 const crypto = require('crypto')
 const streams = require('stream')
-const fs = require('fs')
 const attachments = require('../library/models/attachments')
 const asyncIterableToArray = require('../library/utility/async-iterable-to-array')
 
@@ -55,15 +54,6 @@ describe('models/attachments', function () {
     const write = await attachments.writeStream(input, { linkers: ['/datasets/system:attachments-test/records/readStreamTest'] })
     const outputData = await asyncIterableToArray(await attachments.readStream(write.hash))
     expect(Buffer.concat(testData).equals(Buffer.concat(outputData))).to.be.true
-    mess.push(write)
-  })
-
-  it('attachments.getPath(hash) works', async function () {
-    const testData = [...pseudorandom('getPath test', 100)]
-    const input = streams.Readable.from(testData)
-    const write = await attachments.writeStream(input, { linkers: ['/datasets/system:attachments-test/records/getPathTest'] })
-    const outputData = await asyncIterableToArray(await fs.createReadStream(attachments.getPath(write.hash)))
-    expect(Buffer.concat(testData)).to.deep.equal(Buffer.concat(outputData))
     mess.push(write)
   })
 

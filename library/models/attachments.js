@@ -3,8 +3,6 @@
  */
 const assert = require('assert')
 const readPath = require('./read-path')
-const HashThrough = require('hash-through')
-const crypto = require('crypto')
 const tq = require('tiny-function-queue')
 
 // final location blobs are moved in to
@@ -19,19 +17,6 @@ const metaStore = require('./file/cbor').instance({
 })
 
 /**
- * Get a local filesystem path to the blob data of the attachment content hash
- * Note: this does not validate the content exists
- * @param {Buffer|string} hash
- * @returns {string} local filesystem path
- */
-exports.getPath = function (hash) {
-  if (typeof hash === 'string') hash = Buffer.from(hash, 'hex')
-  assert(Buffer.isBuffer(hash), 'hash argument must be a buffer or hex string')
-
-  return blobStore.getPath(hash)
-}
-
-/**
  * Write a stream of arbitrary data to the attachment store
  * @param {Readable} stream Readable stream to write to attachment store
  * @param {object} meta metadata object, importantly containing linkers array
@@ -42,32 +27,20 @@ exports.writeStream = async function (stream, meta) {
   assert(meta && typeof meta === 'object', 'meta argument must be an object')
   assert(Array.isArray(meta.linkers), 'meta object must contain a linkers property which is an array')
 
-  const tempPath = [`attachment-write-stream-temp-${crypto.randomBytes(20).toString('hex')}`]
-  const hasher = new HashThrough(blobStore.getHashObject)
-  await blobStore.raw.writeStream(tempPath, stream.pipe(hasher))
-  const hash = hasher.digest()
+  const hash = await blobStore.writeStream(stream)
   const hexHash = hash.toString('hex')
-  const dataPath = [hexHash]
-  const release = exports.hold(hexHash)
+  const release = this.hold(hexHash)
 
-  return await tq.lockWhile(['attachments', hexHash], async () => {
-    await metaStore.update([hexHash], async oldValue => {
-      try {
-        await blobStore.raw.rename(tempPath, dataPath)
-      } catch (err) {
-        await blobStore.raw.delete(tempPath)
-      }
-
-      return {
-        created: Date.now(),
-        ...oldValue || {},
-        updated: Date.now(),
-        ...meta,
-        linkers: [...new Set([...(oldValue || {}).linkers || [], ...meta.linkers])]
-      }
-    })
-    return { hash, release }
+  await metaStore.update([hexHash], async oldValue => {
+    return {
+      created: Date.now(),
+      ...oldValue || {},
+      updated: Date.now(),
+      ...meta,
+      linkers: [...new Set([...(oldValue || {}).linkers || [], ...meta.linkers])]
+    }
   })
+  return { hash, release }
 }
 
 /**
