@@ -22,18 +22,20 @@ Vibe.iconPath = '/design/icomoon/symbol-defs.svg'
 app.use(require('compression')({}))
 
 // allow forms to override method using Rails ?_method= format
-app.use(methodOverride((req, res) => (req.query && req.query._method) || (req.body && req.body._method) || req.method))
+app.use(methodOverride((req, res) => req.method === 'POST' ? (req.query._method || req.method) : req.method))
 
 // allow non-credentialed cors requests to anything by default
 app.use((req, res, next) => {
   res.set('Access-Control-Allow-Origin', '*')
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization')
   next()
 })
 
 // Give the logged in people a crypto signed cookie, to store session information
 // If you'd like your cookies to keep working between app edits, make sure to check out the .env file!
 app.use(cookieSession({
-  secret: process.env.SECRET || crypto.randomBytes(64).toString('base64')
+  secret: process.env.SECRET || crypto.randomBytes(64).toString('base64'),
+  sameSite: 'lax'
 }))
 
 // log requests
