@@ -8,6 +8,7 @@ exports.yaml = require('./yaml')
 exports.msgpack = require('./msgpack')
 exports.xml = require('./xml')
 exports.html = require('pigeonmark-html')
+exports.javascript = require('./javascript')
 
 exports.path = require('./path')
 exports.objectHash = require('./object-hash')

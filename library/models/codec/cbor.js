@@ -1,9 +1,9 @@
-const cbor = require('cbor')
+const cbor = require('cbor-x')
 
 exports.handles = ['application/cbor', 'application/x-cbor']
 exports.extensions = ['cbor']
-exports.decoderOpts = {}
-exports.encoderOpts = { highWaterMark: 25000000 }
+exports.decoderOpts = { structuredClone: false, useRecords: false }
+exports.encoderOpts = { structuredClone: false, useRecords: false }
 
 /**
  * Encodes a CBOR encodable object, with support for this application's Attachment and AttachmentReference objects
@@ -11,7 +11,7 @@ exports.encoderOpts = { highWaterMark: 25000000 }
  * @returns {Buffer} - cbor buffer
  */
 exports.encode = function (data) {
-  return cbor.encodeOne(data, this.encoderOpts)
+  return cbor.encode(data)
 }
 
 /**
@@ -20,7 +20,7 @@ exports.encode = function (data) {
  * @returns {any} - returns decoded object
  */
 exports.decode = function (inputBuffer) {
-  return cbor.decodeFirstSync(inputBuffer, this.decoderOpts)
+  return cbor.decode(inputBuffer)
 }
 
 /**
@@ -28,7 +28,7 @@ exports.decode = function (inputBuffer) {
  * @returns {import('stream').Transform}
  */
 exports.decoder = function () {
-  return new cbor.Decoder(this.decoderOpts)
+  return new cbor.DecoderStream(exports.decoderOpts)
 }
 
 /**
@@ -36,5 +36,5 @@ exports.decoder = function () {
  * @returns {import('stream').Transform}
  */
 exports.encoder = function () {
-  return new cbor.Encoder(this.encoderOpts)
+  return new cbor.EncoderStream(exports.encoderOpts)
 }
