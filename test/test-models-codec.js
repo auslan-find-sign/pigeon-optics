@@ -24,6 +24,7 @@ const tests = [
   0.0001,
   [1, 2, 3],
   [null, null, null],
+  [null, true, false, Infinity, -Infinity, NaN], // test extended types
   Buffer.from('hello world'),
   { a: 1, b: 2 },
   { 1: false, 2: true },
