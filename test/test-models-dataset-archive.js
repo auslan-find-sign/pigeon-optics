@@ -1,7 +1,7 @@
 const asyncIterableToArray = require('../library/utility/async-iterable-to-array')
 const chai = require('chai')
 const expect = chai.expect
-const raw = require('../library/models/file/raw')
+const raw = require('../library/models/file/raw').instance({ extension: '.dataset.br' })
 const { open } = require('../library/models/dataset-archive')
 
 const testData = [

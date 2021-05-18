@@ -1,15 +1,23 @@
 /**
  * Dataset Archive format is (possibly?) used to store a dataset in a single flat file on disk
+ * It's a simple format, using length-prefixed-stream to chunk keys and values with a specific length
+ * The first entry is always a key, which is a raw utf-8 string, the second entry is a JSON value
+ * entries after these continue alternating in this zig zag pattern
  */
-const { Readable } = require('stream')
+const { Readable, PassThrough } = require('stream')
 const zlib = require('zlib')
+// const json = require('./codec/json')
 const cbor = require('./codec/cbor')
+const lps = require('length-prefixed-stream')
 
-const BrotliOpts = {
+// const valueEncode = any => Buffer.from(json.encode(any), 'utf-8')
+// const valueDecode = buffer => json.decode(buffer.toString('utf-8'))
+const valueEncode = any => cbor.encode(any)
+const valueDecode = buffer => cbor.decode(buffer)
+
+const brotliOptions = {
   chunkSize: 32 * 1024,
-  params: {
-    [zlib.constants.BROTLI_PARAM_QUALITY]: zlib.constants.BROTLI_MIN_QUALITY
-  }
+  params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 }
 }
 
 class DatasetArchive {
@@ -25,43 +33,75 @@ class DatasetArchive {
 
   /**
    * iterate the contents of the dataset archive, yielding objects with "id" and "data" fields
+   * @param {object} [options]
+   * @param {boolean} [options.decode] - should the value be decoded or left as a buffer with V prefix
    * @yields {[id, data]}
    */
-  async * read () {
+  async * read ({ decode = true } = {}) {
     const bytes = await this.raw.readStream(this.path)
-    for await (const tuple of bytes.pipe(zlib.createBrotliDecompress(BrotliOpts)).pipe(cbor.decoder())) {
-      yield tuple
+    const decompressed = bytes.pipe(zlib.createBrotliDecompress(brotliOptions))
+    const chunked = decompressed.pipe(lps.decode())
+    const output = chunked.pipe(new PassThrough({ objectMode: true }))
+
+    let index = 0
+    let key
+    for await (const buffer of output) {
+      if (index % 2 === 0) {
+        // key
+        key = decode ? buffer.toString('utf-8') : buffer
+      } else {
+        const value = decode ? valueDecode(buffer) : buffer
+        yield [key, value]
+      }
+      index += 1
     }
   }
 
   /**
    * Given an async iterable, rebuilds the dataset archive with new contents, completely replacing it
+   * @param {object} [options]
+   * @param {boolean} [options.encode] - should the iterable's stuff be encoded?
    * @param {*} iterable
    */
-  async write (iterable) {
+  async write (iterable, { encode = true } = {}) {
     async function * gen () {
       for await (const object of iterable) {
         if (!Array.isArray(object)) throw new Error('iterator must provide two element arrays')
         if (object.length !== 2) throw new Error('Array must have length of 2')
-        yield cbor.encode(object)
+        if (encode) {
+          if (typeof object[0] !== 'string') throw new Error('key must be a string')
+          yield Buffer.from(object[0], 'utf-8')
+          yield valueEncode(object[1])
+        } else {
+          if (!Buffer.isBuffer(object[0])) throw new Error('key must be a Buffer')
+          if (!Buffer.isBuffer(object[1])) throw new Error('value must be a Buffer')
+          yield object[0]
+          yield object[1]
+        }
       }
     }
-    await this.raw.writeStream(this.path, Readable.from(gen()).pipe(zlib.createBrotliCompress(BrotliOpts)))
+
+    const readStream = Readable.from(gen(), { objectMode: false })
+    const chunkPacked = readStream.pipe(lps.encode())
+    const compressed = chunkPacked.pipe(zlib.createBrotliCompress(brotliOptions))
+    await this.raw.writeStream(this.path, compressed)
   }
 
   /**
    * filter the contents of the dataset archive using a supplied testing function
    * @param {function (key, value)} filterFunction - function which returns a truthy value or a promise that resolves to one
+   * @param {boolean} [includeValue = true] - should value be decoded and provided to filter function?
    */
-  async filter (filterFunction) {
-    async function * iter (archive, filter) {
-      for await (const [key, value] of archive.read()) {
-        if (await filter(key, value)) {
-          yield [key, value]
+  async filter (filter, includeValue = true) {
+    async function * iter (archive) {
+      for await (const [keyBuffer, valueBuffer] of archive.read({ decode: false })) {
+        const key = keyBuffer.toString('utf-8')
+        if (await (includeValue ? filter(key, valueDecode(valueBuffer)) : filter(key))) {
+          yield [keyBuffer, valueBuffer]
         }
       }
     }
-    await this.write(iter(this, filterFunction))
+    await this.write(iter(this), { encode: false })
   }
 
   /**
@@ -69,7 +109,7 @@ class DatasetArchive {
    * @param  {...string} keys - list of keys
    */
   async delete (...keys) {
-    await this.filter(key => !keys.includes(key))
+    await this.filter(key => !keys.includes(key), false)
   }
 
   /**
@@ -77,7 +117,7 @@ class DatasetArchive {
    * @param  {...string} keys - list of keys
    */
   async retain (...keys) {
-    await this.filter(key => keys.includes(key))
+    await this.filter(key => keys.includes(key), false)
   }
 
   /**
@@ -91,19 +131,20 @@ class DatasetArchive {
       for await (const [key, value] of iter) {
         if (!set.has(key)) {
           set.add(key)
-          if (value !== undefined) yield [key, value]
+          if (value !== undefined) yield [Buffer.from(`${key}`, 'utf-8'), valueEncode(value)]
         }
       }
 
-      for await (const [key, value] of archive.read()) {
+      for await (const [keyBuffer, valueBuffer] of archive.read({ decode: false })) {
+        const key = keyBuffer.toString('utf-8')
         if (!set.has(key)) {
           set.add(key)
-          if (value !== undefined) yield [key, value]
+          yield [keyBuffer, valueBuffer]
         }
       }
     }
 
-    await this.write(gen(this, iter))
+    await this.write(gen(this, iter), { encode: false })
   }
 
   /**
@@ -121,8 +162,11 @@ class DatasetArchive {
    */
   async get (searchKey) {
     let result
-    for await (const [key, value] of this.read()) {
-      if (key === searchKey) result = value
+    const searchBuffer = Buffer.from(searchKey, 'utf-8')
+    for await (const [keyBuffer, valueBuffer] of this.read({ decode: false })) {
+      if (searchBuffer.equals(keyBuffer)) {
+        result = valueDecode(valueBuffer)
+      }
     }
     return result
   }
