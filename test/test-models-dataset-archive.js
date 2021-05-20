@@ -1,3 +1,5 @@
+/* eslint-env mocha */
+/* eslint-disable no-unused-expressions */
 const asyncIterableToArray = require('../library/utility/async-iterable-to-array')
 const chai = require('chai')
 const expect = chai.expect
@@ -40,6 +42,17 @@ describe('models/dataset-archive', function () {
     })
   })
 
+  it('selects', async () => {
+    expect(await asyncIterableToArray(tape.select(key => key.includes('c')))).to.deep.equal([
+      ['cat', 'friend'],
+      ['abc', 'xyz']
+    ])
+
+    expect(await asyncIterableToArray(tape.select((key, value) => value.includes('o')))).to.deep.equal([
+      ['pea', 'soup']
+    ])
+  })
+
   it('deletes', async () => {
     await tape.delete('abc', 'pea')
 
@@ -65,6 +78,12 @@ describe('models/dataset-archive', function () {
 
   it('gets', async () => {
     expect(await tape.get('cat')).to.equal('dog')
-    expect(await tape.get('fake')).to.equal(undefined)
+    expect(await tape.get('fake')).to.be.undefined
+  })
+
+  it('deletes the archive', async () => {
+    await tape.deleteArchive()
+    expect(await tape.get('cat')).to.be.undefined
+    expect(await tape.raw.exists(tape.path)).to.be.false
   })
 })
