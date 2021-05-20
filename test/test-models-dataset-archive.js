@@ -18,7 +18,8 @@ describe('models/dataset-archive', function () {
 
   it('creates an archive and read it back', async () => {
     tape = open(raw, ['test-archive'])
-    await tape.write(testData)
+    const storedKeys = await tape.write(testData)
+    expect([...storedKeys].sort()).to.deep.equal(['abc', 'cat', 'pea'])
 
     const readback = await asyncIterableToArray(tape.read())
     expect(readback).to.deep.equal(testData)
@@ -32,7 +33,8 @@ describe('models/dataset-archive', function () {
   })
 
   it('merges', async () => {
-    await tape.merge([['cat', 'friend'], ['beans', undefined]])
+    const storedKeys = await tape.merge([['cat', 'friend'], ['beans', undefined]])
+    expect([...storedKeys].sort()).to.deep.equal(['abc', 'cat', 'pea'])
 
     const readback = Object.fromEntries(await asyncIterableToArray(tape.read()))
     expect(readback).to.deep.equal({

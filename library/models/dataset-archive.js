@@ -63,20 +63,30 @@ class DatasetArchive {
    * Given an async iterable, rebuilds the dataset archive with new contents, completely replacing it
    * @param {object} [options]
    * @param {boolean} [options.encode] - should the iterable's stuff be encoded?
-   * @param {*} iterable
+   * @param {AsyncIterable|Iterable} iterable
+   * @returns {Set.<string>} keys in archive
+   * @async
    */
   async write (iterable, { encode = true } = {}) {
+    const storedKeys = new Set()
     async function * gen () {
       for await (const object of iterable) {
         if (!Array.isArray(object)) throw new Error('iterator must provide two element arrays')
         if (object.length !== 2) throw new Error('Array must have length of 2')
+        // skip entries which are duplicates
+        if (storedKeys.has(encode ? object[0] : object[1].toString('utf-8'))) {
+          continue
+        }
+
         if (encode) {
+          storedKeys.add(object[0])
           if (typeof object[0] !== 'string') throw new Error('key must be a string')
           yield Buffer.from(object[0], 'utf-8')
           yield exports.valueEncode(object[1])
         } else {
           if (!Buffer.isBuffer(object[0])) throw new Error('key must be a Buffer')
           if (!Buffer.isBuffer(object[1])) throw new Error('value must be a Buffer')
+          storedKeys.add(object[0].toString('utf-8'))
           yield object[0]
           yield object[1]
         }
@@ -87,6 +97,8 @@ class DatasetArchive {
     const chunkPacked = readStream.pipe(lps.encode())
     const compressed = chunkPacked.pipe(zlib.createBrotliCompress(brotliOptions))
     await this.raw.writeStream(this.path, compressed)
+
+    return storedKeys
   }
 
   /**
@@ -157,13 +169,11 @@ class DatasetArchive {
    */
   async merge (iter) {
     const set = new Set()
-    const retainedKeys = new Set()
     async function * gen (archive, iter) {
       for await (const [key, value] of iter) {
         if (!set.has(key)) {
           set.add(key)
           if (value !== undefined) {
-            retainedKeys.add(key)
             yield [Buffer.from(`${key}`, 'utf-8'), exports.valueEncode(value)]
           }
         }
@@ -173,15 +183,12 @@ class DatasetArchive {
         const key = keyBuffer.toString('utf-8')
         if (!set.has(key)) {
           set.add(key)
-          retainedKeys.add(key)
           yield [keyBuffer, valueBuffer]
         }
       }
     }
 
-    await this.write(gen(this, iter), { encode: false })
-
-    return retainedKeys
+    return await this.write(gen(this, iter), { encode: false })
   }
 
   /**
