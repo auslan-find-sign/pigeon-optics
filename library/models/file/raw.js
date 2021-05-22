@@ -8,6 +8,7 @@ const os = require('os')
 const settings = require('../settings')
 const assert = require('assert')
 const { Readable } = require('stream')
+const { pipeline } = require('stream/promises')
 const tq = require('tiny-function-queue')
 const MultiStream = require('multistream')
 
@@ -134,19 +135,11 @@ exports.readStream = function (dataPath) {
 
 /** Create or update a raw file, creating a .backup file of the previous version in the process
  * @param {string[]} path - relative path inside data directory the data is located at
- * @param {ReadableStream} stream - binary data to stream to file
+ * @param {Readable|AsyncIterable|Iterable} stream - binary data to stream to file
  * @async
  */
 exports.writeStream = async function (dataPath, stream) {
   assert(Array.isArray(dataPath), 'dataPath must be an array of path segments')
-
-  // little utility to listen to events on stuff with an async await style
-  function event (obj, event, errEvent = 'error') {
-    return new Promise((resolve, reject) => {
-      obj.once(event, (arg) => resolve(arg))
-      obj.once(errEvent, (err) => reject(err))
-    })
-  }
 
   const path1 = this.fullPath(dataPath, this.extension)
   const path2 = this.fullPath(dataPath, `${this.extension}.backup`)
@@ -159,7 +152,7 @@ exports.writeStream = async function (dataPath, stream) {
   const tempPath = path.join(os.tmpdir(), `pigeon-optics-writing-${rand}${this.extension}`)
 
   try {
-    await event(stream.pipe(fs.createWriteStream(tempPath)), 'finish')
+    await pipeline(stream, fs.createWriteStream(tempPath))
 
     // update backup with a copy of what was here previously if something old exists
     if (await fs.pathExists(path1)) {

@@ -1,3 +1,5 @@
+/* eslint-env mocha */
+/* eslint-disable no-unused-expressions */
 const asyncIterableToArray = require('../library/utility/async-iterable-to-array')
 const crypto = require('crypto')
 const chai = require('chai')
@@ -5,6 +7,7 @@ chai.use(require('chai-as-promised'))
 const expect = chai.expect
 const { Readable } = require('stream')
 const raw = require('../library/models/file/raw')
+const delay = require('delay')
 
 const tests = [
   crypto.randomBytes(32),
@@ -142,6 +145,41 @@ describe('models/file/raw', function () {
     expect(output.sort()).to.deep.equal(folders.sort())
 
     await raw.delete(['file-tests'])
+  })
+
+  it('raw.writeStream() accepts a generators', async () => {
+    function * syncGen () {
+      for (let i = 0; i < 3; i++) yield Buffer.from(`${i}\n`)
+    }
+
+    await raw.writeStream(['file-tests', 'sync-generator'], syncGen())
+    expect(await raw.read(['file-tests', 'sync-generator'])).to.deep.equal(Buffer.from('0\n1\n2\n'))
+
+    async function * asyncGen () {
+      for (let i = 0; i < 3; i++) {
+        await delay(1)
+        yield Buffer.from(`${i}\n`)
+      }
+    }
+
+    await raw.writeStream(['file-tests', 'async-generator'], asyncGen())
+    expect(await raw.read(['file-tests', 'async-generator'])).to.deep.equal(Buffer.from('0\n1\n2\n'))
+  })
+
+  it('raw.writeStream() passes stream errors through', async () => {
+    const errStream = new Readable({ read (size) { this.destroy(new Error('foo')) } })
+
+    await expect(raw.writeStream(['file-tests', 'err-stream'], errStream)).to.be.rejectedWith('foo')
+    expect(await raw.exists(['file-tests', 'err-stream'])).to.be.false
+  })
+
+  it('raw.writeStream() passes generator errors through', async () => {
+    async function * errGenerator () {
+      throw new Error('foo')
+    }
+
+    await expect(raw.writeStream(['file-tests', 'err-generator'], errGenerator())).to.be.rejectedWith('foo')
+    expect(await raw.exists(['file-tests', 'err-generator'])).to.be.false
   })
 
   after(async function () {
