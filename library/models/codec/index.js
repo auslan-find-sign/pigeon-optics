@@ -7,6 +7,7 @@ exports.jsonLines = require('./json-lines')
 exports.yaml = require('./yaml')
 exports.msgpack = require('./msgpack')
 exports.xml = require('./xml')
+exports.v8 = require('./v8')
 exports.html = require('pigeonmark-html')
 exports.javascript = require('./javascript')
 
