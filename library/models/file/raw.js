@@ -7,10 +7,9 @@ const path = require('path')
 const os = require('os')
 const settings = require('../settings')
 const assert = require('assert')
-const { Readable } = require('stream')
+const { Readable, Writable } = require('stream')
 const { pipeline } = require('stream/promises')
 const tq = require('tiny-function-queue')
-const MultiStream = require('multistream')
 
 // encodes a string to be a valid filename but not use meaningful characters like . or /
 function encodePathSegment (string) {
@@ -134,11 +133,14 @@ exports.readStream = function (dataPath) {
 }
 
 /** Create or update a raw file, creating a .backup file of the previous version in the process
+ * If a stream is provided, writeStream returns a promise which resolves when the file is totally rewritten with the stream's content
+ * If no stream is provided, immediately returns a writable stream, which emits a 'ready' event when it ready to start writing, and buffers until then
  * @param {string[]} path - relative path inside data directory the data is located at
- * @param {Readable|AsyncIterable|Iterable|Generator} stream - binary data to stream to file
+ * @param {Readable|AsyncIterable|Iterable|Generator} [stream] - binary data to stream to file
+ * @returns {import('stream').Writable|Promise}
  * @async
  */
-exports.writeStream = async function (dataPath, stream) {
+exports.writeStream = function (dataPath, stream) {
   assert(Array.isArray(dataPath), 'dataPath must be an array of path segments')
 
   const path1 = this.fullPath(dataPath, this.extension)
@@ -146,24 +148,47 @@ exports.writeStream = async function (dataPath, stream) {
 
   // ensure directory exists
   const folderPath = path.dirname(path1)
-  await fs.ensureDir(folderPath)
 
   const rand = `${Math.round(Math.random() * 0xFFFFFF)}-${Math.round(Math.random() * 0xFFFFFF)}`
   const tempPath = path.join(os.tmpdir(), `pigeon-optics-writing-${rand}${this.extension}`)
 
-  try {
-    await pipeline(stream, fs.createWriteStream(tempPath))
+  const writable = new Writable({
+    async construct (callback) {
+      try {
+        await fs.ensureDir(folderPath)
+        this._fsWriteStream = fs.createWriteStream(tempPath)
+        this._fsWriteStream.on('error', (err) => this.destroy(err))
+        callback()
+      } catch (err) {
+        callback(err)
+      }
+    },
+    write (chunk, encoding, callback) {
+      this._fsWriteStream.write(chunk, encoding, callback)
+    },
+    async final (callback) {
+      try {
+        // update backup with a copy of what was here previously if something old exists
+        if (await fs.pathExists(path1)) {
+          await fs.remove(path2)
+          await fs.move(path1, path2)
+        }
 
-    // update backup with a copy of what was here previously if something old exists
-    if (await fs.pathExists(path1)) {
-      await fs.remove(path2)
-      await fs.move(path1, path2)
+        await fs.move(tempPath, path1)
+        await fs.remove(path2) // everything succeeded, we can erase the backup
+        callback()
+      } catch (err) {
+        callback(err)
+      } finally {
+        await fs.remove(tempPath)
+      }
     }
+  })
 
-    await fs.move(tempPath, path1)
-    await fs.remove(path2) // everything succeeded, we can erase the backup
-  } finally {
-    await fs.remove(tempPath)
+  if (stream) {
+    return pipeline(stream, writable)
+  } else {
+    return writable
   }
 }
 
@@ -180,8 +205,13 @@ exports.appendStream = async function (dataPath, data) {
       sources.unshift(await this.readStream(dataPath))
     } catch {}
 
-    const stream = new MultiStream(sources)
-    await this.writeStream(dataPath, stream)
+    async function * generate () {
+      for (const source of sources) {
+        yield * source
+      }
+    }
+
+    await this.writeStream(dataPath, Readable.from(generate(), { objectMode: false }))
   })
 }
 

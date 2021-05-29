@@ -54,7 +54,7 @@ exports.ScratchFile = class ScratchFile {
  * @returns {exports.ScratchFile}
  */
 exports.file = async function createScratchFile () {
-  const id = `scratch-file-${crypto.randomBytes(32).toString('hex')}.cbor`
+  const id = `scratch-file-${crypto.randomBytes(32).toString('hex')}.v8-scratch`
   const tempPath = path.join(os.tmpdir(), id)
   const fileRef = await fs.open(tempPath, 'wx+')
   await fs.unlink(tempPath)
