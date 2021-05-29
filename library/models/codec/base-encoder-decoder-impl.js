@@ -1,5 +1,41 @@
-const streams = require('stream')
+const { Readable, PassThrough } = require('stream')
+const duplexify = require('duplexify')
 const nullSymbol = Symbol.for('null')
+
+function generatorToStream (gen, args, inputOptions, outputOptions, transformOptions) {
+  const inputStream = new PassThrough(inputOptions)
+  const outputStream = Readable.from(gen(inputStream, ...args), { outputOptions })
+  const transformStream = duplexify(inputStream, outputStream, transformOptions)
+  return transformStream
+}
+
+/**
+ * given a readable stream
+ * @param {AsyncIterable|AsyncIterableIterator|Iterable|IterableIterator} readable - Readable node-like object stream or iterator
+ * @param {object} [options]
+ * @param {boolean} [wrap = false] - are all values wrapped inside a { value } object?
+ */
+async function * unwrap (readable, { wrap = false } = {}) {
+  if (wrap) {
+    for await (const { value } of readable) yield value
+  } else {
+    for await (const value of readable) yield (value === nullSymbol ? null : value)
+  }
+}
+
+/**
+ * given a readable stream
+ * @param {AsyncIterable|AsyncIterableIterator|Iterable|IterableIterator} readable - Readable node-like object stream or iterator
+ * @param {object} [options]
+ * @param {boolean} [wrap = false] - are all values wrapped inside a { value } object?
+ */
+async function * wrap (iterable, { wrap = false } = {}) {
+  if (wrap) {
+    for await (const value of iterable) yield { value }
+  } else {
+    for await (const value of iterable) yield (value === null ? nullSymbol : value)
+  }
+}
 
 /**
  * Creates a Transform/Duplex stream, which encodes any objects written to it
@@ -7,43 +43,18 @@ const nullSymbol = Symbol.for('null')
  * @param {boolean} [options.wrap = false] - input values are wrapped in a { value } object to better support null values
  * @returns {import('stream').Duplex}
  */
-exports.encoder = function (options = {}) {
-  const objects = new streams.PassThrough({ objectMode: true })
+exports.encoder = function (...args) {
   const self = this
-  let iter
+  const options = {
+    wrap: false,
+    ...args.find(x => x && typeof x === 'object' && !Array.isArray(x)) || {}
+  }
 
-  const duplex = new streams.Duplex({
-    readableObjectMode: false,
-    writableObjectMode: true,
-    async read () {
-      try {
-        if (iter === undefined) {
-          async function * iterFeed () {
-            for await (const value of objects) yield value === nullSymbol ? null : value
-          }
-          iter = self.iteratorToStream(iterFeed(), options)
-        }
+  async function * gen (input, ...args) {
+    yield * self.encodeIterable(unwrap(input, options), ...args)
+  }
 
-        for await (const value of iter) {
-          const morePlz = this.push(value)
-          if (!morePlz) return
-        }
-        this.push(null)
-      } catch (err) {
-        this.destroy(err)
-      }
-    },
-    write (value, enc, cb) {
-      if (value === nullSymbol) value = null
-      else if (options.wrap) value = value.value
-      objects.write(value === null ? nullSymbol : value, enc, cb)
-    },
-    final (cb) { objects.end(cb) }
-  })
-
-  objects.on('error', err => duplex.destroy(err))
-
-  return duplex
+  return generatorToStream(gen, args, { objectMode: true }, { objectMode: false }, { writableObjectMode: true, readableObjectMode: false })
 }
 
 /**
@@ -52,33 +63,17 @@ exports.encoder = function (options = {}) {
  * @param {boolean} [options.wrap = false] - input values are wrapped in a { value } object to better support null values
  * @returns {import('stream').Duplex}
  */
-exports.decoder = function (options = {}) {
-  const buffers = new streams.PassThrough({ objectMode: false })
+
+exports.decoder = function (...args) {
   const self = this
-  let iter
+  const options = {
+    wrap: false,
+    ...args.find(x => x && typeof x === 'object' && !Array.isArray(x)) || {}
+  }
 
-  const duplex = new streams.Duplex({
-    readableObjectMode: true,
-    writableObjectMode: false,
-    async read () {
-      try {
-        if (!iter) iter = await self.streamToIterator(buffers, options)
+  async function * gen (input, ...args) {
+    yield * wrap(self.decodeStream(input, ...args), options)
+  }
 
-        for await (const value of iter) {
-          const morePlz = this.push(options.wrap ? { value } : (value === null ? nullSymbol : value))
-          if (!morePlz) return
-        }
-        this.push(null)
-      } catch (err) {
-        this.destroy(err)
-      }
-    },
-    write (chunk, enc, cb) { buffers.write(chunk, enc, cb) },
-    final (cb) { buffers.end(cb) }
-  })
-
-  buffers.on('drain', () => duplex.emit('drain'))
-  buffers.on('error', err => duplex.destroy(err))
-
-  return duplex
+  return generatorToStream(gen, args, { objectMode: false }, { objectMode: true }, { writableObjectMode: false, readableObjectMode: true })
 }

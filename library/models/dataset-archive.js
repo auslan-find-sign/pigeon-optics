@@ -214,6 +214,14 @@ class DatasetArchive {
     }
     return result
   }
+
+  /**
+   * allow DatasetArchive instances to be used directly as async iterables, for example in for await loops
+   * or the Readable.from constructor
+   */
+  async * [Symbol.asyncIterator] () {
+    yield * this.read({ decode: true })
+  }
 }
 
 /**

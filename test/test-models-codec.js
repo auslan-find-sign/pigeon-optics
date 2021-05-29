@@ -3,6 +3,7 @@ const { expect } = require('chai')
 const { Readable } = require('stream')
 const asyncIterableToArray = require('../library/utility/async-iterable-to-array')
 const typeDetect = require('type-detect')
+const baseEncDecImpl = require('../library/models/codec/base-encoder-decoder-impl')
 
 const unicodeStrings = [
   'بِسْمِ ٱللّٰهِ ٱلرَّحْمـَبنِ ٱلرَّحِيمِ', // arabic
@@ -23,12 +24,15 @@ const tests = [
   9274,
   0.0001,
   [1, 2, 3],
-  [null, null, null],
+  [null, null, undefined, null],
   [null, true, false, Infinity, -Infinity, NaN], // test extended types
+  // undefined,
+  // null,
   Buffer.from('hello world'),
   { a: 1, b: 2 },
   { 1: false, 2: true },
   new Set([1, 2, 3, 'a', 'b', 'c']),
+  // new Map([['a', 1], [2, '3'], [true, 9]]),
   {
     foo: [1, 2, 3, null, 5],
     bar: {
@@ -47,43 +51,149 @@ const tests = [
   ...unicodeStrings
 ]
 
-describe('models/codec.json', function () {
-  for (const obj of tests) {
-    it(`encodes type ${typeDetect(obj)} reversably`, function () {
-      const roundtripped = codec.json.decode(codec.json.encode(obj))
-      expect(roundtripped).to.deep.equal(obj)
-    })
-
-    it('decodes json5 pretty printed version correctly', function () {
-      const roundtripped = codec.json.decode(codec.json.print(obj))
-      expect(roundtripped).to.deep.equal(obj)
-    })
+function * getCodecsByFeatures (...hasFunctions) {
+  for (const [label, object] of Object.entries(codec)) {
+    if (!Array.isArray(object.handles)) continue
+    if (hasFunctions.every(name => typeof object[name] === 'function')) {
+      yield [label, object]
+    }
   }
+}
+
+describe('models/codec/base-encoder-decoder-impl', function () {
+  this.timeout(100)
+
+  it('encoder()', async () => {
+    function encodeIterable (input) {
+      async function * gen () { yield * input }
+      return Readable.from(gen(), { objectMode: false })
+    }
+    const enc = baseEncDecImpl.encoder.call({ encodeIterable })
+    expect(enc).to.have.property('pipe')
+    const res = Readable.from('abcdefghijklmnopqrstuvwxyz'.split(''), { objectMode: true }).pipe(enc)
+    const output = await asyncIterableToArray(res)
+    expect(Buffer.concat(output).toString('utf-8')).to.equal('abcdefghijklmnopqrstuvwxyz')
+  })
+
+  it('encoder({ wrap: true })', async () => {
+    function encodeIterable (input) {
+      async function * gen () { yield * input }
+      return Readable.from(gen(), { objectMode: false })
+    }
+    const enc = baseEncDecImpl.encoder.call({ encodeIterable }, { wrap: true })
+    expect(enc).to.have.property('pipe')
+    const res = Readable.from('abcdefghijklmnopqrstuvwxyz'.split('').map(value => ({ value })), { objectMode: true }).pipe(enc)
+    const output = await asyncIterableToArray(res)
+    expect(Buffer.concat(output).toString('utf-8')).to.equal('abcdefghijklmnopqrstuvwxyz')
+  })
+
+  it('decoder()', async () => {
+    async function * decodeStream (stream) { for await (const x of stream) yield x.toString() }
+    const res = Readable.from(['a', 'b', 'c', 'd'], { objectMode: false })
+    const dec = baseEncDecImpl.decoder.call({ decodeStream })
+    res.pipe(dec)
+    expect(dec).to.have.property('pipe')
+    const output = await asyncIterableToArray(dec)
+    expect(output.join('')).to.equal('abcd')
+  })
+
+  it('decoder({ wrap: true })', async () => {
+    async function * decodeStream (stream) { for await (const x of stream) yield x.toString() }
+    const res = Readable.from('abcdefghijklmnopqrstuvwxyz'.split(''), { objectMode: false })
+    const dec = baseEncDecImpl.decoder.call({ decodeStream }, { wrap: true })
+    res.pipe(dec)
+    expect(dec).to.have.property('pipe')
+    const output = await asyncIterableToArray(dec)
+    expect(output.map(x => x.value).join('')).to.equal('abcdefghijklmnopqrstuvwxyz')
+  })
 })
 
-describe('models/codec.cbor', function () {
-  for (const obj of tests) {
-    it(`encodes type ${typeDetect(obj)} reversably`, function () {
-      const roundtripped = codec.cbor.decode(codec.cbor.encode(obj))
-      expect(roundtripped).to.deep.equal(obj)
+describe('models/codec formats common interface', function () {
+  this.timeout(100)
+
+  for (const [label, format] of getCodecsByFeatures('encode', 'decode')) {
+    if (['jsonLines', 'html'].includes(label)) continue // not general codecs (yet), special case
+
+    it(`solo ${label} encode() > decode() roundtrip`, function () {
+      for (const obj of tests) {
+        try {
+          const rt = format.decode(format.encode(obj))
+          expect(rt).to.deep.equal(obj)
+        } catch (err) {
+          err.stack = `testing ${typeDetect(obj)}\n${err.stack}`
+          throw err
+        }
+      }
+    })
+
+    if (format.print) {
+      it(`solo ${label} print() > decode() roundtrip`, function () {
+        for (const obj of tests) {
+          const rt = format.decode(format.print(obj))
+          expect(rt).to.deep.equal(obj)
+        }
+      })
+    }
+  }
+
+  const streamTests = tests.filter(x => x !== null)
+  for (const [label, format] of getCodecsByFeatures('encoder', 'decoder')) {
+    it(`stream ${label} encoder() > decoder() roundtrip`, async function () {
+      const encoderStream = Readable.from(streamTests).pipe(format.encoder())
+      const decoderStream = encoderStream.pipe(format.decoder())
+      const output = await asyncIterableToArray(decoderStream)
+      expect(output).to.deep.equal(streamTests)
+    })
+
+    if (label === 'json') {
+      // test json's object root streaming decoder
+      it(`stream ${label} decoder() handles object at root well`, async function () {
+        const entriesTest = tests.map((x, i) => [`prop${i + 1}`, x])
+        const objTest = Object.fromEntries(entriesTest)
+        const encoded = format.encode(objTest)
+        const input = Readable.from(encoded, { objectMode: false })
+        const output = await asyncIterableToArray(input.pipe(format.decoder()))
+        expect(Object.fromEntries(output)).to.deep.equal(objTest)
+      })
+
+      // test json object root streaming encoder object output
+      it(`stream ${label} encoder() can build root objects`, async function () {
+        const entriesTest = tests.map((x, i) => [`prop${i + 1}`, x])
+        const input = Readable.from(entriesTest, { objectMode: true })
+        const enc = input.pipe(format.encoder({ object: true }))
+        const output = Buffer.concat(await asyncIterableToArray(enc)).toString('utf-8')
+        const decode = format.decode(output)
+        expect(decode).to.deep.equal(Object.fromEntries(entriesTest))
+      })
+    }
+  }
+
+  // test iterableToStream into decoder
+  for (const [label, format] of getCodecsByFeatures('encodeIterable', 'decoder')) {
+    it(`iterator/stream ${label} encodeIterable > decoder roundtrip`, async function () {
+      const stream = await format.encodeIterable(streamTests)
+      expect(stream).to.have.property('pipe')
+      const decoded = await asyncIterableToArray(stream.pipe(format.decoder({ wrap: true })))
+      expect(decoded).to.deep.equal(tests.map(value => ({ value })))
     })
   }
-})
 
-describe('models/codec.yaml', function () {
-  for (const obj of tests) {
-    it(`encodes type ${typeDetect(obj)} reversably`, function () {
-      const roundtripped = codec.yaml.decode(codec.yaml.encode(obj))
-      expect(roundtripped).to.deep.equal(obj)
+  for (const [label, format] of getCodecsByFeatures('encoder', 'decodeStream')) {
+    it(`iterator/stream ${label} encoder > decodeStream roundtrip`, async function () {
+      const encoderStream = Readable.from(streamTests.map(value => ({ value }))).pipe(format.encoder({ wrap: true }))
+      expect(encoderStream).to.have.property('pipe')
+      const decoded = await asyncIterableToArray(await format.decodeStream(encoderStream))
+      expect(decoded).to.deep.equal(tests)
     })
   }
-})
 
-describe('models/codec.msgpack', function () {
-  for (const obj of tests) {
-    it(`encodes type ${typeDetect(obj)} reversably`, function () {
-      const roundtripped = codec.msgpack.decode(codec.msgpack.encode(obj))
-      expect(roundtripped).to.deep.equal(obj)
+  // test iterableToStream into streamToIterable roundtrip
+  for (const [label, format] of getCodecsByFeatures('encodeIterable', 'decodeStream')) {
+    it(`iterator ${label} iterableToStream > streamToIterable roundtrip`, async function () {
+      const stream = await format.encodeIterable(tests)
+      expect(stream).to.be.instanceOf(Readable)
+      const decoded = await asyncIterableToArray(format.decodeStream(stream))
+      expect(decoded).to.deep.equal(tests)
     })
   }
 })
@@ -122,14 +232,6 @@ describe('models/codec.xml', function () {
     const encoded = codec.xml.encode(test)
     expect(encoded).to.equal(expected)
   })
-
-  for (const obj of tests) {
-    it(`encodes type ${typeDetect(obj)} reversably`, function () {
-      const encoded = codec.xml.encode(obj)
-      const roundtripped = codec.xml.decode(encoded)
-      expect(roundtripped).to.deep.equal(obj)
-    })
-  }
 
   it('JsonML decodes xml well', function () {
     const tests = {
@@ -254,30 +356,6 @@ describe('models/codec.html', () => {
   })
 })
 
-describe('models/codec streaming mode', function () {
-  // check all the other's roundtrip the requests well
-  const implementers = Object.values(codec).filter(x => typeof x === 'object' && typeof x.encoder === 'function' && typeof x.decoder === 'function')
-  for (const format of implementers) {
-    it(`codec.${Object.entries(codec).find(x => x[1] === format)[0]}.encoder() and .decoder() transform streams roundtrip data well`, async function () {
-      const encodeStream = format.encoder()
-      const decodeStream = format.decoder()
-      const input = Readable.from(tests, { objectMode: true })
-      const output = await asyncIterableToArray(input.pipe(encodeStream).pipe(decodeStream))
-      expect(output).to.deep.equal(tests)
-    })
-  }
-
-  // test json's object root streaming decoder
-  it('codec.json.decoder() handles object at root well', async function () {
-    const entriesTest = tests.map((x, i) => [`prop-${i + 1}`, x])
-    const objTest = Object.fromEntries(entriesTest)
-    const decoder = codec.json.decoder()
-    const input = Readable.from([codec.json.encode(objTest)])
-    const output = await asyncIterableToArray(input.pipe(decoder))
-    expect(output).to.deep.equal(entriesTest)
-  })
-})
-
 describe('models/codec.path', function () {
   it('encodes without a record ID', function () {
     const opts = { source: 'datasets', author: 'person', name: 'name' }
@@ -331,11 +409,12 @@ describe('models/codec.objectHash', function () {
   })
 
   it('the same thing hashes the same', function () {
+    const v8 = require('v8')
     for (const obj of tests) {
-      const copy = codec.cbor.decode(codec.cbor.encode(obj))
+      const copy = v8.deserialize(v8.serialize(obj))
       const a = codec.objectHash(obj).toString('hex')
       const b = codec.objectHash(copy).toString('hex')
-      expect(a).to.equal(b)
+      expect(a).to.equal(b, `with object type ${typeDetect(obj)}`)
     }
   })
 })
@@ -351,12 +430,21 @@ describe('models/codec.for()', () => {
     expect(codec.for('application/xml')).to.equal(codec.xml)
   })
 
-  it('looks up by extension', function () {
+  it('looks up by path with extension', function () {
     expect(codec.for('/path/to/some-file.json')).to.equal(codec.json)
     expect(codec.for('/path/to/some-file.cbor')).to.equal(codec.cbor)
     expect(codec.for('/path/to/some-file.msgpack')).to.equal(codec.msgpack)
     expect(codec.for('/path/to/some-file.yaml')).to.equal(codec.yaml)
     expect(codec.for('/path/to/some-file.jsonl')).to.equal(codec.jsonLines)
     expect(codec.for('/path/to/some-file.xml')).to.equal(codec.xml)
+  })
+
+  it('looks up by extension alone', function () {
+    expect(codec.for('json')).to.equal(codec.json)
+    expect(codec.for('cbor')).to.equal(codec.cbor)
+    expect(codec.for('msgpack')).to.equal(codec.msgpack)
+    expect(codec.for('yaml')).to.equal(codec.yaml)
+    expect(codec.for('jsonl')).to.equal(codec.jsonLines)
+    expect(codec.for('xml')).to.equal(codec.xml)
   })
 })
