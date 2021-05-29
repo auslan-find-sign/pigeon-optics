@@ -1,4 +1,5 @@
 const typeDetect = require('type-detect')
+
 /**
  * Reduce two or more documents in to each other, returning one merged document
  * Arrays concatinate
@@ -7,7 +8,7 @@ const typeDetect = require('type-detect')
  * Sets union
  * Buffers, Strings Overwrite
  * Dates returns the most futuristic entry
- * @param {*[]} documents
+ * @param {Array} documents
  */
 function reduce (documents) {
   const types = documents.map(x => typeDetect(x))

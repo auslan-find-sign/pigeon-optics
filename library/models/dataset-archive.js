@@ -93,7 +93,7 @@ class DatasetArchive {
       }
     }
 
-    const readStream = Readable.from(gen(), { objectMode: false })
+    const readStream = Readable.from(gen(), { objectMode: true })
     const chunkPacked = readStream.pipe(lps.encode())
     const compressed = chunkPacked.pipe(zlib.createBrotliCompress(brotliOptions))
     await this.raw.writeStream(this.path, compressed)

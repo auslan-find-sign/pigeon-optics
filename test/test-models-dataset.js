@@ -3,6 +3,7 @@ chai.use(require('chai-as-promised'))
 const { expect } = chai
 const crypto = require('crypto')
 const createHttpError = require('http-errors')
+const delay = require('delay')
 const dataset = require('../library/models/dataset')
 const account = 'system'
 const name = 'test-models-dataset'
@@ -26,6 +27,17 @@ describe('models/dataset', function () {
       memo: 'Automated Unit Testing created this dataset to verify internal models are working correctly'
     })
     await expect(dataset.readMeta(account, name)).eventually.property('memo').does.include('Automated Unit Testing')
+  })
+
+  it('dataset.updateMeta() carries errors correctly', async function () {
+    await expect(dataset.updateMeta(account, name, meta => {
+      throw new Error('chaos emerald')
+    })).to.be.rejectedWith('chaos')
+
+    await expect(dataset.updateMeta(account, name, async meta => {
+      await delay(10)
+      throw new Error('chaos 2')
+    })).to.be.rejectedWith('chaos')
   })
 
   it('dataset.write(account, name, recordID, data) works', async function () {

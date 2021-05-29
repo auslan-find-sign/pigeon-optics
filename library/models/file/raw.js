@@ -135,7 +135,7 @@ exports.readStream = function (dataPath) {
 
 /** Create or update a raw file, creating a .backup file of the previous version in the process
  * @param {string[]} path - relative path inside data directory the data is located at
- * @param {Readable|AsyncIterable|Iterable} stream - binary data to stream to file
+ * @param {Readable|AsyncIterable|Iterable|Generator} stream - binary data to stream to file
  * @async
  */
 exports.writeStream = async function (dataPath, stream) {

@@ -3,7 +3,7 @@
  * @module module:models/file/cbor
  */
 const assert = require('assert')
-const codec = require('../codec')
+const cbor = require('../codec/cbor')
 const { Readable } = require('stream')
 exports.raw = require('./raw').instance({
   extension: '.cbor'
@@ -18,17 +18,17 @@ exports.raw = require('./raw').instance({
  */
 exports.read = async function (dataPath) {
   const buffer = await this.raw.read(dataPath)
-  return codec.cbor.decode(buffer)
+  return cbor.decode(buffer)
 }
 
 /** Create or update a cbor data file, creating a .backup file of the previous version in the process
  * @param {string|string[]} path - relative path inside data directory the data is located at
- * @param {object} data - cbor encodable object to store
+ * @param {object} value - cbor encodable object to store
  * @async
  */
-exports.write = async function (dataPath, data) {
-  assert(data !== null, 'data cannot be null')
-  return await this.writeStream(dataPath, Readable.from([data]))
+exports.write = async function (dataPath, value) {
+  assert(value !== null, 'data cannot be null')
+  return await this.writeStream(dataPath, Readable.from([{ value }], { objectMode: true }), { wrap: true })
 }
 
 /**
@@ -49,10 +49,10 @@ exports.write = async function (dataPath, data) {
  */
 exports.update = async function (dataPath, block) {
   await this.raw.update(dataPath, async (buf) => {
-    const input = buf ? codec.cbor.decode(buf) : undefined
+    const input = buf ? cbor.decode(buf) : undefined
     const output = await block(input)
     if (output !== undefined) {
-      return codec.cbor.encode(output)
+      return cbor.encode(output)
     }
   })
 }
@@ -64,36 +64,43 @@ exports.update = async function (dataPath, block) {
  */
 exports.append = async function (dataPath, ...datas) {
   if (datas.length > 0) {
-    return await this.raw.appendStream(dataPath, Readable.from(datas, { objectMode: true }).pipe(codec.cbor.encoder()))
+    return await this.appendStream(dataPath, Readable.from(datas.map(value => ({ value })), { objectMode: true }), { wrap: true })
   }
 }
 
 /**
  * Open a readable object stream to the underlying file
  * @param {string[]} path data path to file
+ * @param {object} [options]
+ * @param {boolean} [options.wrap = false] - should the values in the object stream be inside a { value } object to allow for null?
+ * @returns {Readable}
  */
-exports.readStream = async function (dataPath) {
+exports.readStream = async function (dataPath, opts = {}) {
   const rawStream = await this.raw.readStream(dataPath)
-  return rawStream.pipe(codec.cbor.decoder())
+  return rawStream.pipe(cbor.decoder(opts))
 }
 
 /**
  * Write an object stream to the file
  * @param {string[]} path data path to file
  * @param {ReadableStream} data
+ * @param {object} [options]
+ * @param {boolean} [options.wrap = false] - should the values in the object stream be inside a { value } object to allow for null?
  */
-exports.writeStream = async function (dataPath, data) {
-  return await this.raw.writeStream(dataPath, data.pipe(codec.cbor.encoder()))
+exports.writeStream = async function (dataPath, data, opts = {}) {
+  return await this.raw.writeStream(dataPath, data.pipe(cbor.encoder(opts)))
 }
 
 /**
  * Append an object stream of cbor objects to an existing file
  * @param {string[]} dataPath
  * @param {Readable} stream
+ * @param {object} [options]
+ * @param {boolean} [options.wrap = false] - should the values in the object stream be inside a { value } object to allow for null?
  * @returns
  */
-exports.appendStream = async function (dataPath, stream) {
-  return await this.raw.appendStream(dataPath, stream.pipe(codec.cbor.encoder()))
+exports.appendStream = async function (dataPath, stream, opts = {}) {
+  return await this.raw.appendStream(dataPath, stream.pipe(cbor.encoder(opts)))
 }
 
 /** Remove a cbor data file

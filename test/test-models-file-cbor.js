@@ -5,6 +5,7 @@ chai.use(require('chai-as-promised'))
 const { expect } = chai
 const { Readable } = require('stream')
 const cbor = require('../library/models/file/cbor')
+const delay = require('delay')
 
 const tests = [
   true,
@@ -99,6 +100,18 @@ describe('models/file/cbor', function () {
     })
 
     await expect(cbor.read(path)).to.eventually.deep.equal({ hello: 'world' })
+  })
+
+  it('cbor.update() carries thrown errors correctly', async function () {
+    const path = ['file-tests', randomName()]
+    await expect(cbor.update(path, async data => {
+      await delay(10)
+      throw new Error('chaos emerald')
+    })).to.be.rejectedWith('chaos')
+
+    await expect(cbor.update(path, data => {
+      throw new Error('chaos 2 electric boogaloo')
+    })).to.be.rejectedWith('chaos')
   })
 
   it('cbor.exists() works', async function () {

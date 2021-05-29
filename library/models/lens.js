@@ -12,7 +12,6 @@
 const assert = require('assert')
 const codec = require('./codec')
 const settings = require('./settings')
-const cbor = require('./file/cbor')
 
 const auth = require('./auth')
 const xbytes = require('xbytes')
@@ -20,6 +19,8 @@ const updateEvents = require('../utility/update-events')
 const { LensWorker } = require('../workers/interface')
 const reduce = require('../utility/reduce')
 const tfq = require('tiny-function-queue')
+const dataArc = require('./dataset-archive')
+const scratchFiles = require('./file/scratch')
 
 Object.assign(exports, require('./base-data-model'))
 
@@ -84,23 +85,10 @@ exports.getInputs = async function () {
  * @yields {object}
  */
 exports.iterateLogs = async function * (author, name) {
-  // const file = this.getFileStore(author, name)
-  // yield * await file.readStream(['build-logs'])
-  const ioCache = this.getIOCache(author, name)
-  for await (const ioID of ioCache.iterate([])) {
-    const { input, output } = await ioCache.read([ioID])
-    yield { input: input.path, errors: output.errors, logs: output.logs }
+  const computeCache = this.getComputeCache(author, name)
+  for await (const [path, info] of computeCache.read({ decode: true })) {
+    yield { path, logs: info.logs, errors: info.errors }
   }
-}
-
-/**
- * get an IO cache filesystem
- * @param {string} author - name of owner authors
- * @param {string} name - lens name
- * @returns {import('./file/cbor')}
- */
-exports.getIOCache = function (author, name) {
-  return cbor.instance({ rootPath: this.path(author, name, 'cache') })
 }
 
 /**
@@ -109,92 +97,236 @@ exports.getIOCache = function (author, name) {
  * @param {string} name - lens name
  */
 exports.build = async function (author, name) {
-  const readPath = require('./read-path')
+  const rp = require('./read-path')
+
   const worker = new LensWorker()
-  const objects = this.getObjectStore(author, name)
-  const ioCache = this.getIOCache(author, name)
-  const usedIO = new Set()
-  const dirtyRecords = new Set()
-  const recordComposition = new Map()
+  /** @type {dataArc.DatasetArchive} */
+  const computeCache = this.getComputeCache(author, name)
 
-  await tfq.lockWhile(['lens build', author, name], async () => {
-    const meta = await this.readMeta(author, name)
+  return await this.updateMeta(author, name, async (meta) => {
+    // make sure lens has an inputVersions object, to track which inputs need rebuilding
+    if (!meta.inputVersions) meta.inputVersions = {}
+    const updatedInputVersions = {}
 
-    try {
-      // refresh io cache
-      for await (const recordMeta of readPath.meta(meta.inputs)) {
-        const ioID = `${recordMeta.path}@${codec.objectHash([recordMeta.hash, meta.code]).toString('hex')}`
-        usedIO.add(ioID)
-        if (!(await ioCache.exists([ioID]))) {
-          if (!worker.started) {
-            // start up a worker subprocess if we have something needing a fresh map
-            const startupResult = await worker.startup(meta)
-            if (startupResult.errors.length > 0) {
-              throw new exports.LensCodeError(startupResult.errors[0])
-            }
+    const scratch = await scratchFiles.file()
+    const compositions = new Map()
+    const inputRecordPaths = new Set()
+    const retainOutputKeys = new Set()
+
+    async function * updateComputeCache () {
+      const retainPaths = new Set()
+
+      for (const input of meta.inputs) {
+        const { source, author, name, recordID } = codec.path.decode(input)
+        for await (const entry of rp.getSource(source).iterate(author, name, { fastRead: true })) {
+          const path = codec.path.encode(source, author, name, entry.id)
+          const data = await entry.read()
+
+          // if we've already seen this input path, skip it, it's redundant
+          if (inputRecordPaths.has(path)) {
+            continue
           }
 
-          const input = { path: recordMeta.path, version: recordMeta.version, hash: recordMeta.hash }
-          const output = await worker.map({ ...input, data: await recordMeta.read() })
-          await ioCache.write([ioID], { input, output })
-          for (const { id } of output.outputs) {
-            dirtyRecords.add(id)
-            if (!recordComposition.has(id)) recordComposition.set(id, [])
-            recordComposition.get(id).push(ioID)
+          // record the input record path
+          inputRecordPaths.add(path)
+
+          // build new updatedInputVersions meta info
+          if (updatedInputVersions[source] === undefined || updatedInputVersions[source] < entry.version) {
+            updatedInputVersions[source] = entry.version
           }
-        } else {
-          const { output } = await ioCache.read([ioID])
-          for (const { id } of output.outputs) {
-            dirtyRecords.add(id)
-            if (!recordComposition.has(id)) recordComposition.set(id, [])
-            recordComposition.get(id).push(ioID)
-          }
-        }
-      }
-    } finally {
-      // shut down the worker, if it was started
-      if (worker.started) await worker.shutdown()
-    }
 
-    // take out the trash in the io cache
-    for await (const filename of ioCache.iterate([])) {
-      if (!await usedIO.has(filename)) {
-        await ioCache.delete([filename])
-      }
-    }
-
-    // build outputs
-    await this.updateMeta(author, name, async (meta) => {
-      // remove any records which aren't mentioned by any outputs in the current build
-      for (const recordID in meta.records) {
-        if (!recordComposition.has(recordID)) delete meta.records[recordID]
-      }
-
-      // dirty records are records which have changed in their composition, these need to be reduced and output
-      for (const recordID of dirtyRecords) {
-        const composition = recordComposition.get(recordID)
-        let value
-        let first = true
-        for (const ioID of composition) {
-          const { output } = await ioCache.read([ioID])
-          for (const { id, data } of output.outputs) {
-            if (id === recordID) {
-              if (first) {
-                value = data
-              } else {
-                value = reduce([value, data])
+          // does the recordID match the path selector in the lens input spec?
+          if (recordID === undefined || recordID === entry.id) {
+            // is the entry fresher than what we might have cached?
+            if (meta.inputVersions[source] === undefined || meta.inputVersions[source] < entry.version) {
+              // if the worker hasn't been started up yet, boot it up
+              if (!worker.started) {
+                const result = await worker.startup(meta)
+                if (result.errors.length > 0) throw new exports.LensCodeError(result.errors[0])
               }
-              first = false
+
+              // use map function to build new outputs
+              const result = await worker.map({ path, data })
+
+              // write out the values to scratch pad for each output key
+              for (const output of result.outputs) {
+                retainOutputKeys.add(output.id)
+                const reader = await scratch.write(output.data)
+                if (!compositions.has(output.id)) {
+                  compositions.set(output.id, [reader])
+                } else {
+                  compositions.get(output.id).push(reader)
+                }
+              }
+
+              // yield an updated version in to the compute cache
+              yield [Buffer.from(path, 'utf-8'), dataArc.valueEncode(result)]
+            } else {
+              // cached version should still be good, signal to retain it later
+              retainPaths.add(path)
             }
           }
         }
-        const hash = await objects.write(value)
-        meta.records[recordID] = { hash }
       }
 
-      return meta
-    })
+      for await (const [keyBuffer, valueBuffer] of computeCache.read({ decode: false })) {
+        const key = keyBuffer.toString('utf-8')
+        const value = dataArc.valueDecode(valueBuffer)
+
+        // retain anything that the previous step indicated should remain in the cache
+        if (retainPaths.has(key)) {
+          yield [keyBuffer, valueBuffer]
+
+          // also check for any outputs matching compositions we started building
+          for (const output of value.outputs) {
+            retainOutputKeys.add(output.id)
+            if (compositions.has(output.id)) {
+              compositions.get(output.id).push(await scratch.write(output.data))
+            }
+          }
+        }
+      }
+    }
+    await computeCache.write(updateComputeCache(), { encode: false })
+
+    // remove any keys from meta.records which aren't used anymore
+    const removals = new Set()
+    for (const key of Object.keys(meta.records)) {
+      if (!retainOutputKeys.has(key)) {
+        removals.add(key)
+        delete meta.records[key]
+      }
+    }
+
+    /** @type {dataArc.DatasetArchive} */
+    const dataArchive = this.getDataArchive(author, name)
+
+    async function * updateOutputsArchive () {
+      const writtenKeys = new Set()
+      // build new outputs by reducing all the values in the composition map
+      for (const [key, valueGetters] of compositions) {
+        let value = await valueGetters.shift()()
+        while (valueGetters.length > 0) {
+          value = reduce([value, await valueGetters.shift()()])
+        }
+
+        writtenKeys.add(key)
+        yield [Buffer.from(key, 'utf-8'), dataArc.valueEncode(value)]
+      }
+      // read in the old data archive and copy forward any cached stuff that's still up to date
+      for (const [keyBuffer, valueBuffer] of dataArchive.read({ decode: false })) {
+        const key = keyBuffer.toString('utf-8')
+        if (retainOutputKeys.has(key) && !writtenKeys.has(key)) {
+          writtenKeys.add(key)
+          yield [keyBuffer, valueBuffer]
+        }
+      }
+    }
+    dataArchive.write(updateOutputsArchive(), { encode: false })
+
+    meta.inputVersions = updatedInputVersions
+    await scratch.close() // close scratch file, effectively erasing it from disk
+
+    return meta
   })
+}
+// exports.build = async function (author, name) {
+//   const readPath = require('./read-path')
+//   const worker = new LensWorker()
+//   const objects = this.getObjectStore(author, name)
+//   const ioCache = this.getIOCache(author, name)
+//   const usedIO = new Set()
+//   const dirtyRecords = new Set()
+//   const recordComposition = new Map()
+
+//   await tfq.lockWhile(['lens build', author, name], async () => {
+//     const meta = await this.readMeta(author, name)
+
+//     try {
+//       // refresh io cache
+//       for await (const recordMeta of readPath.meta(meta.inputs)) {
+//         const ioID = `${recordMeta.path}@${codec.objectHash([recordMeta.hash, meta.code]).toString('hex')}`
+//         usedIO.add(ioID)
+//         if (!(await ioCache.exists([ioID]))) {
+//           if (!worker.started) {
+//             // start up a worker subprocess if we have something needing a fresh map
+//             const startupResult = await worker.startup(meta)
+//             if (startupResult.errors.length > 0) {
+//               throw new exports.LensCodeError(startupResult.errors[0])
+//             }
+//           }
+
+//           const input = { path: recordMeta.path, version: recordMeta.version, hash: recordMeta.hash }
+//           const output = await worker.map({ ...input, data: await recordMeta.read() })
+//           await ioCache.write([ioID], { input, output })
+//           for (const { id } of output.outputs) {
+//             dirtyRecords.add(id)
+//             if (!recordComposition.has(id)) recordComposition.set(id, [])
+//             recordComposition.get(id).push(ioID)
+//           }
+//         } else {
+//           const { output } = await ioCache.read([ioID])
+//           for (const { id } of output.outputs) {
+//             dirtyRecords.add(id)
+//             if (!recordComposition.has(id)) recordComposition.set(id, [])
+//             recordComposition.get(id).push(ioID)
+//           }
+//         }
+//       }
+//     } finally {
+//       // shut down the worker, if it was started
+//       if (worker.started) await worker.shutdown()
+//     }
+
+//     // take out the trash in the io cache
+//     for await (const filename of ioCache.iterate([])) {
+//       if (!await usedIO.has(filename)) {
+//         await ioCache.delete([filename])
+//       }
+//     }
+
+//     // build outputs
+//     await this.updateMeta(author, name, async (meta) => {
+//       // remove any records which aren't mentioned by any outputs in the current build
+//       for (const recordID in meta.records) {
+//         if (!recordComposition.has(recordID)) delete meta.records[recordID]
+//       }
+
+//       // dirty records are records which have changed in their composition, these need to be reduced and output
+//       for (const recordID of dirtyRecords) {
+//         const composition = recordComposition.get(recordID)
+//         let value
+//         let first = true
+//         for (const ioID of composition) {
+//           const { output } = await ioCache.read([ioID])
+//           for (const { id, data } of output.outputs) {
+//             if (id === recordID) {
+//               if (first) {
+//                 value = data
+//               } else {
+//                 value = reduce([value, data])
+//               }
+//               first = false
+//             }
+//           }
+//         }
+//         const hash = await objects.write(value)
+//         meta.records[recordID] = { hash }
+//       }
+
+//       return meta
+//     })
+//   })
+// }
+
+/**
+ * Get a DatasetArchive instance which caches map function results
+ * @param {string} author - author/owner name
+ * @param {string} name - collection name
+ * @returns {dataArc.DatasetArchive}
+ */
+exports.getComputeCache = function (author, name) {
+  return dataArc.open(this.getFileStore(author, name, { extension: '.archive.br' }), ['compute'])
 }
 
 exports.LensCodeError = class LensCodeError extends Error {
