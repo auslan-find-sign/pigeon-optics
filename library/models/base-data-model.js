@@ -15,7 +15,7 @@ const createMissingAttachmentsError = require('../utility/missing-attachments-er
 const attachments = require('./attachments')
 const createHttpError = require('http-errors')
 const dataArc = require('./dataset-archive')
-const scratchFile = require('./file/scratch')
+const ScratchPad = require('file-scratch-pad')
 
 /* read meta info about dataset */
 exports.readMeta = async function (author, name) {
@@ -169,7 +169,7 @@ exports.writeEntries = async function (author, name, entries, { overwrite = fals
     entries = Object.entries(entries)
   }
 
-  const scratch = await scratchFile.file()
+  const scratch = await ScratchPad.create()
 
   try {
     await this.updateMeta(author, name, async meta => {

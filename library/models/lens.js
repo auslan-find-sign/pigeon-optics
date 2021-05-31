@@ -20,7 +20,7 @@ const { LensWorker } = require('../workers/interface')
 const reduce = require('../utility/reduce')
 const tfq = require('tiny-function-queue')
 const dataArc = require('./dataset-archive')
-const scratchFiles = require('./file/scratch')
+const ScratchPad = require('file-scratch-pad')
 
 Object.assign(exports, require('./base-data-model'))
 
@@ -108,7 +108,7 @@ exports.build = async function (author, name) {
     if (!meta.inputVersions) meta.inputVersions = {}
     const updatedInputVersions = {}
 
-    const scratch = await scratchFiles.file()
+    const scratch = await ScratchPad.create()
     const compositions = new Map()
     const inputRecordPaths = new Set()
     const retainOutputKeys = new Set()

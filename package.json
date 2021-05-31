@@ -34,6 +34,7 @@
     "encodeuricomponent-tag": "^1.0.1",
     "express": "^4.17.1",
     "express-async-errors": "^3.1.1",
+    "file-scratch-pad": "^1.0.0",
     "fs-extra": "^9.1.0",
     "hash-through": "^0.1.16",
     "html-tags": "^3.1.0",
