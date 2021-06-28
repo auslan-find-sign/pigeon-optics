@@ -1,18 +1,7 @@
 const raw = require('./raw')
 const lengthPrefix = require('it-length-prefixed')
-const zlib = require('zlib')
-const streamToIt = require('stream-to-it')
-const { pipe } = require('it-pipe')
 const tq = require('tiny-function-queue')
 const cborCodec = require('../codec/cbor')
-
-const BrotliOptions = {
-  chunkSize: 32 * 1024,
-  params: {
-    [zlib.constants.BROTLI_PARAM_QUALITY]: zlib.constants.BROTLI_MIN_QUALITY,
-    [zlib.constants.BROTLI_PARAM_MODE]: zlib.constants.BROTLI_MODE_GENERIC
-  }
-}
 
 // singleton file access API, written as a class to make it more easily understood by vscode intellisense
 // can be instanced with .instance to create a path sandboxed api or to use a different file extension
@@ -178,7 +167,6 @@ class FSObjects {
    */
   async * readIter (path) {
     const input = await this._raw.readIter(path)
-    // const decompressed = streamToIt.transform(zlib.createBrotliDecompress(BrotliOptions))(input)
     const buffers = lengthPrefix.decode()(input)
 
     for await (const entry of buffers) {
@@ -200,7 +188,6 @@ class FSObjects {
       }
     }
     const encodedBuffers = encoder(this, iterable)
-    // const compressed = streamToIt.transform(zlib.createBrotliCompress(BrotliOptions))(lengthChunked)
     await this._raw.writeIter(path, encodedBuffers)
   }
 
