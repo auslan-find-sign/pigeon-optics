@@ -14,7 +14,7 @@ const recordStructure = require('../utility/record-structure')
 const createMissingAttachmentsError = require('../utility/missing-attachments-error')
 const attachments = require('./attachments')
 const createHttpError = require('http-errors')
-const dataArc = require('./dataset-archive')
+const dataArc = require('dataset-archive/index.cjs')
 const ScratchPad = require('file-scratch-pad')
 
 /* read meta info about dataset */
@@ -120,7 +120,7 @@ exports.iterate = async function * (author, name = undefined, { fastRead = false
 
       for await (const [keyBuffer, valueBuffer] of archive.read({ decode: false })) {
         const id = keyBuffer.toString('utf-8')
-        yield { id, ...meta.records[id], read: () => Promise.resolve(dataArc.valueDecode(valueBuffer)) }
+        yield { id, ...meta.records[id], read: () => Promise.resolve(archive.valueCodec.decode(valueBuffer)) }
       }
     } else {
       for (const id in meta.records) {
@@ -297,12 +297,9 @@ exports.create = async function (author, name, config = {}) {
  * @returns {dataArc.DatasetArchive}
  */
 exports.getDataArchive = function (author, name) {
-  const raw = require('./file/raw').instance({
-    rootPath: this.path(author, name),
-    extension: '.archive.br'
-  })
-
-  return dataArc.open(raw, ['data'])
+  const raw = require('./file/raw')
+  const path = raw.fullPath(this.path(author, name, 'data'), '.archive.br')
+  return dataArc.fsOpen(path, { codec: codec.cbor })
 }
 
 /**

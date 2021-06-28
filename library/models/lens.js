@@ -19,7 +19,7 @@ const updateEvents = require('../utility/update-events')
 const { LensWorker } = require('../workers/interface')
 const reduce = require('../utility/reduce')
 const tfq = require('tiny-function-queue')
-const dataArc = require('./dataset-archive')
+const dataArc = require('dataset-archive/index.cjs')
 const ScratchPad = require('file-scratch-pad')
 
 Object.assign(exports, require('./base-data-model'))
@@ -160,7 +160,7 @@ exports.build = async function (author, name) {
               }
 
               // yield an updated version in to the compute cache
-              yield [Buffer.from(path, 'utf-8'), dataArc.valueEncode(result)]
+              yield [computeCache.keyCodec.encode(path), computeCache.valueCodec.encode(result)]
             } else {
               // cached version should still be good, signal to retain it later
               retainPaths.add(path)
@@ -170,8 +170,8 @@ exports.build = async function (author, name) {
       }
 
       for await (const [keyBuffer, valueBuffer] of computeCache.read({ decode: false })) {
-        const key = keyBuffer.toString('utf-8')
-        const value = dataArc.valueDecode(valueBuffer)
+        const key = computeCache.keyCodec.decode(keyBuffer)
+        const value = computeCache.valueCodec.decode(valueBuffer)
 
         // retain anything that the previous step indicated should remain in the cache
         if (retainPaths.has(key)) {
@@ -211,7 +211,7 @@ exports.build = async function (author, name) {
         }
 
         writtenKeys.add(key)
-        yield [Buffer.from(key, 'utf-8'), dataArc.valueEncode(value)]
+        yield [dataArchive.keyCodec.encode(key), dataArchive.valueCodec.encode(value)]
       }
       // read in the old data archive and copy forward any cached stuff that's still up to date
       for (const [keyBuffer, valueBuffer] of dataArchive.read({ decode: false })) {
@@ -326,7 +326,9 @@ exports.build = async function (author, name) {
  * @returns {dataArc.DatasetArchive}
  */
 exports.getComputeCache = function (author, name) {
-  return dataArc.open(this.getFileStore(author, name, { extension: '.archive.br' }), ['compute'])
+  const raw = require('./file/raw')
+  const path = raw.fullPath(this.path(author, name, 'compute'), '.archive.br')
+  return dataArc.fsOpen(path, { codec: codec.cbor })
 }
 
 exports.LensCodeError = class LensCodeError extends Error {
