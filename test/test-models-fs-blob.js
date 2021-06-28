@@ -1,12 +1,10 @@
-const asyncIterableToArray = require('../library/utility/async-iterable-to-array')
+const toArr = require('../library/utility/async-iterable-to-array')
 const crypto = require('crypto')
 const chai = require('chai')
 chai.use(require('chai-as-promised'))
 const { expect } = chai
 
-const blob = require('../library/models/file/blob').instance({ rootPath: ['blob-tests'], extension: 'blob' })
-const raw = require('../library/models/file/raw')
-const { Readable } = require('stream')
+const blob = require('../library/models/fs/blob').instance({ prefix: ['blob-tests'] })
 
 const tests = [
   crypto.randomBytes(32),
@@ -16,18 +14,19 @@ const tests = [
   crypto.randomBytes(7 * 1024 * 1024) // 7mb
 ]
 
-describe('models/file/blob', function () {
+describe('models/fs/blob', function () {
   it('blob.read() and blob.write()', async function () {
     for (const test of tests) {
       const hash = await blob.write(test)
       const data = await blob.read(hash)
       expect(data).to.be.a('Uint8Array')
+      expect(data).to.have.length(test.length)
       expect(data.equals(test)).to.equal(true)
       await blob.delete(hash)
     }
   })
 
-  it('blob.writeStream and blob.readStream() work', async function () {
+  it('blob.writeIter and blob.readIter() work', async function () {
     function * pseudorandom (seed, iterations = 100) {
       for (let i = 0; i < iterations; i++) {
         const hash = crypto.createHash('sha256')
@@ -37,8 +36,8 @@ describe('models/file/blob', function () {
       }
     }
 
-    const hash = await blob.writeStream(Readable.from(pseudorandom('beans')))
-    const readback = Buffer.concat(await asyncIterableToArray(await blob.readStream(hash)))
+    const hash = await blob.writeIter(pseudorandom('beans'))
+    const readback = Buffer.concat(await toArr(blob.readIter(hash)))
     const expected = Buffer.concat([...pseudorandom('beans')])
     expect(readback).to.deep.equal(expected)
     await expect(blob.read(hash)).to.eventually.deep.equal(expected)
@@ -61,7 +60,7 @@ describe('models/file/blob', function () {
   it('blob.exists() works', async function () {
     const hash = await blob.write(Buffer.from('hello friend'))
     await expect(blob.exists(hash)).to.become(true)
-    await expect(blob.exists(crypto.randomBytes(hash.length))).to.become(false)
+    await expect(blob.exists(crypto.randomBytes(hash.length).toString('hex'))).to.become(false)
     await blob.delete(hash)
   })
 
@@ -71,16 +70,14 @@ describe('models/file/blob', function () {
       await blob.write(Buffer.from('test1')),
       await blob.write(Buffer.from('test2')),
       await blob.write(Buffer.from('test3'))
-    ].map(x => x.toString('hex'))
+    ]
 
     // iterate files, and folders, and compare notes
-    const output = (await asyncIterableToArray(blob.iterate())).map(x => x.toString('hex'))
+    const output = await toArr(blob.iterate())
     expect(output.sort()).to.deep.equal(files.sort())
-
-    for (const hash of files) await blob.delete(hash)
   })
 
   after(async function () {
-    await raw.delete(['blob-tests'])
+    await blob._raw.delete([])
   })
 })

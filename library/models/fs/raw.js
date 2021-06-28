@@ -155,7 +155,7 @@ class FSRaw {
     try {
       handle = await fs.promises.open(tmpPath, 'wx')
     } catch (err) {
-      if (err.code === 'ENOENT' && path.length > 1) {
+      if (err.code === 'ENOENT') {
         // perhaps the parent directory doesn't exist
         const parentDir = this.resolveSystemPath(path.slice(0, -1), '')
         try {
@@ -171,6 +171,7 @@ class FSRaw {
         throw err
       }
     }
+
     try {
       for await (let chunk of iterable) {
         if (typeof chunk === 'string') chunk = Buffer.from(chunk, 'utf-8')

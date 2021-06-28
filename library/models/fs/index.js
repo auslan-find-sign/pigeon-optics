@@ -9,3 +9,4 @@
 
 exports.raw = require('./raw')
 exports.objects = require('./objects')
+exports.blob = require('./blob')

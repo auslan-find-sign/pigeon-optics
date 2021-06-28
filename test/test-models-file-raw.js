@@ -8,21 +8,51 @@ const expect = chai.expect
 const { Readable } = require('stream')
 const raw = require('../library/models/file/raw')
 const delay = require('delay')
-const { once } = require('events')
+const fs = require('fs-extra')
+const { pipeline, finished } = require('stream/promises')
 
 const tests = [
   crypto.randomBytes(32),
   crypto.randomBytes(16 * 1024), // 16kb
   Buffer.from([0]),
   Buffer.from([1]),
-  crypto.randomBytes(7 * 1024 * 1024) // 7mb
+  crypto.randomBytes(3 * 1024 * 1024) // 3mb
 ]
 
-function randomName () {
-  return crypto.randomBytes(32).toString('hex')
+function randomName (prefix) {
+  return (prefix ? `${prefix}-` : '') + crypto.randomBytes(8).toString('hex')
 }
 
 describe('models/file/raw', function () {
+  this.timeout(500)
+  this.slow(250)
+
+  it('raw.read(path)', async function () {
+    // generate a random data path
+    const path = ['file-tests', randomName()]
+    // generate 512kb of random data
+    const testData = crypto.randomBytes(1024 * 512)
+    // use known good fs module to write it to a file
+    await fs.outputFile(raw.getPath(path), testData)
+
+    // read it out using the raw.read function
+    const readback = await raw.read(path)
+    // check it matches exactly
+    expect(testData).to.deep.equal(readback)
+  })
+
+  it('raw.write(path, data)', async function () {
+    // generate a random data path
+    const path = ['file-tests', randomName()]
+    // generate 512kb of random data
+    const testData = crypto.randomBytes(1024 * 512)
+    await raw.write(path, testData)
+    // use known good fs module to read out the data
+    const readback = await fs.readFile(raw.getPath(path))
+    // check it matches exactly
+    expect(testData).to.deep.equal(readback)
+  })
+
   it('raw.read(path) and raw.write(path, buffer)', async function () {
     for (const test of tests) {
       const path = ['file-tests', randomName()]
@@ -58,13 +88,16 @@ describe('models/file/raw', function () {
     expect(readback.equals(Buffer.concat(tests))).to.equal(true)
   })
 
-  it('raw.appendStream(path, stream) anticlobbering', async function () {
+  it('raw.readStream(path)', async function () {
     const path = ['file-tests', randomName()]
-    const writes = []
-    for (const test of tests) writes.push(raw.appendStream(path, Readable.from(test)))
-    await Promise.all(writes)
-    const readback = await raw.read(path)
-    expect(readback.equals(Buffer.concat(tests))).to.equal(true)
+    await raw.write(path, Buffer.from('foobar'))
+    const chunks = await asyncIterableToArray(raw.readStream(path))
+    expect(Buffer.concat(chunks).toString('utf-8')).to.equal('foobar')
+  })
+
+  it('raw.readStream(fakePath) errors well', async function () {
+    const path = ['file-tests', randomName('fake-path')]
+    await expect(asyncIterableToArray(raw.readStream(path))).to.be.rejectedWith('ENOENT')
   })
 
   it('raw.delete(path) works', async function () {
@@ -184,15 +217,65 @@ describe('models/file/raw', function () {
   })
 
   it('raw.writeStream(path) returns a writable stream and it works', async () => {
-    const writable = raw.writeStream(['file-tests', 'writable-stream'])
+    const path = ['file-tests', randomName()]
+    const writable = raw.writeStream(path)
     expect(writable).have.a.property('write')
-    writable.write('foo')
-    writable.write('bar')
-    writable.write('baz')
-    writable.end()
-    await once(writable, 'finish')
-    const readback = await raw.read(['file-tests', 'writable-stream'])
+    await pipeline(['foo', 'bar', 'baz'], writable)
+    const readback = await raw.read(path)
     expect(readback.toString()).to.equal('foobarbaz')
+  })
+
+  it('raw.appendStream(path, generator) accepts a generators', async () => {
+    const path = ['file-tests', 'sync-generator-append']
+
+    function * syncGen () {
+      for (let i = 0; i < 1024; i++) yield Buffer.from(`${i}\n`)
+    }
+
+    await raw.write(path, Buffer.from('prefix:'))
+    await raw.appendStream(path, syncGen())
+    expect(await raw.read(path)).to.deep.equal(Buffer.concat([Buffer.from('prefix:'), ...syncGen()]))
+
+    async function * asyncGen () {
+      for (let i = 0; i < 10; i++) {
+        await delay(1)
+        yield Buffer.from(`${i}\n`)
+      }
+    }
+
+    await raw.appendStream(['file-tests', 'async-generator-append'], asyncGen())
+    expect(await raw.read(['file-tests', 'async-generator-append'])).to.deep.equal(Buffer.from('0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n'))
+  })
+
+  it('raw.appendStream(path, stream) passes stream errors through', async () => {
+    const errStream = new Readable({ read (size) { this.destroy(new Error('foo')) } })
+
+    await expect(raw.appendStream(['file-tests', 'err-stream-append'], errStream)).to.be.rejectedWith('foo')
+    expect(await raw.exists(['file-tests', 'err-stream=append'])).to.be.false
+  })
+
+  it('raw.appendStream(path, generator) passes generator errors through', async () => {
+    async function * errGenerator () {
+      await delay(1)
+      throw new Error('foo')
+    }
+
+    await expect(raw.appendStream(['file-tests', 'err-generator-append'], errGenerator())).to.be.rejectedWith('foo')
+    expect(await raw.exists(['file-tests', 'err-generator-append'])).to.be.false
+  })
+
+  it('raw.appendStream(path) returns a writable stream and it works', async () => {
+    const path = ['file-tests', randomName('appendStream-writer')]
+
+    for (const chunk of ['foo', 'bar', 'baz', 'frog']) {
+      const writable = raw.appendStream(path)
+      expect(writable).have.a.property('write')
+      await pipeline([Buffer.from(chunk, 'utf-8')], writable)
+      await finished(writable)
+    }
+
+    const readback = await raw.read(path)
+    expect(readback.toString()).to.equal('foobarbazfrog')
   })
 
   after(async function () {
