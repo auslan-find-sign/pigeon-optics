@@ -6,12 +6,9 @@ const cborCodec = require('../codec/cbor')
 // singleton file access API, written as a class to make it more easily understood by vscode intellisense
 // can be instanced with .instance to create a path sandboxed api or to use a different file extension
 class FSObjects {
-  constructor ({ prefix, extension, codec }) {
+  constructor ({ raw, codec }) {
     this.codec = codec
-    this._raw = raw.instance({
-      prefix,
-      extension: (extension === undefined ? `.${this.codec.extensions[0] || 'obj'}` : extension)
-    })
+    this._raw = raw
   }
 
   /**
@@ -22,11 +19,9 @@ class FSObjects {
    * @returns {FSRaw}
    */
   instance ({ prefix, extension, codec }) {
-    return new FSObjects({
-      prefix: [...this._raw.pathPrefix, ...(prefix || [])],
-      extension: extension !== undefined ? extension : this._raw.fileExtension,
-      codec: codec !== undefined ? codec : this.codec
-    })
+    codec = codec !== undefined ? codec : this.codec
+    const raw = this._raw.instance({ prefix, extension: extension || `.${codec.extensions[0]}` })
+    return new FSObjects({ raw, codec })
   }
 
   /**
@@ -270,7 +265,8 @@ class FSObjects {
 }
 
 module.exports = new FSObjects({
-  codec: cborCodec,
-  extension: '.cbor',
-  prefix: []
+  raw: raw.instance({ prefix: [], extension: '.cbor' }),
+  codec: cborCodec
 })
+
+module.exports.FSObjects = FSObjects
