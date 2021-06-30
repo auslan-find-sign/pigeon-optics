@@ -6,9 +6,8 @@ const codec = require('../models/codec')
 const xbytes = require('xbytes')
 const settings = require('../models/settings')
 const finished = require('on-finished')
-const blob = require('../models/file/blob')
+const blob = require('../models/fs/blob')
 const multipart = require('it-multipart')
-const { Readable } = require('stream')
 const ctype = require('content-type')
 const cdisp = require('content-disposition')
 const { resolveContentIDs } = require('./record-structure')
@@ -38,7 +37,7 @@ module.exports = async function (req, res, next) {
 
   if (req.is('multipart/form-data')) {
     const randomID = crypto.randomBytes(32).toString('hex')
-    const storage = blob.instance({ rootPath: ['uploads', randomID] })
+    const storage = blob.instance({ prefix: ['uploads', randomID] })
     const maxBodyLength = xbytes.parseSize(settings.maxRecordSize)
 
     req.on('error', () => {
@@ -54,13 +53,13 @@ module.exports = async function (req, res, next) {
 
       if (filename && name !== 'body') {
         // it's a file
-        const hash = await storage.writeStream(Readable.from(body))
+        const hash = await storage.writeIter(body)
 
-        const read = storage.read.bind(storage, hash)
-        const readStream = storage.readStream.bind(storage, hash)
-        const file = { hash, field: name, filename, storage, read, readStream, type, encoding }
+        const read = () => storage.read(hash)
+        const readIter = () => storage.readIter(hash)
+        const file = { hash, field: name, filename, storage, read, readIter, type, encoding }
         req.files.push(file)
-        req.filesByHash[hash.toString('hex')] = file
+        req.filesByHash[hash] = file
         req.filesByName[filename] = file
         if (['content-id'] in headers) req.filesByName[headers['content-id']] = file
         req.filesByField[name] = (req.filesByField[name] || [])

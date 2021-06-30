@@ -21,16 +21,16 @@ exports.iterateHashURLs = function * iterateHashURLs (input) {
   } else if (typeof input === 'string') {
     const m = input.match(/^hash:\/\/sha256\/([a-f0-9]{64})\?([^#?]*)$/im)
     if (m) {
-      const hash = Buffer.from(m[1], 'hex')
+      const hash = m[1].toLowerCase()
       const params = new URLSearchParams(m[2])
-      yield { algo: 'sha256', hash, params, toString () { return `hash://sha256/${hash.toString('hex')}?${params}` } }
+      yield { algo: 'sha256', hash, params, toString () { return `hash://sha256/${hash}?${params}` } }
     }
   }
 }
 
 /** get an array of all the hash url's in the input
  * @param {*} input
- * @returns {object[]} hashes - { algo: 'sha256', hash <Buffer>, params <URLSearchParams>, toString() }
+ * @returns {object[]} hashes - { algo: 'sha256', hash <string>, params <URLSearchParams>, toString() }
  */
 exports.listHashURLs = function listHashURLs (input) {
   return [...this.iterateHashURLs(input)]

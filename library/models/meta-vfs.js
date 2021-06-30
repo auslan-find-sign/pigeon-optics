@@ -72,11 +72,11 @@ exports.readEntry = (author, name, record) => {
 }
 
 exports.readEntryMeta = (author, name, record) => {
-  return { version: 0, hash: Buffer.from(record) }
+  return { version: Date.now(), hash: `${Date.now()}` }
 }
 
 exports.readEntryByHash = (author, name, hash) => {
-  return exports.readEntry(author, name, hash.toString())
+  return exports.readEntry(author, name, hash)
 }
 
 exports.iterateEntries = async function * () {
