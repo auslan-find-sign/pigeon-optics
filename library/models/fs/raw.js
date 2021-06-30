@@ -2,6 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const settings = require('../settings')
 const tq = require('tiny-function-queue')
+const restack = require('../../utility/restack')
 
 // encodes a string to be a valid filename but not use meaningful characters like . or /
 const encodePathSegment = (string) => encodeURIComponent(string).replace('.', '%2e')
@@ -135,6 +136,8 @@ class FSRaw {
           break
         }
       }
+    } catch (err) {
+      throw restack(err)
     } finally {
       // ensure underlying resources are released
       if (handle) handle.close()
@@ -147,45 +150,49 @@ class FSRaw {
    * @param {AsyncIterable|Iterable|Array} iterable
    */
   async writeIter (path, iterable) {
-    const tmpPath = this.resolveSystemPath(path, `.temporary-${Date.now().toString(36)}-${Math.round(Math.random() * 0xFFFFFFFF).toString(36)}`)
-    const bakPath = this.resolveSystemPath(path, `${this.fileExtension}.backup`)
-    const canonicalPath = this.resolveSystemPath(path, this.fileExtension)
-
-    let handle
     try {
-      handle = await fs.promises.open(tmpPath, 'wx')
-    } catch (err) {
-      if (err.code === 'ENOENT') {
-        // perhaps the parent directory doesn't exist
-        const parentDir = this.resolveSystemPath(path.slice(0, -1), '')
-        try {
-          await fs.promises.stat(parentDir)
-          throw err
-        } catch (err) {
-          if (err.code === 'ENOENT') {
-            await fs.promises.mkdir(parentDir, { recursive: true })
-            handle = await fs.promises.open(tmpPath, 'wx')
+      const tmpPath = this.resolveSystemPath(path, `.temporary-${Date.now().toString(36)}-${Math.round(Math.random() * 0xFFFFFFFF).toString(36)}`)
+      const bakPath = this.resolveSystemPath(path, `${this.fileExtension}.backup`)
+      const canonicalPath = this.resolveSystemPath(path, this.fileExtension)
+
+      let handle
+      try {
+        handle = await fs.promises.open(tmpPath, 'wx')
+      } catch (err) {
+        if (err.code === 'ENOENT') {
+          // perhaps the parent directory doesn't exist
+          const parentDir = this.resolveSystemPath(path.slice(0, -1), '')
+          try {
+            await fs.promises.stat(parentDir)
+            throw err
+          } catch (err) {
+            if (err.code === 'ENOENT') {
+              await fs.promises.mkdir(parentDir, { recursive: true })
+              handle = await fs.promises.open(tmpPath, 'wx')
+            }
           }
+        } else {
+          throw err
         }
-      } else {
+      }
+
+      try {
+        for await (let chunk of iterable) {
+          if (typeof chunk === 'string') chunk = Buffer.from(chunk, 'utf-8')
+          else if (!Buffer.isBuffer(chunk)) throw new Error(`Iterable must yield Buffers or Strings, but received ${chunk.constructor}`)
+          await handle.write(chunk)
+        }
+        await handle.close()
+        await fs.promises.unlink(bakPath).catch(x => {})
+        await fs.promises.rename(canonicalPath, bakPath).catch(x => {})
+        await fs.promises.rename(tmpPath, canonicalPath)
+        await fs.promises.unlink(bakPath).catch(x => {})
+      } catch (err) {
+        await fs.promises.unlink(tmpPath).catch(x => {})
         throw err
       }
-    }
-
-    try {
-      for await (let chunk of iterable) {
-        if (typeof chunk === 'string') chunk = Buffer.from(chunk, 'utf-8')
-        else if (!Buffer.isBuffer(chunk)) throw new Error(`Iterable must yield Buffers or Strings, but received ${chunk.constructor}`)
-        await handle.write(chunk)
-      }
-      await handle.close()
-      await fs.promises.unlink(bakPath).catch(x => {})
-      await fs.promises.rename(canonicalPath, bakPath).catch(x => {})
-      await fs.promises.rename(tmpPath, canonicalPath)
-      await fs.promises.unlink(bakPath).catch(x => {})
     } catch (err) {
-      await fs.promises.unlink(tmpPath).catch(x => {})
-      throw err
+      throw restack(err)
     }
   }
 
@@ -212,17 +219,19 @@ class FSRaw {
    * @async
    */
   async delete (dataPath = []) {
-    // if there's a folder with this path, erase it's contents
-    for await (const { file, folder } of this.iterateFilesAndFolders(dataPath)) {
-      if (file) await this.delete([...dataPath, file])
-      if (folder) await this.delete([...dataPath, folder])
-    }
+    try {
+      const dirPath = this.resolveSystemPath(dataPath, '')
+      const mainPath = this.resolveSystemPath(dataPath, `${this.fileExtension}`)
+      const backupPath = this.resolveSystemPath(dataPath, `${this.fileExtension}.backup`)
 
-    await Promise.all([
-      fs.promises.rmdir(this.resolveSystemPath(dataPath, '')).catch(_ => {}),
-      fs.promises.unlink(this.resolveSystemPath(dataPath, `${this.fileExtension}`)).catch(_ => {}),
-      fs.promises.unlink(this.resolveSystemPath(dataPath, `${this.fileExtension}.backup`)).catch(_ => {})
-    ])
+      if (fs.promises.rm) await fs.promises.rm(dirPath, { recursive: true }).catch(_ => {})
+      else await fs.promises.rmdir(dirPath, { recursive: true, force: true }).catch(_ => {})
+
+      await fs.promises.unlink(mainPath).catch(_ => {})
+      await fs.promises.unlink(backupPath).catch(_ => {})
+    } catch (err) {
+      throw restack(err)
+    }
   }
 
   /**
@@ -262,8 +271,7 @@ class FSRaw {
         await fs.promises.stat(systemPath)
         return true
       } catch (err) {
-        if (err.code === 'ENOENT') return false
-        else throw err
+        return false
       }
     }))
 
@@ -310,10 +318,11 @@ class FSRaw {
       }
     } catch (err) {
       if (err.code !== 'ENOENT') { // if the data is just missing, silently ignore it yielding no entries
-        throw err
+        throw restack(err)
       }
     }
   }
 }
 
 module.exports = new FSRaw([], '.raw')
+module.exports.FSRaw = FSRaw
