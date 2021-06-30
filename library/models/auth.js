@@ -7,7 +7,7 @@ const unicodeFormat = require('unicode/category/Cf')
 const unicodeLineSep = require('unicode/category/Zl')
 const unicodeParaSep = require('unicode/category/Zp')
 
-const file = require('./file/cbor')
+const file = require('./fs/objects')
 const settings = require('./settings')
 const updateEvents = require('../utility/update-events')
 const asyncIterableToArray = require('../utility/async-iterable-to-array')
