@@ -90,12 +90,12 @@ class FSBlob {
     return hash
   }
 
-  /** Remove a raw file or directory
-   * @param {string} hash - string hash of data to remove
+  /** Remove a blob by it's hash, or if undefined, remove the entire storage area
+   * @param {string|undefined} hash - string hash of data to remove
    * @async
    */
   async delete (hash) {
-    await this._raw.delete([hash])
+    await this._raw.delete(hash === undefined ? [] : [hash])
   }
 
   /** Checks a given data path for an existing record, and returns true or false async
