@@ -7,6 +7,7 @@ const delay = require('delay')
 const dataset = require('../library/models/dataset')
 const account = 'system'
 const name = 'test-models-dataset'
+const memo = 'Automated Unit Testing created this dataset to verify internal models are working correctly'
 
 function fakehash (size = 8000) {
   const data = crypto.randomBytes(size)
@@ -18,18 +19,17 @@ function fakehash (size = 8000) {
 }
 
 describe('models/dataset', function () {
-  before(async function () {
-    await dataset.delete(account, name)
-  })
+  beforeEach(async () => await dataset.delete(account, name))
+  afterEach(async () => await dataset.delete(account, name))
 
-  it('dataset.create(account, name) sets up a dataset with a memo', async function () {
-    await dataset.create(account, name, {
-      memo: 'Automated Unit Testing created this dataset to verify internal models are working correctly'
-    })
+  it('dataset.create(account, name) reads back with readMemo(account, name)', async () => {
+    await dataset.create(account, name, { memo })
     await expect(dataset.readMeta(account, name)).eventually.property('memo').does.include('Automated Unit Testing')
   })
 
-  it('dataset.updateMeta() carries errors correctly', async function () {
+  it('dataset.updateMeta() carries errors correctly', async () => {
+    await dataset.create(account, name, { memo })
+
     await expect(dataset.updateMeta(account, name, meta => {
       throw new Error('chaos emerald')
     })).to.be.rejectedWith('chaos')
@@ -40,17 +40,20 @@ describe('models/dataset', function () {
     })).to.be.rejectedWith('chaos')
   })
 
-  it('dataset.write(account, name, recordID, data) works', async function () {
-    await dataset.write(account, name, 'test-1', {
-      hello: 'world'
-    })
+  it('dataset.write(account, name, recordID, data) works', async () => {
+    await dataset.create(account, name, { memo })
+    await dataset.write(account, name, 'test-1', { hello: 'world' })
   })
 
-  it('dataset.read(account, name, recordID) works', async function () {
+  it('dataset.read(account, name, recordID) works', async () => {
+    await dataset.create(account, name, { memo })
+    await dataset.write(account, name, 'test-1', { hello: 'world' })
     await expect(dataset.read(account, name, 'test-1')).to.eventually.deep.equal({ hello: 'world' })
   })
 
-  it('dataset.readMeta(account, name) contains correct versions', async function () {
+  it('dataset.readMeta(account, name) contains correct versions', async () => {
+    await dataset.create(account, name, { memo })
+    await dataset.write(account, name, 'test-1', { hello: 'world' })
     const meta = await dataset.readMeta(account, name)
     expect(meta).to.have.all.keys('memo', 'version', 'updated', 'created', 'records')
     expect(meta.memo).to.equal('Automated Unit Testing created this dataset to verify internal models are working correctly')
@@ -60,7 +63,9 @@ describe('models/dataset', function () {
     expect(meta.records['test-1']).to.have.all.keys('hash', 'version', 'links')
   })
 
-  it('dataset.merge(account, name, records) works as expected', async function () {
+  it('dataset.merge(account, name, records) works as expected', async () => {
+    await dataset.create(account, name, { memo })
+    await dataset.write(account, name, 'test-1', { hello: 'world' })
     await dataset.merge(account, name, {
       'test-2': 1,
       'test-3': Buffer.from('looks good?')
@@ -72,76 +77,101 @@ describe('models/dataset', function () {
     await expect(dataset.read(account, name, 'test-3')).to.eventually.be.a('Uint8Array')
   })
 
-  it('dataset.list(account)', async function () {
+  it('dataset.list(account)', async () => {
+    await dataset.create(account, name, { memo })
+    await dataset.write(account, name, 'test-1', { hello: 'world' })
     await expect(dataset.list(crypto.randomBytes(16).toString('hex'))).is.rejectedWith(createHttpError.NotFound)
     await expect(dataset.list(account)).to.eventually.deep.equal([name])
   })
 
-  it('dataset.list(account, name)', async function () {
+  it('dataset.list(account, name)', async () => {
+    await dataset.create(account, name, { memo })
+    await dataset.write(account, name, 'test-1', { hello: 'world' })
+    await dataset.write(account, name, 'test-2', { hello: 'world' })
+    await dataset.write(account, name, 'test-3', { hello: 'world' })
     const list = await dataset.list(account, name)
     expect(list.map(x => x.id).sort()).to.deep.equal(['test-1', 'test-2', 'test-3'].sort())
-    const test3 = list.find(x => x.id === 'test-3')
-    expect(test3.version).to.equal(2)
-    expect(test3.hash).to.be.a('Uint8Array')
-    expect(test3.hash.length).to.equal(32)
-    const read = await test3.read()
-    expect(read).to.be.a('Uint8Array')
-    expect(read).to.deep.equal(Buffer.from('looks good?'))
+    const test2 = list.find(x => x.id === 'test-2')
+    expect(test2.version).to.equal(2)
+    expect(test2.hash).to.be.a('string')
+    expect(test2.hash.length).to.equal(64)
+    const read = await test2.read()
+    expect(read).to.be.a('object')
+    expect(read).to.deep.equal({ hello: 'world' })
   })
 
   it('dataset.overwrite(account, name, records) works as expected', async function () {
+    await dataset.create(account, name, { memo })
+    await dataset.write(account, name, 'abc', 987)
+    await dataset.write(account, name, 'test-2', { hello: 'world' })
+    await dataset.write(account, name, 'test-3', { hello: 'world' })
     await dataset.overwrite(account, name, { abc: 123, def: 456 })
     const meta = await dataset.readMeta(account, name)
-    expect(meta.version).to.equal(3)
     expect(meta.records).has.all.keys('abc', 'def')
     await expect(dataset.read(account, name, 'abc')).to.eventually.equal(123)
     await expect(dataset.read(account, name, 'def')).to.eventually.equal(456)
   })
 
   it('dataset.write() with same value doesn\'t change version number', async function () {
-    await dataset.write(account, name, 'def', 456)
+    await dataset.create(account, name, { memo })
+    await dataset.write(account, name, 'abc', 'hey')
+    await dataset.write(account, name, 'abc', 'hey')
     const meta = await dataset.readMeta(account, name)
-    expect(meta.version).to.equal(4)
-    expect(meta.records.abc.version).to.equal(3)
-    expect(meta.records.def.version).to.equal(3)
+    expect(meta.version).to.equal(2)
+    expect(meta.records.abc.version).to.equal(1)
   })
 
   it('dataset.exists() works correctly', async function () {
+    await expect(dataset.exists(account, name)).to.eventually.be.false
+    await dataset.create(account, name, { memo })
+    await expect(dataset.exists(account, name)).to.eventually.be.true
+    await expect(dataset.exists(account, name, 'abc')).to.eventually.be.false
+    await dataset.write(account, name, 'abc', 123)
     await expect(dataset.exists(account, name)).to.eventually.be.true
     await expect(dataset.exists(account, name, 'abc')).to.eventually.be.true
-    await expect(dataset.exists(account, name, 'def')).to.eventually.be.true
-    await expect(dataset.exists(account, name, 'xyz')).to.eventually.be.false
-    await expect(dataset.exists(account, name, 'test-1')).to.eventually.be.false
+
     await expect(dataset.exists(account, 'fake-dataset-doesnt-exist')).to.eventually.be.false
     await expect(dataset.exists(account, 'fake-dataset-doesnt-exist', 'non-existing-record')).to.eventually.be.false
   })
 
   it('dataset.delete(account, name, record) works', async function () {
+    await dataset.create(account, name, { memo })
+    await dataset.overwrite(account, name, { abc: 123, def: 456 })
+
     await dataset.delete(account, name, 'def')
     const meta = await dataset.readMeta(account, name)
     expect(meta.records).has.all.keys('abc')
-    expect(meta.version).does.equal(5)
+    expect(meta.version).does.equal(2)
   })
 
   it('dataset.write() throws for missing hashURLs', async function () {
+    await dataset.create(account, name, { memo })
+
     const { hashURL } = fakehash()
     const prom = dataset.write(account, name, 'attach', { file: hashURL })
     await expect(prom).to.be.rejectedWith(createHttpError.BadRequest)
   })
 
   it('dataset.merge() throws for missing hashURLs', async function () {
+    await dataset.create(account, name, { memo })
+
     const { hashURL } = fakehash()
     const prom = dataset.merge(account, name, { r1: { msg: 'test' }, r2: { file: hashURL } })
     await expect(prom).to.be.rejectedWith(createHttpError.BadRequest)
   })
 
   it('dataset.overwrite() throws for missing hashURLs', async function () {
+    await dataset.create(account, name, { memo })
+
     const { hashURL } = fakehash()
     const prom = dataset.overwrite(account, name, { A: { msg: 'test' }, B: { file: hashURL } })
     await expect(prom).to.be.rejectedWith(createHttpError.BadRequest)
   })
 
   it('dataset.delete(account, name) works', async function () {
+    await dataset.create(account, name, { memo })
+    await dataset.overwrite(account, name, { abc: 123, def: 456 })
+
     await expect(dataset.exists(account, name)).to.eventually.be.true
     await expect(dataset.exists(account, name, 'abc')).to.eventually.be.true
     await dataset.delete(account, name)
