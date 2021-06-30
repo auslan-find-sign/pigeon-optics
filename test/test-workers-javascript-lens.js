@@ -47,10 +47,12 @@ describe('workers/interface.LensWorker#map', async function () {
 
   before('startup worker', async function () {
     worker = new LensWorker()
-    await worker.startup({
+    const startup = await worker.startup({
       mapType: 'javascript',
       code: testCode
     })
+
+    expect(startup.errors).to.be.an('array').and.be.empty
   })
 
   it('maps correctly', async function () {
@@ -114,7 +116,11 @@ describe('workers/environment.js', () => {
     const path = codec.path.encode('datasets', 'test', 'test', cmdPath)
     const result = await worker.map({ path, data: args })
     for (const { type, args } of result.logs) console[type](...args)
-    if (result.errors.length > 0) throw new Error(JSON.stringify(result.errors[0]))
+    if (result.errors.length > 0) {
+      const err = new Error(JSON.stringify(result.errors[0].message))
+      err.stack = `${result.errors[0].stack.join('\n')}\n --- rpc boundary ---\n${err.stack}`
+      throw err
+    }
     const resultOutput = result.outputs.find(x => x.id === 'result')
     if (resultOutput) return resultOutput.data
   }

@@ -17,7 +17,6 @@ let timeout
 let outputs
 let logs
 
-//
 /**
  * take an error from a map or reduce function compile or run, and transform it to be cleaned up
  * @param {Error} error
@@ -108,7 +107,7 @@ exports.startup = async function (config) {
       filename: 'map.js',
       result: { reference: true }
     }
-    mapFnReference = (await context.evalClosure(snippet, [], opts)).result
+    mapFnReference = await context.evalClosure(snippet, [], opts)
   } catch (err) {
     returnVal.errors.push(transformVMError(err, 'map.js', code))
   }
