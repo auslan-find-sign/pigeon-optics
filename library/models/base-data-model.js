@@ -14,7 +14,7 @@ const recordStructure = require('../utility/record-structure')
 const createMissingAttachmentsError = require('../utility/missing-attachments-error')
 const attachments = require('./attachments')
 const createHttpError = require('http-errors')
-const dataArc = require('dataset-archive/index.cjs')
+const { DatasetArchive } = require('dataset-archive/dataset-archive.cjs')
 const ScratchPad = require('file-scratch-pad')
 
 /* read meta info about dataset */
@@ -24,14 +24,11 @@ exports.readMeta = async function (author, name) {
 
 /* update meta about dataset */
 exports.updateMeta = async function (author, name, block) {
-  const retainObjectList = []
   let notifyVersion = 0
   await this.getFileStore(author, name).update(['meta'], async (config) => {
     if (!config) throw new Error('Dataset doesn\'t exist')
     config.version += 1
     config.updated = Date.now()
-    // collect prev version's objects, just to avoid some minor clobbering
-    Object.values(config.records).map(({ hash }) => retainObjectList.push(hash))
 
     const result = await block(config)
     assert(result && typeof result === 'object', 'block callback function must return an object')
@@ -41,9 +38,8 @@ exports.updateMeta = async function (author, name, block) {
       if (!('version' in meta)) meta.version = config.version
       assert(typeof meta.version === 'number', 'record object value must have a numeric version number')
       assert(meta.version > 0, 'record object must contain version number above 0')
-      assert(Buffer.isBuffer(meta.hash), 'record object\'s hash property must be a Buffer')
-      assert.strictEqual(meta.hash.length, 32, 'record object\'s hash property must be 32 bytes long')
-      retainObjectList.push(meta.hash)
+      assert(typeof meta.hash === 'string', 'record object\'s hash property must be a hex string')
+      assert.strictEqual(meta.hash.length, 64, 'record object\'s hash property must be 64 characters long')
     }
 
     // sort records object
@@ -60,19 +56,6 @@ exports.updateMeta = async function (author, name, block) {
 
   // notify downstream lenses of the change
   process.nextTick(() => updateEvents.pathUpdated(codec.path.encode(this.source, author, name), notifyVersion))
-}
-
-/**
- * read a record by it's recordID
- * @param {string} author
- * @param {string} name
- * @param {string} recordID
- * @returns {any} record value
- * @async
- */
-exports.read = async function (author, name, recordID) {
-  const data = this.getDataArchive(author, name)
-  return await data.get(recordID)
 }
 
 /**
@@ -105,7 +88,7 @@ exports.read = async function (author, name, recordID) {
  */
 exports.iterate = async function * (author, name = undefined, { fastRead = false } = {}) {
   if (name === undefined) {
-    const file = require('./file/cbor')
+    const file = require('./fs/objects')
     const path = this.path(author)
     if (await file.exists(path)) {
       yield * file.iterateFolders(path)
@@ -138,6 +121,19 @@ exports.iterate = async function * (author, name = undefined, { fastRead = false
  */
 exports.list = async function (author, name = undefined) {
   return await itToArray(this.iterate(author, name))
+}
+
+/**
+ * read a record by it's recordID
+ * @param {string} author
+ * @param {string} name
+ * @param {string} recordID
+ * @returns {any} record value
+ * @async
+ */
+exports.read = async function (author, name, recordID) {
+  const data = this.getDataArchive(author, name)
+  return await data.get(recordID)
 }
 
 /**
@@ -191,9 +187,9 @@ exports.writeEntries = async function (author, name, entries, { overwrite = fals
           // apply source specific validation rules
           await this.validateRecord(entry[0], entry[1])
 
-          const hash = codec.objectHash(entry[1])
+          const hash = codec.objectHash(entry[1]).toString('hex')
           // update meta file's records if the value actually changed or is newly created
-          if (meta.records[entry[0]] === undefined || !hash.equals(meta.records[entry[0]].hash)) {
+          if (meta.records[entry[0]] === undefined || hash !== meta.records[entry[0]].hash) {
             meta.records[entry[0]] = { hash, links: links.map(x => x.toString()) }
           }
         }
@@ -284,6 +280,10 @@ exports.create = async function (author, name, config = {}) {
   await this.validateConfig(author, name, config)
   await file.write(['meta'], config)
 
+  // create data archive
+  const data = this.getDataArchive(author, name)
+  await data.write([])
+
   process.nextTick(() => {
     updateEvents.pathUpdated(codec.path.encode('meta', 'system', 'system', this.source))
     updateEvents.pathUpdated(codec.path.encode(this.source, author, name), config.version)
@@ -294,22 +294,32 @@ exports.create = async function (author, name, config = {}) {
  * Get a DatasetArchive instance which can read and manipulate the records collection of this dataset
  * @param {string} author - author/owner name
  * @param {string} name - collection name
- * @returns {dataArc.DatasetArchive}
+ * @returns {DatasetArchive}
  */
-exports.getDataArchive = function (author, name) {
-  const raw = require('./file/raw')
-  const path = raw.fullPath(this.path(author, name, 'data'), '.archive.br')
-  return dataArc.fsOpen(path, { codec: codec.cbor })
+exports.getDataArchive = function (author, name, archiveName = 'data') {
+  const fileStore = this.getFileStore(author, name)._raw.instance({ extension: '.archive.br' })
+
+  return new DatasetArchive({
+    io: {
+      async * read () {
+        yield * fileStore.readIter([archiveName])
+      },
+      async write (iterable) {
+        await fileStore.writeIter([archiveName], iterable)
+      }
+    },
+    codec: codec.cbor
+  })
 }
 
 /**
  * Get a cbor encoded file store for storing things like metadata files
  * @param {string} author - author/owner name
  * @param {string} name - collection name
- * @returns {import('./file/cbor')}
+ * @returns {import('./fs/objects').FSObjects}
  */
-exports.getFileStore = function (author, name) {
-  return require('./file/cbor').instance({
-    rootPath: this.path(author, name)
+exports.getFileStore = function (...args) {
+  return require('./fs/objects').instance({
+    prefix: this.path(...args)
   })
 }
