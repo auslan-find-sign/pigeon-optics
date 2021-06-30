@@ -58,7 +58,7 @@ describe('models/attachments', function () {
   })
 
   it('attachments.has(hash) works', async function () {
-    await expect(attachments.has(crypto.randomBytes(32))).to.eventually.be.false
+    await expect(attachments.has(crypto.randomBytes(32).toString('hex'))).to.eventually.be.false
     const stream = streams.Readable.from(pseudorandom('has test', 100))
     const write = await attachments.writeStream(stream, { linkers: ['/datasets/system:attachments-test/records/hasTest'] })
     await expect(attachments.has(write.hash)).to.eventually.be.true
