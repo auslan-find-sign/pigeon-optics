@@ -8,5 +8,6 @@
  */
 
 exports.raw = require('./raw')
+exports.compressed = require('./compressed')
 exports.objects = require('./objects')
 exports.blob = require('./blob')

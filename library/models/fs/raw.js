@@ -24,7 +24,7 @@ class FSRaw {
    * @returns {FSRaw}
    */
   instance ({ prefix, extension }) {
-    return new FSRaw([...this.pathPrefix, ...(prefix || [])], extension || this.fileExtension)
+    return new this.constructor([...this.pathPrefix, ...(prefix || [])], extension || this.fileExtension)
   }
 
   /**
