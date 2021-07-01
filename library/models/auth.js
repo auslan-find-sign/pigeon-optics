@@ -144,7 +144,7 @@ exports.register = async function (author, pass, auth = 'regular') {
 
   await file.write(path, authorData)
 
-  process.nextTick(() => updateEvents.pathUpdated('/meta/system:system/authors'))
+  process.nextTick(() => updateEvents.pathUpdated('/meta/system:system/records/authors'))
 
   return { author, auth }
 }
@@ -185,7 +185,7 @@ exports.getProfile = async function (author) {
  */
 exports.delete = async function (author) {
   await file.delete(this.authorFolder(author))
-  process.nextTick(() => updateEvents.pathUpdated('/meta/system:system/authors'))
+  process.nextTick(() => updateEvents.pathUpdated('/meta/system:system/records/authors'))
 }
 
 /** check if author account exists
