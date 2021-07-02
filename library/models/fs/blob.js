@@ -1,4 +1,4 @@
-const raw = require('./raw')
+const compressed = require('./compressed')
 const crypto = require('crypto')
 
 // singleton file access API, written as a class to make it more easily understood by vscode intellisense
@@ -129,6 +129,6 @@ class FSBlob {
 }
 
 module.exports = new FSBlob({
-  raw: raw.instance({ prefix: [], extension: '.blob' }),
+  raw: compressed.instance({ prefix: [], extension: '.blob.br' }),
   createHash: () => crypto.createHash('sha256')
 })

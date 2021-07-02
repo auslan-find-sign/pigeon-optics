@@ -1,4 +1,4 @@
-const raw = require('./raw')
+const compressed = require('./compressed')
 const lengthPrefix = require('it-length-prefixed')
 const tq = require('tiny-function-queue')
 const cborCodec = require('../codec/cbor')
@@ -20,7 +20,7 @@ class FSObjects {
    */
   instance ({ prefix, extension, codec }) {
     codec = codec !== undefined ? codec : this.codec
-    const raw = this._raw.instance({ prefix, extension: extension || `.${codec.extensions[0]}` })
+    const raw = this._raw.instance({ prefix, extension: extension || `.${codec.extensions[0]}${this._raw.constructor.extension}` })
     return new FSObjects({ raw, codec })
   }
 
@@ -265,7 +265,7 @@ class FSObjects {
 }
 
 module.exports = new FSObjects({
-  raw: raw.instance({ prefix: [], extension: '.cbor' }),
+  raw: compressed.instance({ prefix: [], extension: '.cbor.br' }),
   codec: cborCodec
 })
 

@@ -62,7 +62,7 @@ exports.encode = function encode (source, author, name, recordID = undefined) {
     return this.encode(source.source, source.author, source.name, source.recordID)
   }
 
-  if (!['lenses', 'datasets', 'meta'].includes(source)) throw new Error('Unknown source')
+  if (!['lenses', 'datasets', 'meta'].includes(source)) throw new Error(`Unknown source ${source}`)
 
   if (typeof recordID === 'string') {
     return uri`/${source}/${author}:${name}/records/${recordID}` // recordCompile({ source, author, name, recordID })

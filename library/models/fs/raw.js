@@ -324,5 +324,7 @@ class FSRaw {
   }
 }
 
+FSRaw.extension = ''
+
 module.exports = new FSRaw([], '.raw')
 module.exports.FSRaw = FSRaw

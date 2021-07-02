@@ -11,22 +11,11 @@ const toTransform = (transform) => async function * (source) {
   // In a transform the sink and source are connected, an error in the sink
   // will be thrown in the source also. Catch the sink error to avoid unhandled
   // rejections and yield from the source.
+  let sinkError
+  duplex.sink(source).catch(err => { sinkError = err })
 
-  let error
-  const sinkPromise = duplex.sink(source).catch(err => { error = err })
-
-  for await (const val of duplex.source) {
-    if (error) {
-      if (transform.destroy) transform.destroy()
-      if (duplex.source.return) duplex.source.return()
-      throw error
-    } else {
-      yield val
-    }
-  }
-  if (error) throw error
-  await sinkPromise
-  if (error) throw error
+  yield * duplex.source
+  if (sinkError) throw sinkError
 }
 
 const BrotliOptions = {
@@ -52,6 +41,8 @@ class FSCompressedRaw extends FSRaw {
     )
   }
 }
+
+FSCompressedRaw.extension = '.br'
 
 module.exports = new FSCompressedRaw([], '.raw.br')
 module.exports.FSCompressedRaw = FSCompressedRaw
