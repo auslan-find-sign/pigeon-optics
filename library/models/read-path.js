@@ -3,7 +3,7 @@
  */
 const codec = require('./codec')
 
-async function * readPathConfigurable (mode, path) {
+async function * readPathConfigurable (path, fastRead = false) {
   if (typeof path === 'string') {
     const params = codec.path.decode(path)
     const source = readPath.getSource(params.source)
@@ -11,23 +11,17 @@ async function * readPathConfigurable (mode, path) {
     if (!source) throw new Error(`Unknown source "/${params.source}/..."`)
 
     if (await source.exists(params.author, params.name)) {
-      const fastRead = mode === 'readPath' && params.recordID !== undefined
       const iterator = source.iterate(params.author, params.name, { fastRead })
       for await (const meta of iterator) {
         if (params.recordID === undefined || params.recordID === meta.id) {
           const path = codec.path.encode(params.source, params.author, params.name, meta.id)
-          if (mode === 'readPath') {
-            const data = await meta.read()
-            yield { path, ...meta, read: () => data, data }
-          } else if (mode === 'readPath.meta') {
-            yield { path, ...meta }
-          }
+          yield { path, ...meta }
         }
       }
     }
   } else if (path && (path[Symbol.iterator] || path[Symbol.asyncIterator])) {
     for await (const entry of path) {
-      yield * readPathConfigurable(mode, entry)
+      yield * readPathConfigurable(entry, fastRead)
     }
   } else {
     throw new Error('path type must be an iterable list (like an Array) of strings or string')
@@ -47,7 +41,11 @@ async function * readPathConfigurable (mode, path) {
  * @yields {ReadPathOutput}
  */
 async function * readPath (path) {
-  yield * readPathConfigurable('readPath', path)
+  for await (const entry of readPathConfigurable(path, true)) {
+    const data = await entry.read()
+    const read = () => Promise.resolve(data)
+    yield { ...entry, read, data }
+  }
 }
 
 /** ReadPathOutput is what readPath yields
@@ -60,10 +58,12 @@ async function * readPath (path) {
 
 /** reads a data path, which could be one specific record, or a whole dataset/viewport
  * @param {string|Array} path - can be a path, or array of paths to read sequentially
+ * @param {object} [options]
+ * @param {boolean} [options.fastRead] - set to true to have accelerated reads, if you plan to read a lot of entries
  * @yields {ReadPathMetaOutput}
  */
-readPath.meta = async function * readPathMeta (path) {
-  yield * readPathConfigurable('readPath.meta', path)
+readPath.meta = async function * readPathMeta (path, { fastRead = false } = {}) {
+  yield * readPathConfigurable(path, fastRead)
 }
 
 /**

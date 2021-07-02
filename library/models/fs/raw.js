@@ -317,9 +317,7 @@ class FSRaw {
         }
       }
     } catch (err) {
-      if (err.code !== 'ENOENT') { // if the data is just missing, silently ignore it yielding no entries
-        throw restack(err)
-      }
+      throw restack(err)
     }
   }
 }

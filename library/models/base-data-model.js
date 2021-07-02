@@ -90,10 +90,13 @@ exports.iterate = async function * (author, name = undefined, { fastRead = false
   if (name === undefined) {
     const file = require('./fs/objects')
     const path = this.path(author)
-    if (await file.exists(path)) {
-      yield * file.iterateFolders(path)
-    } else {
-      throw createHttpError.NotFound('Author account name doesn\'t exist')
+    try {
+      for await (const folder of file.iterateFolders(path)) {
+        yield folder
+      }
+    } catch (err) {
+      if (err.code === 'ENOENT') throw createHttpError.NotFound('Author account name doesn\'t exist')
+      else throw err
     }
   } else {
     const meta = await this.readMeta(author, name)
