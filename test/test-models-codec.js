@@ -27,12 +27,12 @@ const tests = [
   [null, null, undefined, null],
   [null, true, false, Infinity, -Infinity, NaN], // test extended types
   // undefined,
-  // null,
+  null,
   Buffer.from('hello world'),
   { a: 1, b: 2 },
   { 1: false, 2: true },
   new Set([1, 2, 3, 'a', 'b', 'c']),
-  // new Map([['a', 1], [2, '3'], [true, 9]]),
+  new Map([['a', 1], [2, '3'], [true, 9]]),
   {
     foo: [1, 2, 3, null, 5],
     bar: {
@@ -136,13 +136,12 @@ describe('models/codec formats common interface', function () {
     }
   }
 
-  const streamTests = tests.filter(x => x !== null)
   for (const [label, format] of getCodecsByFeatures('encoder', 'decoder')) {
     it(`stream ${label} encoder() > decoder() roundtrip`, async function () {
-      const encoderStream = Readable.from(streamTests).pipe(format.encoder())
-      const decoderStream = encoderStream.pipe(format.decoder())
+      const encoderStream = Readable.from(tests.map(value => ({ value }))).pipe(format.encoder({ wrap: true }))
+      const decoderStream = encoderStream.pipe(format.decoder({ wrap: true }))
       const output = await asyncIterableToArray(decoderStream)
-      expect(output).to.deep.equal(streamTests)
+      expect(output).to.deep.equal(tests.map(value => ({ value })))
     })
 
     if (label === 'json') {
@@ -168,10 +167,10 @@ describe('models/codec formats common interface', function () {
     }
   }
 
-  // test iterableToStream into decoder
+  // test encodeIterable into decoder
   for (const [label, format] of getCodecsByFeatures('encodeIterable', 'decoder')) {
     it(`iterator/stream ${label} encodeIterable > decoder roundtrip`, async function () {
-      const stream = await format.encodeIterable(streamTests)
+      const stream = await format.encodeIterable(tests)
       expect(stream).to.have.property('pipe')
       const decoded = await asyncIterableToArray(stream.pipe(format.decoder({ wrap: true })))
       expect(decoded).to.deep.equal(tests.map(value => ({ value })))
@@ -180,7 +179,7 @@ describe('models/codec formats common interface', function () {
 
   for (const [label, format] of getCodecsByFeatures('encoder', 'decodeStream')) {
     it(`iterator/stream ${label} encoder > decodeStream roundtrip`, async function () {
-      const encoderStream = Readable.from(streamTests.map(value => ({ value }))).pipe(format.encoder({ wrap: true }))
+      const encoderStream = Readable.from(tests.map(value => ({ value }))).pipe(format.encoder({ wrap: true }))
       expect(encoderStream).to.have.property('pipe')
       const decoded = await asyncIterableToArray(await format.decodeStream(encoderStream))
       expect(decoded).to.deep.equal(tests)

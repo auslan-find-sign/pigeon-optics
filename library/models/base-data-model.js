@@ -67,7 +67,7 @@ exports.updateMeta = async function (author, name, block) {
 /**
  * @typedef {object} DataModelIterateEntry
  * @property {string} id - record id
- * @property {Buffer} hash - hash of entry's data
+ * @property {string} hash - hash of entry's data
  * @property {number} version - version of entry's data
  * @property {string[]} links - links to attachments contained in this document
  * @property {DataModelIterateEntryRead} read - function which reads the contents of this entry

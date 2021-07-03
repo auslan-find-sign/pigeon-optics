@@ -32,7 +32,7 @@ async function * readPathConfigurable (path, fastRead = false) {
  * @typedef {Object} ReadPathOutput
  * @property {string} path - data path
  * @property {number} version - version number the record is sourced from
- * @property {Buffer} hash - the record's hash
+ * @property {string} hash - the record's hash
  * @property {*} data - the record's value
  */
 
@@ -52,7 +52,7 @@ async function * readPath (path) {
  * @typedef {Object} ReadPathMetaOutput
  * @property {string} path - data path
  * @property {number} version - version number the record is sourced from
- * @property {Buffer} hash - the record's hash
+ * @property {string} hash - the record's hash
  * @property {async function} read - async read and return the value/data of this path
  */
 
